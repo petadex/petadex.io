@@ -1,0 +1,347 @@
+name: Generate API Documentation
+
+on:
+  # Trigger when route files change
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/src/routes/**'
+      - 'backend/src/app.js'
+  # Manual trigger
+  workflow_dispatch:
+  # PR checks
+  pull_request:
+    paths:
+      - 'backend/src/routes/**'
+      - 'backend/src/app.js'
+
+jobs:
+  generate-api-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for better commit messages
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Generate API documentation
+        working-directory: ./backend
+        run: |
+          # Create docs directory if it doesn't exist
+          mkdir -p docs
+
+          # Run the documentation generator
+          node << 'EOF'
+          import fs from 'fs';
+          import path from 'path';
+          import { fileURLToPath } from 'url';
+
+          const __filename = fileURLToPath(import.meta.url);
+          const __dirname = path.dirname(__filename);
+
+          const ROUTES_DIR = './src/routes';
+          const OUTPUT_FILE = './docs/API_DATABASE_DEPENDENCIES.md';
+
+          /**
+           * Extract route and SQL query information from route files
+           */
+          function analyzeRouteFile(filePath) {
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const fileName = path.basename(filePath, '.js');
+            const routes = [];
+
+            // Match router.METHOD patterns
+            const routeRegex = /router\.(get|post|put|delete|patch)\(['"]([^'"]+)['"],\s*async\s*\(req,\s*res/g;
+            let match;
+
+            while ((match = routeRegex.exec(content)) !== null) {
+              const method = match[1].toUpperCase();
+              const routePath = match[2];
+              const startPos = match.index;
+
+              // Extract route handler content
+              const nextRoutePos = content.indexOf('router.', startPos + 1);
+              const exportPos = content.indexOf('export default', startPos);
+              const endPos = nextRoutePos !== -1 ?
+                (exportPos !== -1 ? Math.min(nextRoutePos, exportPos) : nextRoutePos) :
+                (exportPos !== -1 ? exportPos : content.length);
+
+              const routeContent = content.slice(startPos, endPos);
+
+              // Extract SQL queries
+              const sqlRegex = /pool\.query\(\s*['"`]([\s\S]*?)['"`]/g;
+              const queries = [];
+              let sqlMatch;
+
+              while ((sqlMatch = sqlRegex.exec(routeContent)) !== null) {
+                queries.push(sqlMatch[1].trim());
+              }
+
+              // Extract path parameters
+              const paramRegex = /:(\w+)/g;
+              const params = [];
+              let paramMatch;
+              while ((paramMatch = paramRegex.exec(routePath)) !== null) {
+                params.push(paramMatch[1]);
+              }
+
+              routes.push({ method, path: routePath, params, queries });
+            }
+
+            return { fileName, routes };
+          }
+
+          /**
+           * Extract database dependencies from SQL
+           */
+          function extractDependencies(queries) {
+            const tables = new Set();
+            const columns = new Map();
+
+            queries.forEach(query => {
+              // Extract tables from FROM and JOIN
+              const fromRegex = /FROM\s+(\w+)/gi;
+              const joinRegex = /JOIN\s+(\w+)/gi;
+
+              let match;
+              while ((match = fromRegex.exec(query)) !== null) {
+                tables.add(match[1].toLowerCase());
+              }
+              while ((match = joinRegex.exec(query)) !== null) {
+                tables.add(match[1].toLowerCase());
+              }
+
+              // Extract column references
+              const columnRegex = /(\w+)\.(\w+)/g;
+              while ((match = columnRegex.exec(query)) !== null) {
+                const table = match[1].toLowerCase();
+                const column = match[2].toLowerCase();
+
+                if (!columns.has(table)) {
+                  columns.set(table, new Set());
+                }
+                columns.get(table).add(column);
+              }
+
+              // Check for SELECT *
+              if (query.toUpperCase().includes('SELECT *') || query.toUpperCase().includes('SELECT\n*')) {
+                tables.forEach(table => {
+                  if (!columns.has(table)) {
+                    columns.set(table, new Set(['*']));
+                  }
+                });
+              }
+            });
+
+            return {
+              tables: Array.from(tables),
+              columns: Object.fromEntries(
+                Array.from(columns.entries()).map(([k, v]) => [k, Array.from(v)])
+              )
+            };
+          }
+
+          /**
+           * Assess breaking change risk
+           */
+          function assessRisk(dependencies) {
+            let maxRisk = 'LOW';
+            const reasons = [];
+
+            // Check for SELECT *
+            Object.entries(dependencies.columns).forEach(([table, cols]) => {
+              if (cols.includes('*')) {
+                maxRisk = 'CRITICAL';
+                reasons.push(`Uses SELECT * on ${table}`);
+              }
+            });
+
+            // Check for PostGIS
+            Object.entries(dependencies.columns).forEach(([table, cols]) => {
+              if (cols.some(c => c.includes('lat_lon') || c.includes('st_'))) {
+                if (maxRisk !== 'CRITICAL') maxRisk = 'HIGH';
+                reasons.push('Uses PostGIS geometry functions');
+              }
+            });
+
+            // Core tables
+            const coreTables = ['fastaa', 'gene_metadata', 'with_sra_metadata',
+                                'with_sra_and_biosample_loc_metadata', 'pdb_accessions'];
+            const usesCore = dependencies.tables.some(t => coreTables.includes(t));
+            if (usesCore && maxRisk === 'LOW') {
+              maxRisk = 'MEDIUM';
+              reasons.push('Uses core tables');
+            }
+
+            return { level: maxRisk, reasons };
+          }
+
+          /**
+           * Generate markdown documentation
+           */
+          function generateMarkdown(routeFiles) {
+            const now = new Date().toISOString().split('T')[0];
+
+            let md = `# PETadex API - Database Dependencies
+
+          **Auto-generated**: ${now}
+          **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
+
+          ---
+
+          ## Quick Reference
+
+          | Endpoint | Method | Tables | Risk |
+          |----------|--------|--------|------|
+          `;
+
+            // Quick reference table
+            routeFiles.forEach(({ fileName, routes }) => {
+              const basePath = `/api/${fileName.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')}`;
+              routes.forEach(route => {
+                const deps = extractDependencies(route.queries);
+                const risk = assessRisk(deps);
+                md += `| \`${basePath}${route.path}\` | ${route.method} | ${deps.tables.join(', ') || 'None'} | ${risk.level} |\n`;
+              });
+            });
+
+            md += `\n---\n\n`;
+
+            // Detailed sections
+            routeFiles.forEach(({ fileName, routes }) => {
+              const basePath = `/api/${fileName.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')}`;
+
+              md += `## ${fileName.charAt(0).toUpperCase() + fileName.slice(1)} Routes\n\n`;
+              md += `Base: \`${basePath}\`\n\n`;
+
+              routes.forEach(route => {
+                md += `### ${route.method} \`${basePath}${route.path}\`\n\n`;
+
+                if (route.params.length > 0) {
+                  md += `**Parameters**: ${route.params.map(p => `\`${p}\``).join(', ')}\n\n`;
+                }
+
+                const deps = extractDependencies(route.queries);
+                const risk = assessRisk(deps);
+
+                md += `**Tables**: ${deps.tables.join(', ') || 'None'}\n\n`;
+
+                if (Object.keys(deps.columns).length > 0) {
+                  md += `**Columns**:\n`;
+                  Object.entries(deps.columns).forEach(([table, cols]) => {
+                    md += `- \`${table}\`: ${cols.join(', ')}\n`;
+                  });
+                  md += `\n`;
+                }
+
+                md += `**Risk**: ${risk.level}`;
+                if (risk.reasons.length > 0) {
+                  md += ` (${risk.reasons.join(', ')})`;
+                }
+                md += `\n\n`;
+
+                if (route.queries.length > 0) {
+                  md += `<details>\n<summary>SQL Query</summary>\n\n\`\`\`sql\n${route.queries[0]}\n\`\`\`\n</details>\n\n`;
+                }
+
+                md += `---\n\n`;
+              });
+            });
+
+            // Summary
+            md += `## Database Change Impact Guide\n\n`;
+            md += `### 🔴 CRITICAL Risk\n`;
+            md += `- Using \`SELECT *\` - any column change affects API\n`;
+            md += `- Renaming core tables\n`;
+            md += `- Changing PostGIS geometry columns\n\n`;
+
+            md += `### 🟡 HIGH/MEDIUM Risk\n`;
+            md += `- Renaming frequently-used columns\n`;
+            md += `- Changing JOIN relationships\n`;
+            md += `- Modifying core table schemas\n\n`;
+
+            md += `### 🟢 LOW Risk\n`;
+            md += `- Adding new columns\n`;
+            md += `- Adding indexes\n`;
+            md += `- Modifying metadata fields\n\n`;
+
+            md += `---\n\n`;
+            md += `*Generated by GitHub Actions on every route change*\n`;
+
+            return md;
+          }
+
+          // Main
+          console.log('🔍 Analyzing route files...');
+          const files = fs.readdirSync(ROUTES_DIR)
+            .filter(f => f.endsWith('.js'))
+            .map(f => path.join(ROUTES_DIR, f));
+
+          console.log(`Found ${files.length} route files`);
+
+          const routeFiles = files.map(analyzeRouteFile);
+          const markdown = generateMarkdown(routeFiles);
+
+          fs.writeFileSync(OUTPUT_FILE, markdown, 'utf-8');
+
+          const totalRoutes = routeFiles.reduce((sum, f) => sum + f.routes.length, 0);
+          console.log(`✅ Documented ${totalRoutes} endpoints`);
+          console.log(`📄 Output: ${OUTPUT_FILE}`);
+          EOF
+
+      - name: Check if documentation changed
+        id: check_changes
+        run: |
+          git diff --exit-code backend/docs/API_DATABASE_DEPENDENCIES.md || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push if changed
+        if: steps.check_changes.outputs.changed == 'true' && github.event_name == 'push'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add backend/docs/API_DATABASE_DEPENDENCIES.md
+          git commit -m "docs: auto-update API database dependencies [skip ci]"
+          git push
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-documentation
+          path: backend/docs/API_DATABASE_DEPENDENCIES.md
+          retention-days: 30
+
+      - name: Comment on PR (if PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const docPath = 'backend/docs/API_DATABASE_DEPENDENCIES.md';
+
+            if (fs.existsSync(docPath)) {
+              const content = fs.readFileSync(docPath, 'utf8');
+
+              // Extract just the quick reference table
+              const tableMatch = content.match(/## Quick Reference\n\n([\s\S]*?)\n---/);
+              const table = tableMatch ? tableMatch[1] : 'No changes detected';
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 📚 API Documentation Updated\n\nRoute changes detected. Here's the quick reference:\n\n${table}\n\n[View full documentation](../blob/${context.sha}/backend/docs/API_DATABASE_DEPENDENCIES.md)`
+              });
+            }

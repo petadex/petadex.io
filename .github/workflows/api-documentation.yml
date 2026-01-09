@@ -154,40 +154,6 @@ jobs:
             };
           }
 
-          /**
-           * Assess breaking change risk
-           */
-          function assessRisk(dependencies) {
-            let maxRisk = 'LOW';
-            const reasons = [];
-
-            // Check for SELECT *
-            Object.entries(dependencies.columns).forEach(([table, cols]) => {
-              if (cols.includes('*')) {
-                maxRisk = 'CRITICAL';
-                reasons.push(`Uses SELECT * on ${table}`);
-              }
-            });
-
-            // Check for PostGIS
-            Object.entries(dependencies.columns).forEach(([table, cols]) => {
-              if (cols.some(c => c.includes('lat_lon') || c.includes('st_'))) {
-                if (maxRisk !== 'CRITICAL') maxRisk = 'HIGH';
-                reasons.push('Uses PostGIS geometry functions');
-              }
-            });
-
-            // Core tables
-            const coreTables = ['fastaa', 'gene_metadata', 'with_sra_metadata',
-                                'with_sra_and_biosample_loc_metadata', 'pdb_accessions'];
-            const usesCore = dependencies.tables.some(t => coreTables.includes(t));
-            if (usesCore && maxRisk === 'LOW') {
-              maxRisk = 'MEDIUM';
-              reasons.push('Uses core tables');
-            }
-
-            return { level: maxRisk, reasons };
-          }
 
           /**
            * Generate markdown documentation

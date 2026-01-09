@@ -42,14 +42,30 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
+      - name: Set database credentials
+        id: db_creds
+        run: |
+          # Use hardcoded read-only credentials by default
+          DB_HOST="${{ github.event.inputs.db_host }}"
+          DB_PORT="${{ github.event.inputs.db_port }}"
+          DB_NAME="${{ github.event.inputs.db_name }}"
+          DB_USER="${{ github.event.inputs.db_user }}"
+          DB_PASS="${{ github.event.inputs.db_password }}"
+
+          # Use secrets if available, otherwise use hardcoded defaults
+          echo "DB_HOST=${DB_HOST:-${{ secrets.DB_HOST || 'petadex.ccz9y6yshbls.us-east-1.rds.amazonaws.com' }}}" >> $GITHUB_OUTPUT
+          echo "DB_PORT=${DB_PORT:-${{ secrets.DB_PORT || '5432' }}}" >> $GITHUB_OUTPUT
+          echo "DB_NAME=${DB_NAME:-${{ secrets.DB_NAME || 'postgres' }}}" >> $GITHUB_OUTPUT
+          echo "DB_USER=${DB_USER:-${{ secrets.DB_USER || 'readonly_user' }}}" >> $GITHUB_OUTPUT
+          echo "DB_PASS=${DB_PASS:-${{ secrets.DB_PASSWORD || 'petadex' }}}" >> $GITHUB_OUTPUT
+
       - name: Generate database documentation
         env:
-          # Use manual inputs if provided, otherwise use read-only credentials from secrets
-          DB_HOST: ${{ github.event.inputs.db_host || secrets.DB_HOST || 'petadex.ccz9y6yshbls.us-east-1.rds.amazonaws.com' }}
-          DB_PORT: ${{ github.event.inputs.db_port || secrets.DB_PORT || '5432' }}
-          DB_NAME: ${{ github.event.inputs.db_name || secrets.DB_NAME || 'postgres' }}
-          DB_USER: ${{ github.event.inputs.db_user || secrets.DB_USER || 'readonly_user' }}
-          DB_PASS: ${{ github.event.inputs.db_password || secrets.DB_PASSWORD || 'petadex' }}
+          DB_HOST: ${{ steps.db_creds.outputs.DB_HOST }}
+          DB_PORT: ${{ steps.db_creds.outputs.DB_PORT }}
+          DB_NAME: ${{ steps.db_creds.outputs.DB_NAME }}
+          DB_USER: ${{ steps.db_creds.outputs.DB_USER }}
+          DB_PASS: ${{ steps.db_creds.outputs.DB_PASS }}
         run: |
           mkdir -p docs/database
           echo "# Petadex Database Schema" > docs/database/generated-schema.md

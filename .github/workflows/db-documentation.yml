@@ -1,27 +1,32 @@
 name: Generate Database Documentation
 on:
+  # Schedule to run automatically
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC (Saturday 9 PM EST / 6 PM PST)
+
+  # Manual trigger with DB credentials
   workflow_dispatch:
     inputs:
       db_host:
         description: 'Database Host'
-        required: true
+        required: false
         type: string
       db_port:
         description: 'Database Port'
-        required: true
+        required: false
         type: string
         default: '5432'
       db_name:
         description: 'Database Name'
-        required: true
+        required: false
         type: string
       db_user:
         description: 'Database User'
-        required: true
+        required: false
         type: string
       db_password:
         description: 'Database Password'
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -39,11 +44,12 @@ jobs:
           sudo apt-get install -y postgresql-client
       - name: Generate database documentation
         env:
-          DB_HOST: ${{ github.event.inputs.db_host }}
-          DB_PORT: ${{ github.event.inputs.db_port }}
-          DB_NAME: ${{ github.event.inputs.db_name }}
-          DB_USER: ${{ github.event.inputs.db_user }}
-          DB_PASS: ${{ github.event.inputs.db_password }}
+          # Use manual inputs if provided, otherwise use read-only credentials from secrets
+          DB_HOST: ${{ github.event.inputs.db_host || secrets.DB_HOST || 'petadex.ccz9y6yshbls.us-east-1.rds.amazonaws.com' }}
+          DB_PORT: ${{ github.event.inputs.db_port || secrets.DB_PORT || '5432' }}
+          DB_NAME: ${{ github.event.inputs.db_name || secrets.DB_NAME || 'postgres' }}
+          DB_USER: ${{ github.event.inputs.db_user || secrets.DB_USER || 'readonly_user' }}
+          DB_PASS: ${{ github.event.inputs.db_password || secrets.DB_PASSWORD || 'petadex' }}
         run: |
           mkdir -p docs/database
           echo "# Petadex Database Schema" > docs/database/generated-schema.md

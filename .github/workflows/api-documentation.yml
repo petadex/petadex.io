@@ -258,6 +258,46 @@ jobs:
           git commit -m "docs: auto-update API database dependencies [skip ci]"
           git push
 
+      - name: Update GitHub Wiki
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Clone the wiki repository
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki
+
+          cd wiki
+
+          # Create or update the API Documentation page
+          cat > "API-Documentation.md" << 'WIKI_EOF'
+          # API Documentation
+
+          The API queries the database backend for display by the frontend.
+
+          This documentation is automatically generated from the route files and shows which database tables and columns each endpoint depends on. This helps identify breaking changes when the database schema evolves.
+
+          ---
+
+          WIKI_EOF
+
+          # Append the generated documentation (skip the title since we have our own)
+          tail -n +3 ../backend/docs/API_DATABASE_DEPENDENCIES.md >> "API-Documentation.md"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit and push if there are changes
+          git add "API-Documentation.md"
+          if git diff --staged --quiet; then
+            echo "No changes to wiki"
+          else
+            git commit -m "Auto-update API documentation"
+            git push
+            echo "Wiki updated successfully"
+          fi
+
+          cd ..
+          rm -rf wiki
+
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v4
         with:

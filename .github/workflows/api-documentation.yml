@@ -250,7 +250,16 @@ jobs:
       - name: Check if documentation changed
         id: check_changes
         run: |
-          git diff --exit-code backend/docs/API_DATABASE_DEPENDENCIES.md || echo "changed=true" >> $GITHUB_OUTPUT
+          echo "Checking for changes in documentation..."
+          if git diff --exit-code backend/docs/API_DATABASE_DEPENDENCIES.md; then
+            echo "No changes detected"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected!"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+          echo "Git status:"
+          git status backend/docs/
 
       - name: Commit and push if changed
         if: steps.check_changes.outputs.changed == 'true' && github.event_name == 'push'
@@ -262,7 +271,7 @@ jobs:
           git push
 
       - name: Update GitHub Wiki
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           set -e  # Exit on error
 

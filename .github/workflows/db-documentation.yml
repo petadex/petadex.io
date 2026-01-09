@@ -23,6 +23,10 @@ on:
         description: 'Database Password'
         required: true
         type: string
+
+permissions:
+  contents: write  # Needed to push to wiki
+
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
@@ -186,6 +190,67 @@ jobs:
             
             echo "" >> docs/database/generated-schema.md
           done
+
+      - name: Update GitHub Wiki
+        run: |
+          set -e  # Exit on error
+
+          echo "📚 Attempting to clone wiki repository..."
+
+          # Clone the wiki repository
+          if git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki 2>&1; then
+            echo "✅ Wiki repository cloned successfully"
+          else
+            echo "❌ Failed to clone wiki. The wiki may not be initialized yet."
+            echo "👉 Please create the wiki manually in GitHub (Wiki tab → Create the first page)"
+            exit 1
+          fi
+
+          cd wiki
+
+          echo "📝 Creating Database Schema wiki page..."
+
+          # Create the wiki page with static header
+          cat > "Database-Schema.md" << 'WIKI_EOF'
+          # Database Schema
+
+          ## Overview
+
+          PETadex SQL database is an ordered and accessible way to access the petadex project data via pgadmin4 or your favourite PostgreSQL program.
+
+          This documentation is automatically generated from the live database schema.
+
+          ---
+
+          WIKI_EOF
+
+          # Append the generated documentation (skip the title since we have our own)
+          tail -n +3 ../docs/database/generated-schema.md >> "Database-Schema.md"
+
+          echo "📄 Generated wiki content:"
+          wc -l "Database-Schema.md"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit and push if there are changes
+          git add "Database-Schema.md"
+          if git diff --staged --quiet; then
+            echo "ℹ️  No changes to wiki"
+          else
+            echo "💾 Committing changes to wiki..."
+            git commit -m "Auto-update database schema documentation"
+
+            echo "🚀 Pushing to wiki..."
+            git push
+
+            echo "✅ Wiki updated successfully!"
+          fi
+
+          cd ..
+          rm -rf wiki
+
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v4
         with:

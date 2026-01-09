@@ -296,7 +296,7 @@ jobs:
 
           The API queries the database backend for display by the frontend.
 
-          This documentation is automatically generated from the route files and shows which database tables and columns each endpoint depends on. This helps identify breaking changes when the database schema evolves.
+          This documentation is automatically generated from the route files and shows which database tables and columns each endpoint depends on. This helps identify breaking changes as the database schema evolves.
 
           ---
 

@@ -1,0 +1,105 @@
+name: Deploy Gatsby Frontend to Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Backend API URL (leave empty to use secret)'
+        required: false
+        type: string
+        default: 'https://api.petadex.net/api'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "frontend-deploy"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: 🏗 Build Gatsby site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine package manager in frontend/
+        id: detect-pm
+        run: |
+          cd frontend
+          if [ -f yarn.lock ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+            echo "install=install"   >> $GITHUB_OUTPUT
+          elif [ -f package-lock.json ]; then
+            echo "manager=npm"  >> $GITHUB_OUTPUT
+            echo "install=install"   >> $GITHUB_OUTPUT
+          else
+            echo "Unable to detect package manager in frontend/" >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js & cache dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: ${{ steps.detect-pm.outputs.manager }}
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configure Pages for Gatsby
+        id: pages-setup
+        uses: actions/configure-pages@v5
+        with:
+          static_site_generator: gatsby
+
+      - name: Restore Gatsby cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.cache
+            frontend/public
+          key: ${{ runner.os }}-gatsby-${{ steps.detect-pm.outputs.manager }}-build-${{ hashFiles('frontend/**/package-lock.json', 'frontend/**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gatsby-
+
+      - name: Install dependencies in frontend/
+        working-directory: frontend
+        run: ${{ steps.detect-pm.outputs.manager }} ${{ steps.detect-pm.outputs.install }}
+
+      - name: Build Gatsby site
+        working-directory: frontend
+        # Use manual input if provided, otherwise fall back to secret, then to default
+        env:
+          GATSBY_API_URL: ${{ github.event.inputs.api_url || secrets.GATSBY_API_URL || 'https://api.petadex.net/api' }}
+        run: |
+          echo "Building with API URL: $GATSBY_API_URL"
+          ${{ steps.detect-pm.outputs.manager }} run build
+
+      - name: Upload generated site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/public
+
+  deploy:
+    name: 🚀 Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Success message
+        run: echo "Frontend is now live at ${{ steps.deployment.outputs.page_url }}"

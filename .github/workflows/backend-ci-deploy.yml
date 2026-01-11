@@ -1,0 +1,70 @@
+name: Backend CI & Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      ssh_host:
+        description: 'EC2 Host'
+        required: true
+        type: string
+        default: 'ec2-44-222-238-66.compute-1.amazonaws.com'
+      ssh_user:
+        description: 'SSH Username'
+        required: true
+        type: string
+        default: 'ubuntu'
+      ssh_key_gist_url:
+        description: 'Gist Raw URL for SSH key'
+        required: true
+        type: string
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+      - name: Run tests
+        run: |
+          cd backend
+          npm test
+
+  deploy_to_ec2:
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Download SSH key
+        id: get_key
+        run: |
+          KEY_CONTENT=$(curl -s ${{ github.event.inputs.ssh_key_gist_url }})
+          echo "SSH_KEY<<EOF" >> $GITHUB_OUTPUT
+          echo "$KEY_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ github.event.inputs.ssh_host }}
+          username: ${{ github.event.inputs.ssh_user }}
+          key: ${{ steps.get_key.outputs.SSH_KEY }}
+          port: 22
+          timeout: 60s
+          script: |
+            cd /home/ubuntu/petadex.io/petadex.io/backend
+            pm2 stop petadex-backend || true
+            pm2 delete petadex-backend || true
+            sudo lsof -i TCP:3001 -t | xargs -r sudo kill -9
+            git fetch --all
+            git reset --hard origin/main
+            npm ci --only=production
+            pm2 start src/index.js --name petadex-backend
+            pm2 save

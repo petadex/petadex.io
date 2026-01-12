@@ -288,8 +288,6 @@ router.get('/stats/overview', async (req, res, next) => {
         COUNT(DISTINCT e.enzyme_id) as total_enzymes,
         COUNT(DISTINCT t.family) as total_families,
         COUNT(DISTINCT t.component) as total_components,
-        COUNT(DISTINCT CASE WHEN t.component IS NULL THEN t.family END) as families_without_component,
-        COUNT(DISTINCT CASE WHEN t.family_pid IS NULL THEN e.enzyme_id END) as family_centroids,
         COUNT(DISTINCT v.variant_id) as total_variants
       FROM enzyme_fastaa e
       LEFT JOIN enzyme_taxonomy t ON e.enzyme_id = t.enzyme_id

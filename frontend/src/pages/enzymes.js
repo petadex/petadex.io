@@ -116,10 +116,6 @@ const EnzymesPage = () => {
                 <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#2c3e50' }}>{parseInt(stats.total_components).toLocaleString()}</div>
               </div>
               <div>
-                <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Centroids</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#2c3e50' }}>{parseInt(stats.family_centroids).toLocaleString()}</div>
-              </div>
-              <div>
                 <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.25rem' }}>Variants</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: '600', color: '#2c3e50' }}>{parseInt(stats.total_variants).toLocaleString()}</div>
               </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "gatsby";
 import "../styles/home.css";
+import SiteHeader from "../components/SiteHeader";
 import DataViewer from "../components/DataViewer";
 import SynthesizedGenePanel from "../components/SynthesizedGenePanel";
 import config from "../config";
@@ -210,20 +211,7 @@ export default function SequenceTemplate({ pageContext }) {
 
   return (
     <>
-      <header role="banner" className="ui-section-header">
-        <div className="ui-layout-container">
-          <div className="ui-section-header__layout ui-layout-flex">
-            {/* LOGO */}
-            <Link to="/" role="link" aria-label="PETadex Home" style={{ display: 'flex', alignItems: 'center' }}>
-              <img
-                src={require('../images/petadex-icon.png').default}
-                alt="PETadex Logo"
-                style={{ height: '48px', width: 'auto' }}
-              />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader currentPage="sequence-detail" />
 
       <div style={{
         maxWidth: "1200px",

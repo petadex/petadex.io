@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "gatsby";
 import "../styles/home.css";
 import { useScrollHeader } from "../hooks/useScrollHeader";
+import SiteHeader from "../components/SiteHeader";
 import SequencePanel from "../components/SequencePanel";
 import StructurePanel from "../components/StructurePanel";
 import MetadataPanel from "../components/MetadataPanel";
@@ -51,24 +52,7 @@ export default function HomePage() {
 
   return (
     <>
-      <header role="banner" className="ui-section-header">
-        <div className="ui-layout-container">
-          <div className="ui-section-header__layout ui-layout-flex">
-            {/* LOGO */}
-            <Link to="/" role="link" aria-label="PETadex Home" style={{ display: 'flex', alignItems: 'center' }}>
-              <img
-                src={require('../images/petadex-icon.png').default}
-                alt="PETadex Logo"
-                style={{ height: '48px', width: 'auto' }}
-              />
-            </Link>
-            {/* MENU */}
-            <Link to="/fastaa" role="link" aria-label="Browse Database" className="ui-component-button ui-component-button-small ui-component-button-primary">
-              Browse Database
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader currentPage="home" />
 
       <main role="main">
         {/* HERO SECTION */}

@@ -1,0 +1,28 @@
+# Protein Structure Screenshots
+
+This directory contains static PNG screenshots of 3D protein structures.
+
+## Quick Manual Method
+
+For now, you can manually create screenshots:
+
+1. Go to the detail page for a protein (e.g., `/sequence/WP_054022242.1`)
+2. Wait for the 3D viewer to load the structure
+3. Take a screenshot of just the 3D viewer canvas
+4. Crop it to a square (400x400px recommended)
+5. Save as `<accession>.png` in this directory
+
+## Automated Method
+
+Once Puppeteer is installed, run:
+```bash
+cd backend
+npm run generate-screenshots:featured
+```
+
+## Required Screenshots for Carousel
+
+- `WP_054022242.1.png` - IsPETase
+- `WP_054022242.1_M1.png` - Fast-PETase
+
+Any protein with a PDB structure can have a screenshot generated.

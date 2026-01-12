@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "gatsby";
-import ProteinViewer from "./ProteinViewer";
+import Protein3DMolViewer from "./Protein3DMolViewer";
 
 const FeaturedPETases = ({ sequences, loading }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -149,19 +149,15 @@ const FeaturedPETases = ({ sequences, loading }) => {
           {label}
         </div>
 
-        {/* 3D Structure Viewer */}
+        {/* 3D Protein Viewer */}
         <div style={{
-          width: "120px",
-          height: "120px",
           marginBottom: "1.25rem"
         }}>
-          <ProteinViewer
+          <Protein3DMolViewer
             accession={seq.accession}
             width="120px"
             height="120px"
-            showControls={false}
-            enableMeasurement={false}
-            enableSelection={false}
+            backgroundColor="#ffffff"
           />
         </div>
 

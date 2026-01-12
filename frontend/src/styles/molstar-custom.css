@@ -21,6 +21,19 @@
   display: none !important;
 }
 
+/* Ensure compact viewers don't create overlays outside their container */
+.molstar-compact {
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+/* Hide any Molstar toast/overlay elements when in compact mode */
+.molstar-compact .msp-toast-container,
+.molstar-compact .msp-overlay,
+.molstar-compact .msp-highlight-wrapper {
+  display: none !important;
+}
+
 /* Adjust control panel colors to match site theme */
 .msp-btn {
   background-color: white;

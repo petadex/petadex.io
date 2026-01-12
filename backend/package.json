@@ -8,7 +8,9 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "local": "node src/index.js",
-    "test": "echo \"No tests specified yet\" && exit 0"
+    "test": "echo \"No tests specified yet\" && exit 0",
+    "generate-screenshots": "node scripts/generate-protein-screenshots.js",
+    "generate-screenshots:featured": "node scripts/generate-protein-screenshots.js --featured"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10",
+    "puppeteer": "^21.0.0",
     "serverless": "^4.17.1"
   }
 }

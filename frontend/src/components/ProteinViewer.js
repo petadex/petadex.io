@@ -56,7 +56,23 @@ const ProteinViewer = ({
         containerRef.current.style.height = `${rect.height}px`;
 
         // Create plugin with React 18 renderer
+        // Configure spec based on whether we want controls
         const spec = DefaultPluginUISpec();
+        if (!showControls) {
+          // For small viewers, disable all UI panels
+          spec.layout = {
+            initial: {
+              isExpanded: false,
+              showControls: false,
+              controlsDisplay: 'none'
+            }
+          };
+          spec.components = {
+            ...spec.components,
+            controls: { left: 'none', right: 'none', top: 'none', bottom: 'none' }
+          };
+        }
+
         plugin = await createPluginUI({
           target: containerRef.current,
           spec: spec,
@@ -65,13 +81,6 @@ const ProteinViewer = ({
 
         pluginRef.current = plugin;
         console.log('Plugin created:', plugin);
-
-        // Hide controls if needed
-        if (!showControls && plugin.layout) {
-          plugin.layout.setProps({
-            showControls: false,
-          });
-        }
 
         // Get PDB info from backend
         const pdbUrl = `${config.apiUrl}/pdb/accession/${accession}`;
@@ -192,8 +201,10 @@ const ProteinViewer = ({
     };
   }, [accession, showControls, initialStyle, enableMeasurement, enableSelection]);
 
-  // Hide header when hovering over structure viewer
+  // Hide header when hovering over structure viewer (only when controls are shown - i.e., on detail pages)
   const handleMouseEnter = () => {
+    if (!showControls) return; // Don't hide header for small preview viewers
+
     const header = document.querySelector('.ui-section-header');
     if (header && window.pageYOffset > 100) {
       header.classList.add('header-hidden');
@@ -203,12 +214,14 @@ const ProteinViewer = ({
   return (
     <div
       onMouseEnter={handleMouseEnter}
+      className={!showControls ? 'molstar-compact' : ''}
       style={{
         width,
         height,
         position: 'relative',
         borderRadius: '8px',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        isolation: 'isolate' // Create stacking context to contain Molstar UI
       }}
     >
       {/* Molstar plugin container */}
@@ -219,7 +232,8 @@ const ProteinViewer = ({
           height: '100%',
           position: 'absolute',
           top: 0,
-          left: 0
+          left: 0,
+          overflow: 'hidden' // Ensure nothing escapes
         }}
       />
 

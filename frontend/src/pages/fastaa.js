@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "gatsby";
 import "../styles/home.css";
+import SiteHeader from "../components/SiteHeader";
 import SequenceViewer from "../components/SequenceViewer";
 import FeaturedPETases from "../components/FeaturedPETases";
+import Seo from "../components/seo";
 import config from "../config";
 import { useScrollHeader } from "../hooks/useScrollHeader";
 
@@ -282,20 +284,8 @@ const FastaaPage = () => {
 
   return (
     <>
-      <header role="banner" className="ui-section-header">
-        <div className="ui-layout-container">
-          <div className="ui-section-header__layout ui-layout-flex">
-            {/* LOGO */}
-            <Link to="/" role="link" aria-label="PETadex Home" style={{ display: 'flex', alignItems: 'center' }}>
-              <img
-                src={require('../images/petadex-icon.png').default}
-                alt="PETadex Logo"
-                style={{ height: '48px', width: 'auto' }}
-              />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Seo title="Protein Sequences" description="Browse and search plastic-degrading enzyme sequences" />
+      <SiteHeader currentPage="sequence" />
 
       <main style={{
         maxWidth: "1200px",

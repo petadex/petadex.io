@@ -16,6 +16,11 @@ router.get('/', async (req, res, next) => {
         f.source,
         f.synonyms,
         f.date_entered,
+        f.genotype,
+        f.genotype_description,
+        f.synthetic,
+        f.parent_accessions,
+        f.parent_genes,
         f.in_gene_metadata,
         EXISTS(
           SELECT 1
@@ -48,6 +53,11 @@ router.get('/:accession', async (req, res, next) => {
         f.source,
         f.synonyms,
         f.date_entered,
+        f.genotype,
+        f.genotype_description,
+        f.synthetic,
+        f.parent_accessions,
+        f.parent_genes,
         f.in_gene_metadata,
         EXISTS(
           SELECT 1

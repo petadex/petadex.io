@@ -38,6 +38,11 @@ router.get('/', async (req, res, next) => {
         e.enzyme_id,
         e.translated_sequence,
         e.genbank_accession_id,
+        e.contig_id,
+        e.orf_start,
+        e.orf_end,
+        e.orf_type,
+        e.library_id,
         t.family,
         t.family_pid,
         t.component
@@ -130,6 +135,11 @@ router.get('/:enzyme_id', async (req, res, next) => {
         e.enzyme_id,
         e.translated_sequence,
         e.genbank_accession_id,
+        e.contig_id,
+        e.orf_start,
+        e.orf_end,
+        e.orf_type,
+        e.library_id,
         t.family,
         t.family_pid,
         t.component
@@ -163,6 +173,11 @@ router.get('/accession/:accession', async (req, res, next) => {
         e.enzyme_id,
         e.translated_sequence,
         e.genbank_accession_id,
+        e.contig_id,
+        e.orf_start,
+        e.orf_end,
+        e.orf_type,
+        e.library_id,
         t.family,
         t.family_pid,
         t.component
@@ -196,7 +211,9 @@ router.get('/:enzyme_id/variants', async (req, res, next) => {
         v.variant_id,
         v.enzyme_id,
         v.genbank_accession_id,
-        v.enzyme_pid
+        v.enzyme_pid,
+        v.library_id,
+        v.contig_id
       FROM variant_dictionary v
       WHERE v.enzyme_id = $1
       ORDER BY v.enzyme_pid DESC NULLS FIRST`,
@@ -223,6 +240,11 @@ router.get('/family/:family_id', async (req, res, next) => {
         e.enzyme_id,
         e.translated_sequence,
         e.genbank_accession_id,
+        e.contig_id,
+        e.orf_start,
+        e.orf_end,
+        e.orf_type,
+        e.library_id,
         t.family,
         t.family_pid,
         t.component
@@ -257,6 +279,11 @@ router.get('/component/:component_id', async (req, res, next) => {
         e.enzyme_id,
         e.translated_sequence,
         e.genbank_accession_id,
+        e.contig_id,
+        e.orf_start,
+        e.orf_end,
+        e.orf_type,
+        e.library_id,
         t.family,
         t.family_pid,
         t.component

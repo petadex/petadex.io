@@ -17,7 +17,7 @@ router.get('/accession/:accession', async (req, res, next) => {
   try {
     console.log('Querying PDB for accession:', value);
     const { rows } = await pool.query(
-      `SELECT pdb_id, accession, technique, relaxed, date_created, alignment
+      `SELECT pdb_id, accession, technique, relaxed, date_created, date_entered, alignment
        FROM pdb_accessions
        WHERE accession = $1
        ORDER BY date_created DESC
@@ -55,7 +55,7 @@ router.get('/:pdb_id', async (req, res, next) => {
   try {
     console.log('Querying PDB by pdb_id:', value);
     const { rows } = await pool.query(
-      `SELECT pdb_id, accession, technique, relaxed, date_created, alignment
+      `SELECT pdb_id, accession, technique, relaxed, date_created, date_entered, alignment
        FROM pdb_accessions
        WHERE pdb_id = $1`,
       [value]

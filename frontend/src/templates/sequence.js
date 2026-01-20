@@ -5,6 +5,7 @@ import "../styles/home.css";
 import SiteHeader from "../components/SiteHeader";
 import DataViewer from "../components/DataViewer";
 import SynthesizedGenePanel from "../components/SynthesizedGenePanel";
+import Seo from "../components/seo";
 import config from "../config";
 import { useScrollHeader } from "../hooks/useScrollHeader";
 
@@ -289,3 +290,13 @@ export default function SequenceTemplate({ pageContext }) {
     </>
   );
 }
+
+export const Head = ({ pageContext }) => {
+  const accession = pageContext?.sequence?.accession || "Sequence";
+  return (
+    <Seo
+      title={`${accession} - Enzyme Sequence`}
+      description={`View details for plastic-degrading enzyme ${accession} including sequence data, structure, and experimental results.`}
+    />
+  );
+};

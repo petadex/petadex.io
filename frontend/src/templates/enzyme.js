@@ -212,7 +212,7 @@ export const Head = ({ pageContext }) => {
   const enzymeName = enzyme?.genbank_accession_id || `Enzyme ${enzyme?.enzyme_id || ""}`;
   return (
     <Seo
-      title={`${enzymeName} - BLAST-NR Enzyme`}
+      title={enzymeName}
       description={`View details for plastic-degrading enzyme ${enzymeName} including sequence data and classification.`}
     />
   );

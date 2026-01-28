@@ -25,37 +25,60 @@ exports.onCreateWebpackConfig = ({ actions }) => {
  */
 exports.createPages = async ({ actions }) => {
   const { createPage } = actions;
+  const apiUrl = process.env.GATSBY_API_URL || "http://localhost:3001";
 
-  // Create client-only route for sequence pages that aren't pre-rendered
-  // Using onCreatePage hook instead of path with * to avoid Windows issues
-
+  // Create sequence pages
   try {
-    const apiUrl = process.env.GATSBY_API_URL || "http://localhost:3001";
     const response = await fetch(`${apiUrl}/api/fastaa`, {
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!response.ok) {
       console.warn(`API returned status ${response.status}, skipping individual sequence page generation`);
       console.log("Sequence pages will be rendered client-side on demand");
-      return;
-    }
+    } else {
+      const sequences = await response.json();
 
-    const sequences = await response.json();
-
-    // Create individual pages for better performance (pre-rendered with data)
-    sequences.forEach(sequence => {
-      createPage({
-        path: `/sequence/${sequence.accession}`,
-        component: require.resolve("./src/templates/sequence.js"),
-        context: { sequence },
+      sequences.forEach(sequence => {
+        createPage({
+          path: `/sequence/${sequence.accession}`,
+          component: require.resolve("./src/templates/sequence.js"),
+          context: { sequence },
+        });
       });
-    });
 
-    console.log(`Created ${sequences.length} individual sequence pages`);
+      console.log(`Created ${sequences.length} individual sequence pages`);
+    }
   } catch (error) {
     console.warn("Error creating individual sequence pages (backend unavailable during build):", error.message);
     console.log("Sequence pages will be rendered client-side on demand");
-    // Don't throw - allow build to continue
+  }
+
+  // Create enzyme pages
+  try {
+    const response = await fetch(`${apiUrl}/api/enzymes?limit=10000`, {
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      console.warn(`API returned status ${response.status}, skipping individual enzyme page generation`);
+      console.log("Enzyme pages will be rendered client-side on demand");
+    } else {
+      const result = await response.json();
+      const enzymes = result.data || [];
+
+      enzymes.forEach(enzyme => {
+        createPage({
+          path: `/enzyme/${enzyme.enzyme_id}`,
+          component: require.resolve("./src/templates/enzyme.js"),
+          context: { enzyme },
+        });
+      });
+
+      console.log(`Created ${enzymes.length} individual enzyme pages`);
+    }
+  } catch (error) {
+    console.warn("Error creating individual enzyme pages (backend unavailable during build):", error.message);
+    console.log("Enzyme pages will be rendered client-side on demand");
   }
 };

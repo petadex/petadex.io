@@ -208,7 +208,19 @@ const EnzymesPage = () => {
                     fontSize: "1.25rem",
                     fontFamily: "monospace"
                   }}>
-                    {enzyme.genbank_accession_id || `Enzyme ${enzyme.enzyme_id}`}
+                    <Link
+                      to={`/enzyme/${enzyme.enzyme_id}`}
+                      style={{
+                        color: "#2c3e50",
+                        textDecoration: "none",
+                        borderBottom: "2px solid transparent",
+                        transition: "border-color 0.2s"
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = "#3b82f6"}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = "transparent"}
+                    >
+                      {enzyme.genbank_accession_id || `Enzyme ${enzyme.enzyme_id}`}
+                    </Link>
                   </h3>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.85rem', color: '#64748b' }}>

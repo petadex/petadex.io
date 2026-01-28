@@ -1,3 +1,5 @@
+// frontend/src/pages/enzymes.js
+
 import React, { useState, useEffect } from "react";
 import { Link } from "gatsby";
 import "../styles/home.css";
@@ -68,7 +70,6 @@ const EnzymesPage = () => {
 
   return (
     <>
-      <Seo title="BLAST-NR Enzyme Sequences" description="Browse plastic-degrading enzyme sequences from BLAST-NR database" />
       <SiteHeader currentPage="enzymes" />
 
       <main style={{
@@ -333,3 +334,10 @@ const EnzymesPage = () => {
 };
 
 export default EnzymesPage;
+
+export const Head = () => (
+  <Seo
+    title="BLAST-NR Enzyme Sequences"
+    description="Browse plastic-degrading enzyme sequences from BLAST-NR database"
+  />
+);

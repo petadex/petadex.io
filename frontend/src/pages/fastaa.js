@@ -284,7 +284,6 @@ const FastaaPage = () => {
 
   return (
     <>
-      <Seo title="Protein Sequences" description="Browse and search plastic-degrading enzyme sequences" />
       <SiteHeader currentPage="sequence" />
 
       <main style={{
@@ -384,3 +383,10 @@ const FastaaPage = () => {
 };
 
 export default FastaaPage;
+
+export const Head = () => (
+  <Seo
+    title="Protein Sequences"
+    description="Browse and search plastic-degrading enzyme sequences"
+  />
+);

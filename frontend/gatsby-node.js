@@ -27,7 +27,7 @@ exports.createPages = async ({ actions }) => {
   const { createPage } = actions;
   
   // Use production URL during build
-  const apiUrl = process.env.GATSBY_API_URL || "https://petadex.net";
+  const apiUrl = process.env.GATSBY_API_URL || "https://api.petadex.net/api";
   
   console.log(`Using API URL: ${apiUrl}`);
 

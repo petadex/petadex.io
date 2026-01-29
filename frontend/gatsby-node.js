@@ -77,7 +77,7 @@ exports.createPages = async ({ actions }) => {
       const accessionId = enzyme.genbank_accession_id || enzyme.enzyme_id;
       createPage({
         path: `/sequence/${accessionId}`,
-        component: require.resolve("./src/templates/sequence-detail.js"),
+        component: require.resolve("./src/templates/enzyme.js"),
         context: { 
           enzymeId: enzyme.enzyme_id,
           accessionId: accessionId,

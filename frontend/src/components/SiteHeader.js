@@ -4,11 +4,8 @@ import { Link } from "gatsby";
 /**
  * Shared site header component with navigation
  * Used across all pages for consistent navigation
- *
- * @param {string} currentPage - The current page identifier to highlight the active nav link
- *                               Values: 'home', 'sequence', 'enzymes', 'structure', 'metadata'
  */
-const SiteHeader = ({ currentPage = '' }) => {
+const SiteHeader = () => {
   // Navigation items configuration
   const navItems = [
     { label: 'Sequence', path: '/fastaa', key: 'sequence' },
@@ -17,15 +14,8 @@ const SiteHeader = ({ currentPage = '' }) => {
     { label: 'Metadata', path: '/metadata', key: 'metadata' }
   ];
 
-  // Filter navigation items based on current page
-  // - Home page: shows Sequence, Substrate, Metadata (no Enzymes)
-  // - Other pages: hide self-reference link
-  const visibleNavItems = navItems.filter(item => {
-    if (currentPage === 'home') {
-      return item.key !== 'enzymes'; // Home page doesn't show Enzymes
-    }
-    return item.key !== currentPage; // Other pages don't show self-reference
-  });
+  // Show all navigation items on all pages
+  const visibleNavItems = navItems;
 
   return (
     <header role="banner" className="ui-section-header">

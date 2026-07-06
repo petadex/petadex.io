@@ -11,7 +11,16 @@
 // enzyme_fastaa namespace (a different protein for the same integer) and serves a
 // mismatched sequence. This panel is keyed purely on the corpus orf_id.
 import React, { useEffect, useState } from "react"
+import { Link } from "gatsby"
 import config from "../../config"
+
+// PAZy HMM tracks do not currently carry a Pfam accession. When one becomes
+// available on a domain record (e.g. `pfam_accession`/`pfam`), we link it to the
+// matching /cath-domains profile. Until then this returns null (no link shown).
+function pfamAccessionOf(d) {
+  const raw = String(d?.pfam_accession || d?.pfam || "").trim().toUpperCase()
+  return /^PF\d{3,}$/.test(raw) ? raw : null
+}
 
 // Deterministic per-domain hue (same golden-angle scheme used for family colors
 // elsewhere) so a domain's track block and its legend swatch always match.
@@ -264,6 +273,8 @@ function Domain({ d }) {
     ? d.catalytic_match_states.filter(Boolean)
     : []
 
+  const pfam = pfamAccessionOf(d)
+
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -274,6 +285,17 @@ function Domain({ d }) {
           residues {d.domain_start}–{d.domain_end}
         </span>
       </div>
+
+      {pfam && (
+        <p className="text-xs mt-1 mb-0">
+          <Link
+            to={`/cath-domains?pfam=${pfam}`}
+            className="text-accent hover:text-accent-hover underline underline-offset-2"
+          >
+            View CATH domain profile ({pfam})
+          </Link>
+        </p>
+      )}
 
       <p className="text-sm text-secondary-foreground mt-2 mb-0">
         Matched PAZy HMM{" "}

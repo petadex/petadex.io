@@ -2,9 +2,11 @@ import React, { useMemo } from "react"
 import { Link } from "gatsby"
 import { CATH_BASE_CSS } from "../../utils/cathColors"
 import { buildCathDomainPetadexLinks } from "../../utils/cathStructureLinks"
-import { pfamEntryUrl, stripRedundantPfamFromDisplayName } from "../../utils/cathDomainSectionConfig"
+import { stripRedundantPfamFromDisplayName } from "../../utils/cathDomainSectionConfig"
 import { renderCaptionWithReferenceAnchors } from "../../utils/cathCaptionLinks"
 import { buildCathReferencePlan } from "../../utils/cathReferencePlan"
+import CathDomainHmmPanel from "./CathDomainHmmPanel"
+import CathDomainArchitecture from "./CathDomainArchitecture"
 
 const overviewRefLinkOptions = {
   numbered: true,
@@ -84,8 +86,11 @@ const CathDomainVisualizationPanel = ({ domain }) => {
   )
 
   const petadexLinks = buildCathDomainPetadexLinks(domain)
+  const pdbIds = Array.isArray(domain.pdbIds)
+    ? domain.pdbIds.map(p => String(p || "").toUpperCase()).filter(p => /^[0-9][A-Z0-9]{3}$/.test(p))
+    : []
   const hasPetadexLinks =
-    petadexLinks.atlas || petadexLinks.enzymes || petadexLinks.extras.length > 0
+    petadexLinks.atlas || petadexLinks.enzymes || petadexLinks.extras.length > 0 || pdbIds.length > 0
   const embedPdbId =
     Array.isArray(domain.pdbIds) && domain.pdbIds.length ? String(domain.pdbIds[0]).toUpperCase() : null
   const embedUrl =
@@ -105,19 +110,6 @@ const CathDomainVisualizationPanel = ({ domain }) => {
               {domain.profileHmm}
               <span className="text-muted-foreground/70"> · </span>
               {domain.cathId}
-              {domain.pfamAccession ? (
-                <>
-                  <span className="text-muted-foreground/70"> · </span>
-                  <a
-                    href={pfamEntryUrl(domain.pfamAccession)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:text-accent-hover underline underline-offset-2"
-                  >
-                    {domain.pfamAccession}
-                  </a>
-                </>
-              ) : null}
             </p>
             <h2 className="text-xl md:text-2xl font-semibold text-primary m-0">
               {stripRedundantPfamFromDisplayName(domain.displayName, domain.pfamAccession)}
@@ -160,6 +152,8 @@ const CathDomainVisualizationPanel = ({ domain }) => {
             )}
           </div>
         )}
+        <CathDomainHmmPanel domain={domain} />
+        <CathDomainArchitecture pfamAccession={domain.pfamAccession} />
       </div>
 
       <div className="p-5 md:p-6">
@@ -169,7 +163,7 @@ const CathDomainVisualizationPanel = ({ domain }) => {
               Related in PETadex
             </p>
             <p className="text-xs text-muted-foreground mb-3 m-0 leading-relaxed">
-              Atlas links open a filtered UMAP view in a new tab. External sources are in References below.
+              Atlas and structure links open in a new tab. External sources are in References below.
             </p>
             <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
               {petadexLinks.atlas && (
@@ -226,6 +220,18 @@ const CathDomainVisualizationPanel = ({ domain }) => {
                   </li>
                 ),
               )}
+              {pdbIds.map(pdb => (
+                <li key={`pdb-${pdb}`}>
+                  <a
+                    href={`https://www.rcsb.org/structure/${pdb}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-lg border border-input bg-background px-3 py-1.5 text-sm font-medium text-accent hover:bg-muted/50 hover:text-accent-hover transition-colors"
+                  >
+                    Structure {pdb} (RCSB)
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         )}

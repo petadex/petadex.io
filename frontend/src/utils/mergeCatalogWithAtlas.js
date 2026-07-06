@@ -87,6 +87,7 @@ export function buildDomainModelFromCatalog(catalogEntry, atlasRow) {
         : [{ label: "Representative CATH", cathId }],
     pdbIds: Array.isArray(catalogEntry.pdbIds) ? catalogEntry.pdbIds : [],
     resourceLinks: Array.isArray(catalogEntry.resourceLinks) ? catalogEntry.resourceLinks : [],
+    hmmLogoImage: catalogEntry.hmmLogoImage ?? null,
   }
 }
 

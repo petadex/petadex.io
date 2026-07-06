@@ -566,6 +566,13 @@ function positionFromSequenceLetters(host, clientX, viewport) {
 }
 
 /**
+ * Horizontal padding (in plot-local SVG units) inside the feature-viewer clip. The forward
+ * (pointer → residue) and inverse (residue → pixel) mappings MUST use the same value or the
+ * highlight/label drifts from the cursor when residues are sub-pixel wide (zoomed out).
+ */
+const PLOT_PAD = 5
+
+/**
  * Plot drawable width inside feature-viewer clip (matches stripe/zoom scale).
  * @param {HTMLElement} host
  */
@@ -666,9 +673,8 @@ function positionFromPlotX(host, clientX, viewport) {
   const local = pt.matrixTransform(ctm.inverse())
   const plotX = local.x
 
-  const pad = 5
-  const drawable = Math.max(1, innerW - 2 * pad)
-  const rel = plotX - pad
+  const drawable = Math.max(1, innerW - 2 * PLOT_PAD)
+  const rel = plotX - PLOT_PAD
   if (rel < 0 || rel > drawable) return null
 
   const span = Math.max(1, viewport.hi - viewport.lo)
@@ -743,13 +749,35 @@ function featureViewerColumnBounds(host, position, viewport) {
 
   if (left == null) {
     const plot = host.querySelector("#svg-container")
-    const hostRect = host.getBoundingClientRect()
     if (!plot) return null
-    const pr = plot.getBoundingClientRect()
-    const span = Math.max(1, viewport.hi - viewport.lo)
-    const t = (p - viewport.lo) / span
-    width = Math.max(4, pr.width / span)
-    left = pr.left - hostRect.left + t * pr.width - width / 2
+    const ctm = plot.getScreenCTM()
+    const innerW = plotInnerWidth(host)
+    const hostRect = host.getBoundingClientRect()
+
+    if (ctm && innerW > 0) {
+      // Exact inverse of positionFromPlotX: work in plot-local units, then project to screen with
+      // the same CTM so the highlight lands on the residue the pointer actually maps to.
+      const drawable = Math.max(1, innerW - 2 * PLOT_PAD)
+      const span = Math.max(1, viewport.hi - viewport.lo)
+      const widthLocal = drawable / span
+      const centerLocal = PLOT_PAD + ((p - viewport.lo) / span) * drawable
+      const toScreenX = xLocal => {
+        const q = svg.createSVGPoint()
+        q.x = xLocal
+        q.y = 0
+        return q.matrixTransform(ctm).x
+      }
+      const centerScreen = toScreenX(centerLocal)
+      const edgeSpan = Math.abs(toScreenX(centerLocal + widthLocal / 2) - centerScreen)
+      width = Math.max(4, edgeSpan * 2)
+      left = centerScreen - hostRect.left - width / 2
+    } else {
+      const pr = plot.getBoundingClientRect()
+      const span = Math.max(1, viewport.hi - viewport.lo)
+      const t = (p - viewport.lo) / span
+      width = Math.max(4, pr.width / span)
+      left = pr.left - hostRect.left + t * pr.width - width / 2
+    }
   }
 
   const hostRect = host.getBoundingClientRect()

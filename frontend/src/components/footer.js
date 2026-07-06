@@ -20,6 +20,13 @@ const Footer = () => {
             >
               <small>Database</small>
             </Link>
+            <Link
+              to="/cath-domains"
+              aria-label="CATH domains"
+              className="text-primary hover:text-accent-hover transition-colors duration-150"
+            >
+              <small>CATH domains</small>
+            </Link>
             <a
               href="https://github.com/ababaian/petadex.io"
               aria-label="GitHub"

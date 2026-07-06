@@ -225,6 +225,7 @@ const TOOL_CARDS = [
   { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans ~307M sequences in the Logan corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
   { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 / 50 mM BHET. Click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/substrate", Thumb: SubstrateThumb },
   { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for every family, with member tables and centroid sequences.", kbd: "F", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
+  { id: "cath", eyebrow: "05 · CATH", title: "Explore CATH domains", sub: "Literature-backed Pfam / CATH domain profiles with structures, references, and downloadable profile HMMs — linked to the family atlas.", kbd: "C", cta: "Open CATH domains →", href: "/cath-domains", Thumb: AtlasThumb },
 ]
 
 function ToolCards() {
@@ -234,7 +235,7 @@ function ToolCards() {
         <div className="flex items-end justify-between flex-wrap gap-y-4 mb-10">
           <div>
             <p className="label mb-2">Start here</p>
-            <h2 className="text-3xl font-semibold tracking-tight">Four ways into the data</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">Five ways into the data</h2>
           </div>
           <p className="text-muted-foreground text-sm max-w-md">
             PETadex is a launchpad, not a paper. Pick the tool that matches your question.

@@ -45,6 +45,7 @@
  * @property {(string|CathDomainFigure)[]} [figures]  Strings treated as caption-only figures
  * @property {string[]} [pdbIds]  PDB IDs for Mol* / RCSB shortcuts (e.g. ["6TKX"])
  * @property {{ label: string, url: string }[]} [resourceLinks]  Extra curated outbound links (merged with auto PETadex/CATH/PDB links in the UI)
+ * @property {string|null} [hmmLogoImage]  Optional locally committed HMM logo image (e.g. "/cath/hmm/PF01674_logo.png"); when set it renders inline, otherwise the profile links out to the InterPro logo
  */
 
 const PF = acc => `https://www.ebi.ac.uk/interpro/entry/pfam/${acc}/`

@@ -6,6 +6,7 @@ import Seo from "../components/seo"
 import config from "../config"
 import Container from "../components/common/Container"
 import { useScrollHeader } from "../hooks/useScrollHeader"
+import { cathDomainPathForComponent } from "../utils/cathDomainCatalogLookup"
 
 const getNCBILink = accession => {
   if (!accession) return null
@@ -154,7 +155,14 @@ export default function EnzymeTemplate({ pageContext }) {
               )}
 
               {enzyme.component !== null && (
-                <MetaPill label="Component">{enzyme.component}</MetaPill>
+                <MetaPill label="Component">
+                  <Link
+                    to={cathDomainPathForComponent(enzyme.component)}
+                    className="text-accent hover:text-accent-hover"
+                  >
+                    {enzyme.component}
+                  </Link>
+                </MetaPill>
               )}
 
               {enzyme.variant !== null && (

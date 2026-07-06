@@ -17,6 +17,7 @@ import {
   COMPONENT_SHADE_CSS,
   CATH_BASE_CSS,
 } from "../utils/cathColors"
+import { cathDomainPathForComponent } from "../utils/cathDomainCatalogLookup"
 
 // ── CATH badge helper ──────────────────────────────────────────────────────
 
@@ -54,9 +55,12 @@ function CathBadge({ components }) {
                       backgroundColor: COMPONENT_SHADE_CSS[comp] || "#94a3b8",
                     }}
                   />
-                  <span className="text-xs text-muted-foreground">
+                  <Link
+                    to={cathDomainPathForComponent(comp)}
+                    className="text-xs text-accent hover:text-accent-hover underline underline-offset-2"
+                  >
                     Component {comp}
-                  </span>
+                  </Link>
                 </div>
               ))}
           </div>

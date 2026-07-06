@@ -5,12 +5,13 @@
  */
 
 const webpack = require("webpack")
+const path = require("path")
 
 /**
  * Configure webpack for Molstar and feature-viewer (expects global jQuery).
  * @type {import('gatsby').GatsbyNode['onCreateWebpackConfig']}
  */
-exports.onCreateWebpackConfig = ({ actions }) => {
+exports.onCreateWebpackConfig = ({ stage, actions }) => {
   actions.setWebpackConfig({
     resolve: {
       fallback: {
@@ -27,6 +28,22 @@ exports.onCreateWebpackConfig = ({ actions }) => {
       }),
     ],
   })
+
+  // mini-css-extract-plugin can throw when hot-reloading CSS if the old <link>
+  // node was already detached (common with postcss + sass in develop).
+  if (stage === "develop" || stage === "develop-html") {
+    actions.setWebpackConfig({
+      module: {
+        rules: [
+          {
+            enforce: "pre",
+            test: /mini-css-extract-plugin[/\\]dist[/\\]hmr[/\\]hotModuleReplacement\.js$/,
+            use: [path.resolve(__dirname, "loaders/mini-css-hmr-fix-loader.js")],
+          },
+        ],
+      },
+    })
+  }
 }
 
 /**

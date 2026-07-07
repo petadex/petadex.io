@@ -22,8 +22,8 @@ export function canonicalRefKey(url) {
   const u = normalizeUrl(url)
   if (!u) return null
 
-  const doi = u.match(/doi\.org\/([^/?#]+)/)?.[1]
-  if (doi) return `doi:${decodeURIComponent(doi)}`
+  const doi = u.match(/doi\.org\/(10\.\d+\/[^\s/?#]+)/i)?.[1]
+  if (doi) return `doi:${decodeURIComponent(doi).toLowerCase()}`
 
   const pdbRcsb = u.match(/rcsb\.org\/structure\/([0-9][a-z0-9]{3})/)?.[1]
   if (pdbRcsb) return `pdb:${pdbRcsb.toUpperCase()}`

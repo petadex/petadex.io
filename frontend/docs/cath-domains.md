@@ -138,9 +138,7 @@ cathDomainCatalog.js ──► mergeCatalogWithAtlas.js ──► CathDomainVisu
 
 - Highlight-alignment fix verified in-browser via scripted pointer moves at
   20/50/80% of a zoomed-out plot: delta `0–1 px` (was a consistent few px).
-- CATH reference/citation ordering is enforced by `npm run build:validate-cath`
-  (note: it currently flags 3 pre-existing out-of-order citations — `PF01425`,
-  `PF01083`, `PF09995` — unrelated to this work).
+- CATH reference/citation ordering is enforced by `npm run build:validate-cath` (all catalog profiles must pass before a strict build succeeds).
 
 ## Known limitations / follow-ups
 
@@ -149,4 +147,4 @@ cathDomainCatalog.js ──► mergeCatalogWithAtlas.js ──► CathDomainVisu
 - IDA architectures are capped at 6 representatives.
 - `CatalyticDomainsPanel` only shows the CATH link once PAZy tracks carry a Pfam
   accession (falls back to no link until then).
-- Pre-existing CATH citation-order issues remain out of scope.
+- Pre-existing CATH citation-order issues were resolved (duplicate InterPro entries, comma-trailing URLs, and a DOI canonicalization bug for `10.1128/...` AEM papers).

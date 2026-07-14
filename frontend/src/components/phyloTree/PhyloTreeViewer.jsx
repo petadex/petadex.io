@@ -78,9 +78,6 @@ export default function PhyloTreeViewer({
   getLeafColor = null,
   /** @type {((enzymeId: string) => void)|null} */
   onLeafSelect = null,
-  /** @type {Set<string>|null} */
-  fitLeafIds = null,
-  fitNonce = 0,
   zoomNonce = 0,
 }) {
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
@@ -217,68 +214,9 @@ export default function PhyloTreeViewer({
     [isRadial, radialLayout, horizontalLayout],
   )
 
-  const fitToLeaves = useCallback(
-    leafIds => {
-      if (!leafIds?.size || !containerRef.current) return
-      const el = containerRef.current
-      const W = el.clientWidth
-      const H = el.clientHeight
-      if (!W || !H) return
-
-      const points = []
-      if (isRadial && radialLayout) {
-        for (const node of radialLayout.nodes) {
-          if (node.children) continue
-          const id = enzymeIdFromTip(node.data.name)
-          if (!id || !leafIds.has(String(id))) continue
-          points.push({ x: radialLayout.px(node), y: radialLayout.py(node) })
-        }
-      } else if (horizontalLayout) {
-        for (const node of horizontalLayout.nodes) {
-          if (node.children) continue
-          const id = enzymeIdFromTip(node.data.name)
-          if (!id || !leafIds.has(String(id))) continue
-          points.push({
-            x: horizontalLayout.sx(node),
-            y: horizontalLayout.sy(node),
-          })
-        }
-      }
-      if (!points.length) return
-
-      let minX = Infinity
-      let maxX = -Infinity
-      let minY = Infinity
-      let maxY = -Infinity
-      for (const p of points) {
-        minX = Math.min(minX, p.x)
-        maxX = Math.max(maxX, p.x)
-        minY = Math.min(minY, p.y)
-        maxY = Math.max(maxY, p.y)
-      }
-      const pad = 40
-      const bw = Math.max(maxX - minX, 20) + pad * 2
-      const bh = Math.max(maxY - minY, 20) + pad * 2
-      const k = Math.min(Math.min(W / bw, H / bh), 6)
-      const cx = (minX + maxX) / 2
-      const cy = (minY + maxY) / 2
-      setTransform({
-        k,
-        x: W / 2 - cx * k,
-        y: H / 2 - cy * k,
-      })
-    },
-    [isRadial, radialLayout, horizontalLayout],
-  )
-
   useEffect(() => {
     if (focusedLeafId) zoomToLeaf(focusedLeafId)
   }, [focusedLeafId, zoomNonce, zoomToLeaf])
-
-  useEffect(() => {
-    if (!fitNonce) return
-    fitToLeaves(fitLeafIds)
-  }, [fitNonce, fitLeafIds, fitToLeaves])
 
   useEffect(() => {
     const el = containerRef.current

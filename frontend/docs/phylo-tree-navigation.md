@@ -4,9 +4,7 @@
 
 Dry Lab asked for better ways to **search and navigate** family phylogenetic
 trees: traceback from a tip to the root, nearby sequences, a local neighborhood
-around a focus tip, and coloring by metadata. This work adds those tools to the
-**existing** tree UI (`PhyloTreePanel` / `PhyloTreeViewer`), rather than a
-separate search framework.
+around a focus tip, and coloring by metadata. This work adds those tools to thetree UI (`PhyloTreePanel` / `PhyloTreeViewer`).
 
 ## Feature summary
 
@@ -30,13 +28,12 @@ the same tip is already focused.
 
 ### 4. Local neighborhood
 
-Toggle a local neighborhood around the focus tip:
+Toggle a local neighborhood around the focus tip (**Enable local clade view**):
 
 - **Radius** — tips within a patristic-distance radius of the focus
-- **k-NN** — the k nearest tips
+- **k-NN** — the k nearest tips (slider max = number of other tips in the tree)
 
-Non-neighborhood leaves are dimmed; **Fit neighborhood** zooms the viewport to
-the active set.
+Non-neighborhood leaves are dimmed. Clear turns the clade view off.
 
 ### 5. Color by metadata
 
@@ -64,7 +61,7 @@ and wires path / neighborhood / color into the viewer.
 | `/tree/:familyId` | On |
 | `/phylo-tree-prototype/?family=:id` | On (thin wrapper over the same panel) |
 
-Trees themselves are stored in S3 (`search-phylo-trees/family_{id}.nwk`). Only
+Trees are stored in S3 (`search-phylo-trees/family_{id}.nwk`). Only
 families with a tree show “View phylogeny” from search results.
 
 ## File reference
@@ -83,7 +80,7 @@ families with a tree show “View phylogeny” from search results.
 | File | Change |
 |------|--------|
 | `frontend/src/components/phyloTree/PhyloTreePanel.jsx` | `showNavTools`, sidebar state, path/neighborhood/color wiring, `zoomNonce` |
-| `frontend/src/components/phyloTree/PhyloTreeViewer.jsx` | Path highlight, neighborhood dimming, leaf colors, `onLeafSelect`, fit + `zoomNonce` |
+| `frontend/src/components/phyloTree/PhyloTreeViewer.jsx` | Path highlight, neighborhood dimming, leaf colors, `onLeafSelect`, `zoomNonce` |
 | `frontend/src/components/phyloTree/PhyloTreeSearch.jsx` | Empty query does not clear external focus |
 | `frontend/src/components/phyloTree/useFamilyMemberIndex.js` | Store optional `organism` / `country` |
 | `frontend/src/pages/tree/[familyId].js` | Enable `showNavTools` |
@@ -121,7 +118,7 @@ on `[focusedLeafId, zoomNonce, zoomToLeaf]`.
 - Open `/family/182` and `/tree/182` — sidebar present; Newick loads.
 - Focus via search or click — path-to-root highlights; path length updates.
 - Nearby sequences list sorts by distance; click focuses + zooms.
-- Toggle neighborhood (radius and k-NN); dimming + Fit neighborhood work.
+- Enable local clade view — dimming updates with radius/k-NN; Clear turns it off
 - Color modes update tip colors / legend; organism/country only when metadata exists.
 - Re-zoom to an already-focused tip still recenters the viewport.
 - Empty search does not clear a focus set from the sidebar.

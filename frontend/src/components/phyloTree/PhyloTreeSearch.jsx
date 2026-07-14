@@ -34,9 +34,11 @@ export default function PhyloTreeSearch({
   }, [matchIds, query, onMatchesChange])
 
   useEffect(() => {
+    // Only drive focus while a query is active so click/neighbor focus can persist after clear.
+    if (!query.trim()) return
     const focused = matchIds.length ? matchIds[matchIndex] : null
     onFocusChange?.(focused)
-  }, [matchIds, matchIndex, onFocusChange])
+  }, [matchIds, matchIndex, onFocusChange, query])
 
   const goPrev = () => {
     if (!matchIds.length) return

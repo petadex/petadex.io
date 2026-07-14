@@ -25,7 +25,10 @@ const MIN_RADIUS = 160
 const btnClass =
   "btn btn-secondary px-2 py-0.5 text-sm rounded"
 
-function leafVisualState(enzymeId, { highlightIds, matchIds, searchActive, focusedLeafId }) {
+function leafVisualState(
+  enzymeId,
+  { highlightIds, matchIds, searchActive, focusedLeafId, neighborhoodActive, visibleLeafIds },
+) {
   if (!enzymeId) {
     return { dimmed: false, highlighted: false, searchMatch: false, focused: false }
   }
@@ -33,14 +36,26 @@ function leafVisualState(enzymeId, { highlightIds, matchIds, searchActive, focus
   const highlighted = highlightIds?.has(id) ?? false
   const searchMatch = searchActive ? matchIds?.has(id) ?? false : false
   const focused = focusedLeafId === id
-  const dimmed = searchActive && !searchMatch && !highlighted
+  const outsideNeighborhood =
+    neighborhoodActive && visibleLeafIds instanceof Set && !visibleLeafIds.has(id)
+  const dimmed =
+    outsideNeighborhood || (searchActive && !searchMatch && !highlighted)
   return { dimmed, highlighted, searchMatch, focused }
 }
 
-function leafFill({ dimmed, highlighted, searchMatch, focused, isHovered, layout }) {
+function leafFill({
+  dimmed,
+  highlighted,
+  searchMatch,
+  focused,
+  isHovered,
+  layout,
+  metadataColor,
+}) {
   if (dimmed) return layout === "radial" ? "var(--muted-foreground)" : "#ced4da"
   if (focused || isHovered) return layout === "radial" ? "var(--accent-hover, var(--accent))" : "#0056b3"
   if (highlighted || searchMatch) return layout === "radial" ? "#f59e0b" : "#e67700"
+  if (metadataColor) return metadataColor
   return layout === "radial" ? "var(--accent)" : "#007bff"
 }
 
@@ -54,6 +69,19 @@ export default function PhyloTreeViewer({
   memberIndex = new Map(),
   containerHeight,
   className = "",
+  /** @type {Set<number>|null} */
+  pathUids = null,
+  neighborhoodActive = false,
+  /** @type {Set<string>|null} */
+  visibleLeafIds = null,
+  /** @type {((enzymeId: string) => string|null)|null} */
+  getLeafColor = null,
+  /** @type {((enzymeId: string) => void)|null} */
+  onLeafSelect = null,
+  /** @type {Set<string>|null} */
+  fitLeafIds = null,
+  fitNonce = 0,
+  zoomNonce = 0,
 }) {
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
   const transformRef = useRef(transform)
@@ -189,9 +217,68 @@ export default function PhyloTreeViewer({
     [isRadial, radialLayout, horizontalLayout],
   )
 
+  const fitToLeaves = useCallback(
+    leafIds => {
+      if (!leafIds?.size || !containerRef.current) return
+      const el = containerRef.current
+      const W = el.clientWidth
+      const H = el.clientHeight
+      if (!W || !H) return
+
+      const points = []
+      if (isRadial && radialLayout) {
+        for (const node of radialLayout.nodes) {
+          if (node.children) continue
+          const id = enzymeIdFromTip(node.data.name)
+          if (!id || !leafIds.has(String(id))) continue
+          points.push({ x: radialLayout.px(node), y: radialLayout.py(node) })
+        }
+      } else if (horizontalLayout) {
+        for (const node of horizontalLayout.nodes) {
+          if (node.children) continue
+          const id = enzymeIdFromTip(node.data.name)
+          if (!id || !leafIds.has(String(id))) continue
+          points.push({
+            x: horizontalLayout.sx(node),
+            y: horizontalLayout.sy(node),
+          })
+        }
+      }
+      if (!points.length) return
+
+      let minX = Infinity
+      let maxX = -Infinity
+      let minY = Infinity
+      let maxY = -Infinity
+      for (const p of points) {
+        minX = Math.min(minX, p.x)
+        maxX = Math.max(maxX, p.x)
+        minY = Math.min(minY, p.y)
+        maxY = Math.max(maxY, p.y)
+      }
+      const pad = 40
+      const bw = Math.max(maxX - minX, 20) + pad * 2
+      const bh = Math.max(maxY - minY, 20) + pad * 2
+      const k = Math.min(Math.min(W / bw, H / bh), 6)
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      setTransform({
+        k,
+        x: W / 2 - cx * k,
+        y: H / 2 - cy * k,
+      })
+    },
+    [isRadial, radialLayout, horizontalLayout],
+  )
+
   useEffect(() => {
     if (focusedLeafId) zoomToLeaf(focusedLeafId)
-  }, [focusedLeafId, zoomToLeaf])
+  }, [focusedLeafId, zoomNonce, zoomToLeaf])
+
+  useEffect(() => {
+    if (!fitNonce) return
+    fitToLeaves(fitLeafIds)
+  }, [fitNonce, fitLeafIds, fitToLeaves])
 
   useEffect(() => {
     const el = containerRef.current
@@ -281,9 +368,16 @@ export default function PhyloTreeViewer({
       matchIds,
       searchActive,
       focusedLeafId,
+      neighborhoodActive,
+      visibleLeafIds,
     })
     const isHovered = hoveredNode === label
-    const fill = leafFill({ ...visual, isHovered, layout })
+    const metadataColor =
+      !visual.dimmed && !visual.highlighted && !visual.searchMatch && getLeafColor && enzymeId
+        ? getLeafColor(enzymeId)
+        : null
+    const fill = leafFill({ ...visual, isHovered, layout, metadataColor })
+    const onPath = pathUids instanceof Set && node.data.__uid != null && pathUids.has(node.data.__uid)
 
     const title = enzymeId
       ? [
@@ -295,31 +389,48 @@ export default function PhyloTreeViewer({
           .join(" · ")
       : label
 
+    const handleClick = () => {
+      if (!enzymeId) return
+      if (onLeafSelect) {
+        onLeafSelect(String(enzymeId))
+        return
+      }
+      window.open(`/enzyme/${enzymeId}`, "_blank")
+    }
+
     if (isRadial) {
       const onLeft = Math.cos(node.angle) < 0
       const deg = (node.angle * 180) / Math.PI
       const rot = onLeft ? deg + 180 : deg
-      const dotR = (isHovered || visual.focused ? 4 : 2.5) / transform.k
+      const dotR = (isHovered || visual.focused || onPath ? 4 : 2.5) / transform.k
+      const hideLabel =
+        neighborhoodActive &&
+        visual.dimmed &&
+        !isHovered &&
+        !visual.focused
       return (
         <g
           key={i}
           transform={`translate(${coords.x},${coords.y}) rotate(${rot})`}
-          onClick={
-            enzymeId
-              ? () => window.open(`/enzyme/${enzymeId}`, "_blank")
-              : undefined
-          }
+          onClick={enzymeId ? handleClick : undefined}
           onMouseEnter={() => setHoveredNode(label)}
           onMouseLeave={() => setHoveredNode(null)}
           style={{
             cursor: enzymeId ? "pointer" : "default",
-            opacity: visual.dimmed ? 0.25 : 1,
+            opacity: visual.dimmed ? 0.12 : 1,
           }}
         >
           <title>{title}</title>
           <circle r={8 / transform.k} fill="transparent" />
-          <circle r={dotR} fill={fill} />
-          {(showRadialLabels || isHovered || visual.highlighted) && displayLabel && (
+          <circle
+            r={dotR}
+            fill={fill}
+            stroke={onPath ? "#c94141" : "none"}
+            strokeWidth={onPath ? 1.5 / transform.k : 0}
+          />
+          {!hideLabel &&
+            (showRadialLabels || isHovered || visual.highlighted || visual.focused) &&
+            displayLabel && (
             <text
               x={(onLeft ? -6 : 6) / transform.k}
               dy="0.32em"
@@ -343,25 +454,29 @@ export default function PhyloTreeViewer({
       )
     }
 
+    const hideLabel =
+      neighborhoodActive && visual.dimmed && !isHovered && !visual.focused
+
     return (
       <g
         key={i}
         transform={`translate(${coords.x},${coords.y})`}
-        onClick={
-          enzymeId
-            ? () => window.open(`/enzyme/${enzymeId}`, "_blank")
-            : undefined
-        }
+        onClick={enzymeId ? handleClick : undefined}
         onMouseEnter={() => setHoveredNode(label)}
         onMouseLeave={() => setHoveredNode(null)}
         style={{
           cursor: enzymeId ? "pointer" : "default",
-          opacity: visual.dimmed ? 0.25 : 1,
+          opacity: visual.dimmed ? 0.12 : 1,
         }}
       >
         <title>{title}</title>
-        <circle r={isHovered || visual.focused ? 3.5 : 2.5} fill={fill} />
-        {displayLabel && (
+        <circle
+          r={isHovered || visual.focused || onPath ? 3.5 : 2.5}
+          fill={fill}
+          stroke={onPath ? "#c94141" : "none"}
+          strokeWidth={onPath ? 1.5 : 0}
+        />
+        {!hideLabel && displayLabel && (
           <text
             x={6}
             dy="0.32em"
@@ -376,6 +491,13 @@ export default function PhyloTreeViewer({
         )}
       </g>
     )
+  }
+
+  const linkOnPath = link => {
+    if (!(pathUids instanceof Set)) return false
+    const s = link.source?.data?.__uid
+    const t = link.target?.data?.__uid
+    return s != null && t != null && pathUids.has(s) && pathUids.has(t)
   }
 
   const heightStyle = containerHeight || (isRadial ? "60vh" : "70vh")
@@ -436,14 +558,20 @@ export default function PhyloTreeViewer({
               transform: `translate(${transform.x}px,${transform.y}px) scale(${transform.k})`,
             }}
           >
-            <g stroke="var(--border-strong)" fill="none" strokeWidth={0.8}>
-              {radialLayout.links.map((link, i) => (
-                <path
-                  key={i}
-                  d={radialLinkPath(link)}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
+            <g fill="none">
+              {radialLayout.links.map((link, i) => {
+                const onPath = linkOnPath(link)
+                return (
+                  <path
+                    key={i}
+                    d={radialLinkPath(link)}
+                    stroke={onPath ? "#c94141" : "var(--border-strong)"}
+                    strokeWidth={onPath ? 2.2 : 0.8}
+                    vectorEffect="non-scaling-stroke"
+                    opacity={onPath ? 1 : neighborhoodActive ? 0.35 : 1}
+                  />
+                )
+              })}
             </g>
             {radialLayout.nodes.map((node, i) => {
               if (!node.children) {
@@ -452,12 +580,19 @@ export default function PhyloTreeViewer({
                   y: radialLayout.py(node),
                 })
               }
+              const onPath =
+                pathUids instanceof Set &&
+                node.data.__uid != null &&
+                pathUids.has(node.data.__uid)
               return (
                 <g
                   key={i}
                   transform={`translate(${radialLayout.px(node)},${radialLayout.py(node)})`}
                 >
-                  <circle r={2 / transform.k} fill="var(--muted-foreground)" />
+                  <circle
+                    r={(onPath ? 3 : 2) / transform.k}
+                    fill={onPath ? "#c94141" : "var(--muted-foreground)"}
+                  />
                 </g>
               )
             })}
@@ -474,10 +609,19 @@ export default function PhyloTreeViewer({
               transform: `translate(${transform.x}px,${transform.y}px) scale(${transform.k})`,
             }}
           >
-            <g stroke="#adb5bd" fill="none" strokeWidth={0.8}>
-              {horizontalLayout.links.map((link, i) => (
-                <path key={i} d={horizontalLinkPath(link)} />
-              ))}
+            <g fill="none">
+              {horizontalLayout.links.map((link, i) => {
+                const onPath = linkOnPath(link)
+                return (
+                  <path
+                    key={i}
+                    d={horizontalLinkPath(link)}
+                    stroke={onPath ? "#c94141" : "#adb5bd"}
+                    strokeWidth={onPath ? 2.2 : 0.8}
+                    opacity={onPath ? 1 : neighborhoodActive ? 0.35 : 1}
+                  />
+                )
+              })}
             </g>
             {horizontalLayout.nodes.map((node, i) => {
               if (!node.children) {
@@ -486,12 +630,16 @@ export default function PhyloTreeViewer({
                   y: horizontalLayout.sy(node),
                 })
               }
+              const onPath =
+                pathUids instanceof Set &&
+                node.data.__uid != null &&
+                pathUids.has(node.data.__uid)
               return (
                 <g
                   key={i}
                   transform={`translate(${horizontalLayout.sx(node)},${horizontalLayout.sy(node)})`}
                 >
-                  <circle r={2} fill="#6c757d" />
+                  <circle r={onPath ? 3 : 2} fill={onPath ? "#c94141" : "#6c757d"} />
                 </g>
               )
             })}
@@ -506,8 +654,12 @@ export default function PhyloTreeViewer({
             : "mt-1.5 text-xs text-[#868e96]"
         }
       >
-        {numLeaves} leaves · scroll to zoom · drag to pan · click leaf to open enzyme
+        {numLeaves} leaves · scroll to zoom · drag to pan · click leaf to{" "}
+        {onLeafSelect ? "focus" : "open enzyme"}
         {highlightIds.size > 0 && ` · ${highlightIds.size} from search highlighted`}
+        {neighborhoodActive &&
+          visibleLeafIds instanceof Set &&
+          ` · local neighborhood ${visibleLeafIds.size} tips`}
       </p>
     </div>
   )

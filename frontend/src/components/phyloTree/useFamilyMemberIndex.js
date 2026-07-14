@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import config from "../../config"
 
 /**
- * @returns {Map<string, { enzyme_id, accession, component, family_pid }>}
+ * @returns {Map<string, { enzyme_id, accession, component, family_pid, organism, country }>}
  */
 export function useFamilyMemberIndex(familyId) {
   const [members, setMembers] = useState([])
@@ -46,6 +46,8 @@ export function useFamilyMemberIndex(familyId) {
         accession: m.genbank_accession_id,
         component: m.component,
         family_pid: m.family_pid,
+        organism: m.organism ?? null,
+        country: m.country ?? null,
       })
     }
     return map

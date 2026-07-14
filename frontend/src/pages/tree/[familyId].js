@@ -1,7 +1,8 @@
 /**
  * Phylogenetic Tree Viewer — /tree/:familyId
  *
- * Horizontal dendrogram with in-tree search and search-result highlights.
+ * Horizontal dendrogram with in-tree search, search-result highlights,
+ * and Dry Lab navigation tools (path-to-root, neighbors, local clade, metadata color).
  */
 
 import React, { useMemo } from "react"
@@ -40,7 +41,7 @@ const TreePage = ({ params, location }) => {
 
   return (
     <Layout>
-      <div className="max-w-[1100px] mx-auto px-4 py-6">
+      <div className="max-w-[1280px] mx-auto px-4 py-6">
         <div className="mb-4 flex items-center gap-4 flex-wrap">
           <h1 className="m-0 text-2xl font-semibold">
             Family {familyId} — Phylogenetic Tree
@@ -53,6 +54,11 @@ const TreePage = ({ params, location }) => {
           </Link>
         </div>
 
+        <div className="mb-4 px-3 py-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-md text-foreground">
+          <strong>Navigation prototype</strong> — same tree search as before, plus path to
+          root, nearby sequences, local clade filter, and metadata coloring in the sidebar.
+        </div>
+
         {familyId ? (
           <PhyloTreePanel
             familyId={familyId}
@@ -62,6 +68,8 @@ const TreePage = ({ params, location }) => {
             treeSource="search"
             showSearch
             showSearchBanner
+            showNavTools
+            containerHeight="65vh"
           />
         ) : (
           <div className="text-muted-foreground">Invalid family ID</div>

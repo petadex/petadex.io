@@ -517,6 +517,8 @@ export default function FamilyTemplate({ pageContext }) {
                     treeSource="family"
                     showSearch
                     showSearchBanner={false}
+                    showNavTools
+                    containerHeight="65vh"
                   />
                 )}
               </Section>

@@ -11,6 +11,20 @@ function formatPatristic(d) {
   return d.toFixed(3)
 }
 
+/** Six k presets as ~5/10/25/50/75/100% of other tips (deduped, ascending). */
+function kPresets(maxK) {
+  const n = Math.max(1, Math.floor(Number(maxK) || 1))
+  const raw = [
+    Math.max(1, Math.round(n * 0.05)),
+    Math.max(1, Math.round(n * 0.1)),
+    Math.max(1, Math.round(n * 0.25)),
+    Math.max(1, Math.round(n * 0.5)),
+    Math.max(1, Math.round(n * 0.75)),
+    n,
+  ]
+  return [...new Set(raw)].sort((a, b) => a - b)
+}
+
 /**
  * Navigation sidebar for the phylo-tree prototype: root path, neighbors,
  * local neighborhood controls, and metadata coloring.
@@ -25,11 +39,11 @@ export default function PhyloNavSidebar({
   radius,
   maxRadius,
   kNearest,
+  maxKNearest = 50,
   onRadiusChange,
   onKNearestChange,
   onNeighborhoodModeChange,
   onToggleNeighborhood,
-  onFitNeighborhood,
   onClearNeighborhood,
   onSelectNeighbor,
   colorMode,
@@ -42,6 +56,7 @@ export default function PhyloNavSidebar({
   const focusLabel = focusedLeafId
     ? leafDisplayLabel(focusedLeafId, memberIndex) || focusedLeafId
     : null
+  const kShortcutValues = kPresets(maxKNearest)
 
   return (
     <aside
@@ -166,20 +181,22 @@ export default function PhyloNavSidebar({
           <div className="mb-3">
             <label className="flex justify-between text-xs text-muted-foreground mb-1">
               <span>k nearest neighbors</span>
-              <span className="font-mono">{kNearest}</span>
+              <span className="font-mono">
+                {kNearest} / {maxKNearest}
+              </span>
             </label>
             <input
               type="range"
               className="w-full"
               min={1}
-              max={50}
+              max={maxKNearest}
               step={1}
-              value={kNearest}
+              value={Math.min(kNearest, maxKNearest)}
               disabled={!focusedLeafId}
               onChange={e => onKNearestChange?.(Number(e.target.value))}
             />
             <div className="flex flex-wrap gap-1 mt-2">
-              {[5, 10, 15, 25].map(k => (
+              {kShortcutValues.map(k => (
                 <button
                   key={k}
                   type="button"
@@ -194,24 +211,14 @@ export default function PhyloNavSidebar({
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            disabled={!neighborhoodActive || !focusedLeafId}
-            onClick={() => onFitNeighborhood?.()}
-          >
-            Fit to neighborhood
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={!neighborhoodActive}
-            onClick={() => onClearNeighborhood?.()}
-          >
-            Clear
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          disabled={!neighborhoodActive}
+          onClick={() => onClearNeighborhood?.()}
+        >
+          Clear
+        </button>
       </section>
 
       <section className="rounded-lg border border-border bg-card p-3">

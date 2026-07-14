@@ -47,7 +47,6 @@ export default function PhyloTreePanel({
   const [radius, setRadius] = useState(0)
   const [kNearest, setKNearest] = useState(10)
   const [colorMode, setColorMode] = useState("none")
-  const [fitNonce, setFitNonce] = useState(0)
   const [zoomNonce, setZoomNonce] = useState(0)
 
   const handleMatchesChange = useCallback(state => {
@@ -95,17 +94,29 @@ export default function PhyloTreePanel({
     return Math.max(maxPatristicFromFocus(focusedLeafId, treeIndex), 0.001)
   }, [showNavTools, focusedLeafId, treeIndex])
 
+  // k can be at most (#leaves − 1); no fixed 50 cap.
+  const maxKNearest = useMemo(() => {
+    if (!treeIndex?.leafEnzymeIds?.length) return 1
+    return Math.max(1, treeIndex.leafEnzymeIds.length - 1)
+  }, [treeIndex])
+
+  useEffect(() => {
+    setKNearest(k => Math.min(Math.max(1, k), maxKNearest))
+  }, [maxKNearest])
+
+  // Local neighborhood dims tips when the clade-view toggle is on and a tip is focused.
+  const neighborhoodOn = Boolean(
+    showNavTools && neighborhoodActive && focusedLeafId && treeIndex,
+  )
+
   const visibleLeafIds = useMemo(() => {
-    if (!showNavTools || !neighborhoodActive || !focusedLeafId || !treeIndex) {
-      return null
-    }
+    if (!neighborhoodOn || !focusedLeafId || !treeIndex) return null
     if (neighborhoodMode === "knn") {
       return leavesWithinKNearest(focusedLeafId, treeIndex, kNearest)
     }
     return leavesWithinRadius(focusedLeafId, treeIndex, radius)
   }, [
-    showNavTools,
-    neighborhoodActive,
+    neighborhoodOn,
     focusedLeafId,
     treeIndex,
     neighborhoodMode,
@@ -162,12 +173,10 @@ export default function PhyloTreePanel({
         focusedLeafId={focusedLeafId}
         memberIndex={memberIndex}
         pathUids={pathUids}
-        neighborhoodActive={Boolean(showNavTools && neighborhoodActive)}
+        neighborhoodActive={neighborhoodOn}
         visibleLeafIds={visibleLeafIds}
         getLeafColor={getLeafColor}
         onLeafSelect={showNavTools ? handleLeafSelect : null}
-        fitLeafIds={visibleLeafIds}
-        fitNonce={fitNonce}
         zoomNonce={zoomNonce}
         containerHeight={containerHeight}
       />
@@ -228,11 +237,11 @@ export default function PhyloTreePanel({
             radius={radius}
             maxRadius={maxRadius}
             kNearest={kNearest}
+            maxKNearest={maxKNearest}
             onRadiusChange={setRadius}
             onKNearestChange={setKNearest}
             onNeighborhoodModeChange={setNeighborhoodMode}
             onToggleNeighborhood={setNeighborhoodActive}
-            onFitNeighborhood={() => setFitNonce(n => n + 1)}
             onClearNeighborhood={() => setNeighborhoodActive(false)}
             onSelectNeighbor={handleLeafSelect}
             colorMode={colorMode}

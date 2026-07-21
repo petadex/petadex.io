@@ -1,9 +1,9 @@
 import { COMPONENT_SHADE_CSS } from "../../utils/cathColors"
 
 export const COLOR_MODES = [
-  { id: "none", label: "None (search highlights only)" },
-  { id: "component", label: "Component (CATH atlas)" },
-  { id: "family_pid", label: "Identity to centroid (family_pid)" },
+  { id: "none", label: "None (keep search highlights only)" },
+  { id: "component", label: "Domain component (CATH atlas)" },
+  { id: "family_pid", label: "% identity to family center" },
   { id: "organism", label: "Organism" },
   { id: "country", label: "Country" },
 ]

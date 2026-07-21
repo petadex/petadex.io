@@ -597,7 +597,7 @@ export default function PhyloTreeViewer({
         {highlightIds.size > 0 && ` · ${highlightIds.size} from search highlighted`}
         {neighborhoodActive &&
           visibleLeafIds instanceof Set &&
-          ` · local neighborhood ${visibleLeafIds.size} tips`}
+          ` · showing ${visibleLeafIds.size} nearby tips`}
       </p>
     </div>
   )

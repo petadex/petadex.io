@@ -59,8 +59,8 @@ const PhyloTreePrototypePage = ({ location }) => {
         <div className="mb-4">
           <h1 className="m-0 text-2xl font-semibold">Phylogenetic tree navigation</h1>
           <p className="mt-1 mb-0 text-sm text-muted-foreground max-w-2xl">
-            Uses the existing in-tree search. The sidebar adds path-to-root, nearby tips,
-            local clade filtering, and metadata coloring.
+            Uses the existing in-tree search. The sidebar adds lineage to the root, closest
+            sequences, a “show nearby only” filter, and tip coloring by metadata.
           </p>
         </div>
 

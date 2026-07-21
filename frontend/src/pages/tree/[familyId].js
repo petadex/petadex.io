@@ -55,8 +55,9 @@ const TreePage = ({ params, location }) => {
         </div>
 
         <div className="mb-4 px-3 py-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-md text-foreground">
-          <strong>Navigation prototype</strong> — same tree search as before, plus path to
-          root, nearby sequences, local clade filter, and metadata coloring in the sidebar.
+          <strong>Navigation tools</strong> — same tree search as before, plus a sidebar to
+          trace lineage to the root, list closest sequences, dim distant tips, and color
+          tips by metadata.
         </div>
 
         {familyId ? (

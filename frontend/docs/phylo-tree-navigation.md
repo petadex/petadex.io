@@ -14,26 +14,26 @@ Search still uses `PhyloTreeSearch` against `/api/family/:id/tree-members`.
 Focus a tip by searching or clicking a leaf. Clearing an empty search no longer
 wipes an externally set focus (sidebar neighbor clicks stay selected).
 
-### 2. Path to root
+### 2. Lineage to the root
 
 With a focused tip, the tree highlights the unique path from that tip up to the
-root. The sidebar shows path length (edges). Topology helpers live in
-`treeTopology.js` (UID indexing, tip→root path, LCA, patristic distance).
+root. The sidebar explains how many ancestral nodes are on that path.
 
-### 3. Nearby sequences
+### 3. Closest sequences
 
-The sidebar lists the closest tips by patristic distance (k-NN). Selecting a
-neighbor re-focuses the tree and bumps `zoomNonce` so re-zoom works even when
-the same tip is already focused.
+The sidebar lists the closest tips by **tree distance** (branch-length path via
+the last common ancestor; “steps” = edge count). Selecting a neighbor re-focuses
+the tree and bumps `zoomNonce` so re-zoom works even when the same tip is already
+focused.
 
-### 4. Local neighborhood
+### 4. Show nearby only
 
-Toggle a local neighborhood around the focus tip (**Enable local clade view**):
+Toggle **Dim distant sequences** around the focus tip:
 
-- **Radius** — tips within a patristic-distance radius of the focus
-- **k-NN** — the k nearest tips (slider max = number of other tips in the tree)
+- **By tree distance** — tips within a distance cutoff of the focus
+- **Closest N** — the N nearest tips (slider max = number of other tips in the tree)
 
-Non-neighborhood leaves are dimmed. Clear turns the clade view off.
+Non-neighborhood leaves are dimmed. **Show full tree again** turns the filter off.
 
 ### 5. Color by metadata
 
@@ -105,7 +105,7 @@ S3 family_{id}.nwk ──► PhyloTreePanel ──► PhyloTreeViewer
 
 ## Bug fix — re-zoom when focus is unchanged
 
-**Symptom:** “Re-zoom to tip” (or re-selecting the same leaf) did nothing.
+**Symptom:** “Zoom back to this sequence” (or re-selecting the same leaf) did nothing.
 
 **Cause:** React skipped the zoom effect when `focusedLeafId` was set to the
 same value.
@@ -116,11 +116,11 @@ on `[focusedLeafId, zoomNonce, zoomToLeaf]`.
 ## Testing / verification
 
 - Open `/family/182` and `/tree/182` — sidebar present; Newick loads.
-- Focus via search or click — path-to-root highlights; path length updates.
-- Nearby sequences list sorts by distance; click focuses + zooms.
-- Enable local clade view — dimming updates with radius/k-NN; Clear turns it off
+- Focus via search or click — lineage path highlights; ancestor count updates.
+- Closest sequences list sorts by tree distance; click focuses + zooms.
+- Dim distant sequences — filtering updates with distance / Closest N; Show full tree again turns it off
 - Color modes update tip colors / legend; organism/country only when metadata exists.
-- Re-zoom to an already-focused tip still recenters the viewport.
+- Zoom back to an already-focused tip still recenters the viewport.
 - Empty search does not clear a focus set from the sidebar.
 
 ## Known limitations / follow-ups

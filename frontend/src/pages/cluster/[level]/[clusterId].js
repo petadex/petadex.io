@@ -14,6 +14,7 @@ import Seo from "../../../components/seo"
 import Container from "../../../components/common/Container"
 import config from "../../../config"
 import { useScrollHeader } from "../../../hooks/useScrollHeader"
+import StructurePanel from "../../../components/StructurePanel"
 
 const VALID_LEVELS = new Set(["90", "60", "30"])
 
@@ -118,35 +119,68 @@ export default function ClusterPage({ params }) {
           )}
 
           {status === "ready" && block && (
-            <div className="card p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="flex flex-col">
-                  <span className="label">Centroid accession</span>
-                  <span className="font-mono text-sm font-semibold text-primary break-all">
-                    {centroidAcc ?? "—"}
-                  </span>
+            <>
+              <div className="card p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                  <div className="flex flex-col">
+                    <span className="label">Centroid accession</span>
+                    <span className="font-mono text-sm font-semibold text-primary break-all">
+                      {centroidAcc ?? "—"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="label">Centroid ORF</span>
+                    <span className="font-mono text-sm font-semibold text-primary">
+                      {centroidOrf != null ? (
+                        <Link
+                          to={`/sequence/orf/${centroidOrf}`}
+                          className="text-info border-b border-transparent hover:border-info"
+                        >
+                          {centroidOrf}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="label">Centroid ORF</span>
-                  <span className="font-mono text-sm font-semibold text-primary">
-                    {centroidOrf ?? "—"}
-                  </span>
-                </div>
+
+                {extraFields.length > 0 && (
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm border-t border pt-4">
+                    {extraFields.map(([k, v]) => (
+                      <React.Fragment key={k}>
+                        <span className="text-muted-foreground">{k}</span>
+                        <span className="font-mono text-secondary-foreground break-all">
+                          {k === "dominant_organism" && v ? (
+                            <Link
+                              to={`/organism/${encodeURIComponent(String(v))}`}
+                              className="italic text-info hover:underline"
+                            >
+                              {String(v)}
+                            </Link>
+                          ) : v === null ? (
+                            "—"
+                          ) : (
+                            String(v)
+                          )}
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {extraFields.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm border-t border pt-4">
-                  {extraFields.map(([k, v]) => (
-                    <React.Fragment key={k}>
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="font-mono text-secondary-foreground break-all">
-                        {v === null ? "—" : String(v)}
-                      </span>
-                    </React.Fragment>
-                  ))}
+              {String(level) === "90" && centroidOrf != null && (
+                <div className="card p-6 mt-6">
+                  <StructurePanel
+                    orfId={centroidOrf}
+                    accession={centroidAcc}
+                    title="Centroid fold (ESMFold2)"
+                    emptyMessage="No predicted fold available for this 90% centroid yet."
+                  />
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </Container>

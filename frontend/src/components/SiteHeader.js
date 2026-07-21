@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   },
   { label: "Enzymes", path: "/enzymes", key: "enzymes" },
   { label: "Search", path: "/search", key: "search" },
+  { label: "Biosamples", path: "/biosamples", key: "biosamples" },
   { label: "CATH domains", path: "/cath-domains", key: "cath-domains" },
   { label: "Atlas", path: "/atlas", key: "atlas" },
 ]

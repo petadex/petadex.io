@@ -10,6 +10,7 @@ import SequenceViewer from "../components/sequence/SequenceViewer"
 import LazyPetadexCatalyticDomainsPanel from "../components/petadexDomains/LazyPetadexCatalyticDomainsPanel.jsx"
 import AtlasMap from "../components/charts/AtlasMap"
 import PhyloTreePanel from "../components/phyloTree/PhyloTreePanel"
+import StructurePanel from "../components/StructurePanel"
 import config from "../config"
 import { useScrollHeader } from "../hooks/useScrollHeader"
 import {
@@ -491,12 +492,37 @@ export default function FamilyTemplate({ pageContext }) {
                 <MembersTable familyId={familyId} centroid={family} />
               </Section>
 
+              <Section title="Centroid Structure">
+                <StructurePanel
+                  accession={family.centroid_accession}
+                  title="Centroid 3D structure"
+                  emptyMessage="No predicted or experimental fold indexed for this family centroid yet."
+                />
+                <p className="mt-3 text-sm text-muted-foreground m-0">
+                  Prefer ESMFold2 centroid folds when available; curated experimental
+                  PDBs take precedence. Open the{" "}
+                  <Link
+                    to={`/enzyme/${family.centroid_enzyme_id}`}
+                    className="text-info border-b border-transparent hover:border-info"
+                  >
+                    centroid enzyme
+                  </Link>{" "}
+                  for sequence context, or the family{" "}
+                  <a href="#esm-atlas" className="text-info border-b border-transparent hover:border-info">
+                    ESM Atlas
+                  </a>{" "}
+                  map for embedding neighborhood.
+                </p>
+              </Section>
+
               <Section title="Centroid Metadata">
                 <FamilyMetadata familyId={familyId} />
               </Section>
 
               <Section title="ESM Atlas">
-                <AtlasMap familyId={familyId} />
+                <div id="esm-atlas">
+                  <AtlasMap familyId={familyId} />
+                </div>
               </Section>
 
               <Section title="Phylogenetic Tree">

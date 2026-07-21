@@ -70,10 +70,9 @@ export default function CorpusSequenceTemplate({ pageContext }) {
   const [errorMsg, setErrorMsg] = useState(null)
   // Domain selected in the catalytic-domain track → highlighted in SequenceViewer.
   const [domainSelection, setDomainSelection] = useState(null)
-  // Most corpus ORFs have no curated experimental structure; only mount the
-  // heavy Mol* viewer once we've confirmed one exists (a 200 from /api/pdb).
-  // This avoids the viewer churning on a never-resolving structure lookup.
-  const [pdbAvailable, setPdbAvailable] = useState(false)
+  // Most corpus ORFs have a predicted ESMFold2 fold (Alex); rare curated
+  // experimental PDBs win when present. Probe /api/structure once per ORF.
+  const [structureAvailable, setStructureAvailable] = useState(false)
 
   useEffect(() => {
     if (orfId == null || orfId === "") {
@@ -120,30 +119,26 @@ export default function CorpusSequenceTemplate({ pageContext }) {
     }
   }, [orfId])
 
-  // Structure-availability probe: a curated PDB exists only for the rare ORF
-  // already in `pdb_accessions` (keyed by external accession; Logan ORFs have
-  // none). Probe once per accession and gate the viewer on a real 200.
-  const probeAccession = orf?.accession ?? null
+  // Structure-availability probe: experimental PDB or predicted ESMFold2 CIF
+  // via /api/structure/orf/:id (always preferred over accession-only PDB probe).
   useEffect(() => {
-    if (!probeAccession) {
-      setPdbAvailable(false)
+    if (orfId == null || orfId === "" || status !== "ready") {
+      setStructureAvailable(false)
       return
     }
     let cancelled = false
-    setPdbAvailable(false)
-    fetch(
-      `${config.apiUrl}/pdb/accession/${encodeURIComponent(probeAccession)}`
-    )
+    setStructureAvailable(false)
+    fetch(`${config.apiUrl}/structure/orf/${encodeURIComponent(String(orfId))}`)
       .then(res => {
-        if (!cancelled) setPdbAvailable(res.ok)
+        if (!cancelled) setStructureAvailable(res.ok)
       })
       .catch(() => {
-        if (!cancelled) setPdbAvailable(false)
+        if (!cancelled) setStructureAvailable(false)
       })
     return () => {
       cancelled = true
     }
-  }, [probeAccession])
+  }, [orfId, status])
 
   if (status === "loading") {
     return (
@@ -179,7 +174,7 @@ export default function CorpusSequenceTemplate({ pageContext }) {
   const c90Id = orf?.ancestors?.c90_id ?? null
   // Only show the structure viewer once a curated PDB is confirmed to exist
   // (PAZy/NR ORFs that happen to be in pdb_accessions); Logan ORFs never are.
-  const showStructure = Boolean(orf?.accession) && pdbAvailable
+  const showStructure = structureAvailable
 
   return (
     <Container className="py-12 md:py-16 space-y-8">
@@ -231,10 +226,14 @@ export default function CorpusSequenceTemplate({ pageContext }) {
         onSelectDomain={setDomainSelection}
       />
 
-      {/* ── Structure (only when an external accession exists) ── */}
+      {/* ── Structure (experimental PDB or ESMFold2 prediction) ── */}
       {showStructure && (
         <section className="card p-6">
-          <StructurePanel accession={orf.accession} />
+          <StructurePanel
+            orfId={orf.id}
+            accession={orf.accession}
+            title="3D Structure"
+          />
         </section>
       )}
 

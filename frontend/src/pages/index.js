@@ -225,7 +225,8 @@ const TOOL_CARDS = [
   { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans ~307M sequences in the Logan corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
   { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 / 50 mM BHET. Click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/substrate", Thumb: SubstrateThumb },
   { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for every family, with member tables and centroid sequences.", kbd: "F", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
-  { id: "cath", eyebrow: "05 · CATH", title: "Explore CATH domains", sub: "Literature-backed Pfam / CATH domain profiles with structures, references, and downloadable profile HMMs — linked to the family atlas.", kbd: "C", cta: "Open CATH domains →", href: "/cath-domains", Thumb: AtlasThumb },
+  { id: "biosamples", eyebrow: "05 · Biosamples", title: "Explore SRA & BioSamples", sub: "Run, BioSample, and organism hubs from Denis metadata — linked from ORF provenance and the sample map.", kbd: "P", cta: "Open biosamples →", href: "/biosamples", Thumb: SequenceThumb },
+  { id: "cath", eyebrow: "06 · CATH", title: "Explore CATH domains", sub: "Literature-backed Pfam / CATH domain profiles with structures, references, and downloadable profile HMMs — linked to the family atlas.", kbd: "C", cta: "Open CATH domains →", href: "/cath-domains", Thumb: AtlasThumb },
 ]
 
 function ToolCards() {
@@ -298,7 +299,7 @@ const DATA_ROWS = [
   { t: "Sequences", d: "Curated amino-acid sequences from NCBI BLAST-NR + literature", k: "fastaa · enzyme_fastaa · enzyme_taxonomy" },
   { t: "Structures", d: "Predicted & experimental structures via Molstar + 3DMol viewers", k: "PDB · Molstar · 3DMol.js" },
   { t: "Activity", d: "Plate-reader BHET hydrolysis at three substrate concentrations", k: "plate_data · plate_metadata · plate_activity_view" },
-  { t: "Provenance", d: "Geographic origin, BioSample / SRA links, sampling dates", k: "with_sra_and_biosample_loc_metadata" },
+  { t: "Provenance", d: "Geographic origin, BioSample / SRA links, sampling dates — browse the biosample hub", k: "with_sra_and_biosample_loc_metadata", href: "/biosamples" },
   { t: "Embeddings", d: "UMAP coordinates + CATH-domain colorings for every family", k: "family_atlas (materialized view)" },
   { t: "Phylogenies", d: "Pre-computed Newick trees per family from S3-backed alignments", k: "family/:id/tree" },
 ]
@@ -328,7 +329,15 @@ function WhatsInside() {
             <tbody>
               {DATA_ROWS.map((r, i) => (
                 <tr key={i} className="hover:bg-surface-raised transition-colors">
-                  <td className="px-4 py-3 sm:px-5 sm:py-4 text-foreground font-medium">{r.t}</td>
+                  <td className="px-4 py-3 sm:px-5 sm:py-4 text-foreground font-medium">
+                    {r.href ? (
+                      <a href={r.href} className="text-accent hover:underline">
+                        {r.t}
+                      </a>
+                    ) : (
+                      r.t
+                    )}
+                  </td>
                   <td className="px-4 py-3 sm:px-5 sm:py-4 text-muted-foreground">{r.d}</td>
                   <td className="hidden sm:table-cell px-5 py-4 text-xs font-mono text-accent/85">{r.k}</td>
                 </tr>

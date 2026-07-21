@@ -168,6 +168,17 @@ export default function EnzymeTemplate({ pageContext }) {
               {enzyme.variant !== null && (
                 <MetaPill label="Variant">{enzyme.variant}</MetaPill>
               )}
+
+              {enzyme.library_id && (
+                <MetaPill label="SRA library">
+                  <Link
+                    to={`/sra/${encodeURIComponent(enzyme.library_id)}`}
+                    className="text-accent hover:text-accent-hover font-mono"
+                  >
+                    {enzyme.library_id}
+                  </Link>
+                </MetaPill>
+              )}
             </div>
 
             <p className="text-sm text-muted-foreground">

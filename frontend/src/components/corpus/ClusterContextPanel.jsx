@@ -6,6 +6,7 @@
 // (GET /api/cluster/90/{c90_id}) and shows the neighborhood facts, with a link to
 // the full cluster page (/cluster/90/{c90_id}).
 import React, { useEffect, useState } from "react"
+import { Link } from "gatsby"
 import config from "../../config"
 
 function Stat({ label, value }) {
@@ -123,16 +124,26 @@ export default function ClusterContextPanel({ c90Id, ancestors }) {
               <Stat label="NR members" value={block.n_nr} />
             )}
             {block.n_sra != null && (
-              <Stat label="SRA members" value={block.n_sra} />
+              <Stat
+                label="SRA members"
+                value={
+                  <Link to="/biosamples" className="text-info hover:underline">
+                    {block.n_sra}
+                  </Link>
+                }
+              />
             )}
           </div>
 
           {block.dominant_organism && (
             <p className="text-sm text-muted-foreground mt-4 mb-0">
               Dominant organism:{" "}
-              <span className="italic text-foreground">
+              <Link
+                to={`/organism/${encodeURIComponent(block.dominant_organism)}`}
+                className="italic text-info hover:underline"
+              >
                 {block.dominant_organism}
-              </span>
+              </Link>
             </p>
           )}
 

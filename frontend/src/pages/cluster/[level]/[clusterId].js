@@ -175,7 +175,7 @@ export default function ClusterPage({ params }) {
                   <StructurePanel
                     orfId={centroidOrf}
                     accession={centroidAcc}
-                    title="Centroid fold (ESMFold2)"
+                    title="Folding Viewer · centroid (ESMFold2)"
                     emptyMessage="No predicted fold available for this 90% centroid yet."
                   />
                 </div>

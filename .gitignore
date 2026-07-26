@@ -41,3 +41,4 @@ generated-schema 2.md
 docs/.cursor/
 docs/metadata-map.md
 docs/*
+.DS_Store

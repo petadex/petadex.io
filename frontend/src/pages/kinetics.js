@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
 import { useScrollHeader } from "../hooks/useScrollHeader"
@@ -10,65 +10,297 @@ const predictedData = [
   { enzyme: "IsPETase-like candidate #2", species: "CatPred hit", substrate: "MHET", temp: "30", ph: "8.0", kcat: "0.140", km: "0.0000015", ratio: "93333.3", model: "CatPred v1.2" }
 ]
 
+// ── Cell render helpers ────────────────────────────────────────────────────
+const doiLink = v =>
+  v ? (
+    <a
+      href={v}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="View paper"
+      className="whitespace-nowrap text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+    >
+      Paper ↗
+    </a>
+  ) : (
+    "—"
+  )
+
+// Long free-text / sequence fields: truncate but keep the full value on hover.
+const truncated = v =>
+  v ? (
+    <span className="block max-w-56 truncate" title={v}>
+      {v}
+    </span>
+  ) : (
+    "—"
+  )
+
+// ── Column definitions ─────────────────────────────────────────────────────
+// Both tabs show the same nine columns in the collapsed (default) view, so the
+// layout lives in one place. Percent widths + `table-fixed` keep that view
+// inside the viewport — no horizontal scrolling until "Show all fields" is on.
+// Units live on their own line under the header label to keep the numeric
+// columns narrow.
+const makeBaseColumns = (keys, sourceColumn) => [
+  { key: keys.enzyme, label: "Enzyme", width: "19%", cellClass: "font-medium text-foreground break-words" },
+  { key: keys.species, label: "Organism", width: "19%", cellClass: "italic text-secondary-foreground break-words" },
+  { key: keys.substrate, label: "Substrate", width: "13%", cellClass: "text-secondary-foreground break-words" },
+  { key: keys.temp, label: "Temp", unit: "°C", numeric: true, width: "7%", cellClass: "text-muted-foreground" },
+  { key: keys.ph, label: "pH", numeric: true, width: "6%", cellClass: "text-muted-foreground" },
+  {
+    key: keys.kcat,
+    label: (<span>k<sub>cat</sub></span>),
+    unit: "s⁻¹",
+    numeric: true,
+    width: "9%",
+    cellClass: "font-mono text-xs tabular-nums text-secondary-foreground",
+  },
+  {
+    key: keys.km,
+    label: (<span>K<sub>m</sub></span>),
+    unit: "M",
+    numeric: true,
+    width: "9%",
+    cellClass: "font-mono text-xs tabular-nums text-secondary-foreground",
+  },
+  {
+    key: keys.ratio,
+    label: (<span>k<sub>cat</sub>/K<sub>m</sub></span>),
+    unit: "M⁻¹s⁻¹",
+    numeric: true,
+    width: "10%",
+    cellClass: "font-mono text-xs tabular-nums text-accent font-medium",
+  },
+  sourceColumn,
+]
+
+// Published (SQL) table — keys are the raw plastic_kinetics_published column names.
+const PUBLISHED_BASE_COLUMNS = makeBaseColumns(
+  {
+    enzyme: "Enzyme",
+    species: "Species",
+    substrate: "Substrate",
+    temp: "Temperature",
+    ph: "pH",
+    kcat: "Kcat_(/s)",
+    km: "Km_(M)",
+    ratio: "Kcat/Km_(/s/M)",
+  },
+  { key: "DOI", label: "Source", sortable: false, width: "8%", render: doiLink }
+)
+
+// Extra columns revealed by the "Show all fields" toggle.
+const PUBLISHED_EXTRA_COLUMNS = [
+  { key: "Class", label: "Class", cellClass: "text-secondary-foreground" },
+  { key: "Experiment_#", label: "Experiment #", cellClass: "font-mono text-muted-foreground" },
+  { key: "Uniprot", label: "UniProt", cellClass: "font-mono text-secondary-foreground" },
+  { key: "GenBank", label: "GenBank", cellClass: "font-mono text-secondary-foreground" },
+  { key: "AA_SEQ", label: "AA sequence", sortable: false, cellClass: "font-mono text-2xs text-muted-foreground", render: truncated },
+  { key: "Substrate_SMILES", label: "Substrate SMILES", sortable: false, cellClass: "font-mono text-2xs text-muted-foreground", render: truncated },
+  { key: "Paper_#", label: "Paper #", numeric: true, cellClass: "text-muted-foreground" },
+  { key: "Pubmed", label: "PubMed", cellClass: "font-mono text-muted-foreground" },
+  { key: "Supplemental", label: "Supplemental", sortable: false, cellClass: "text-muted-foreground", render: truncated },
+]
+
+// Predicted (static) table — keys match predictedData.
+const PREDICTED_COLUMNS = makeBaseColumns(
+  {
+    enzyme: "enzyme",
+    species: "species",
+    substrate: "substrate",
+    temp: "temp",
+    ph: "ph",
+    kcat: "kcat",
+    km: "km",
+    ratio: "ratio",
+  },
+  {
+    key: "model",
+    label: "Source",
+    sortable: false,
+    width: "8%",
+    cellClass: "text-muted-foreground italic text-2xs break-words",
+  }
+)
+
 const KineticsPage = () => {
   useScrollHeader()
 
   const [activeTab, setActiveTab] = useState("published")
   const [searchTerm, setSearchTerm] = useState("")
+  const [substrateFilter, setSubstrateFilter] = useState("")
+  const [organismFilter, setOrganismFilter] = useState("")
   const [experimentalData, setExperimentalData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [headerHidden, setHeaderHidden] = useState(false)
+  const [sortKey, setSortKey] = useState(null)
+  const [sortDir, setSortDir] = useState("asc")
+  const [showAllFields, setShowAllFields] = useState(false)
 
-  // Fetch published kinetics from the API
+  // Mirror SiteHeader's hide-on-scroll-down behavior so the sticky tab bar
+  // can collapse upward instead of leaving a gap.
   useEffect(() => {
-    if (activeTab === "published") {
-      setLoading(true)
-      fetch(`${config.apiUrl}/kinetics/published`) // adjust endpoint as needed
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          return res.json()
-        })
-        .then(data => {
-          setExperimentalData(Array.isArray(data) ? data : data.data || [])
-          setError(null)
-        })
-        .catch(err => {
-          console.error("Error fetching published kinetics:", err)
-          setError("Failed to load published data. Please try again later.")
-        })
-        .finally(() => setLoading(false))
+    let last = 0
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        const y = window.scrollY
+        setHeaderHidden(y > 80 && y > last)
+        last = y
+        ticking = false
+      })
     }
-  }, [activeTab]) // re-fetch when tab changes? only if you want to refresh
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // Fetch the complete published table (all columns) from the API. The same
+  // payload powers the table, the "Show all fields" toggle, and the download.
+  useEffect(() => {
+    if (activeTab !== "published") return
+    setLoading(true)
+    fetch(`${config.apiUrl}/kinetics/published/raw`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+      })
+      .then(data => {
+        setExperimentalData(Array.isArray(data) ? data : data.data || [])
+        setError(null)
+      })
+      .catch(err => {
+        console.error("Error fetching published kinetics:", err)
+        setError("Failed to load published data. Please try again later.")
+      })
+      .finally(() => setLoading(false))
+  }, [activeTab])
+
+  const switchTab = tab => {
+    setActiveTab(tab)
+    setSearchTerm("")
+    setSubstrateFilter("")
+    setOrganismFilter("")
+    setSortKey(null)
+  }
 
   const currentDataset = activeTab === "published" ? experimentalData : predictedData
 
-  const filteredData = currentDataset.filter(row =>
-    Object.values(row).some(val =>
-      String(val).toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  )
+  // Extract unique values for filter dropdowns
+  const uniqueSubstrates = useMemo(() => {
+    const key = activeTab === "published" ? "Substrate" : "substrate"
+    const values = new Set(currentDataset.map(row => row[key]).filter(Boolean))
+    return Array.from(values).sort()
+  }, [currentDataset, activeTab])
 
-  // Generate CSV from the full dataset (all columns)
-  const generateCSV = (data) => {
+  const uniqueOrganisms = useMemo(() => {
+    const key = activeTab === "published" ? "Species" : "species"
+    const values = new Set(currentDataset.map(row => row[key]).filter(Boolean))
+    return Array.from(values).sort()
+  }, [currentDataset, activeTab])
+
+  const columns = useMemo(() => {
+    if (activeTab !== "published") return PREDICTED_COLUMNS
+    return showAllFields
+      ? [...PUBLISHED_BASE_COLUMNS, ...PUBLISHED_EXTRA_COLUMNS]
+      : PUBLISHED_BASE_COLUMNS
+  }, [activeTab, showAllFields])
+
+  // Only the nine base columns have widths that add up to 100%; the expanded
+  // view falls back to auto layout + horizontal scroll.
+  const fixedLayout = activeTab !== "published" || !showAllFields
+
+  const filteredData = useMemo(() => {
+    const substrateKey = activeTab === "published" ? "Substrate" : "substrate"
+    const organismKey = activeTab === "published" ? "Species" : "species"
+
+    return currentDataset.filter(row => {
+      // Text search across all fields
+      const matchesSearch =
+        !searchTerm ||
+        Object.values(row).some(val =>
+          String(val ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
+
+      // Dropdown filters
+      const matchesSubstrate =
+        !substrateFilter || row[substrateKey] === substrateFilter
+      const matchesOrganism =
+        !organismFilter || row[organismKey] === organismFilter
+
+      return matchesSearch && matchesSubstrate && matchesOrganism
+    })
+  }, [currentDataset, searchTerm, substrateFilter, organismFilter, activeTab])
+
+  const handleSort = key => {
+    if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
+    else {
+      setSortKey(key)
+      setSortDir("asc")
+    }
+  }
+
+  const sortedData = useMemo(() => {
+    const col = columns.find(c => c.key === sortKey)
+    if (!sortKey || !col) return filteredData // hidden/absent column → leave unsorted
+    const numeric = col.numeric
+    return [...filteredData].sort((a, b) => {
+      const av = a[sortKey]
+      const bv = b[sortKey]
+      const aEmpty = av == null || av === ""
+      const bEmpty = bv == null || bv === ""
+      if (aEmpty && bEmpty) return 0
+      if (aEmpty) return 1 // nulls always sort last
+      if (bEmpty) return -1
+      let cmp
+      if (numeric) {
+        const an = Number(av)
+        const bn = Number(bv)
+        cmp = isNaN(an) || isNaN(bn) ? String(av).localeCompare(String(bv)) : an - bn
+      } else {
+        cmp = String(av).toLowerCase().localeCompare(String(bv).toLowerCase())
+      }
+      return sortDir === "asc" ? cmp : -cmp
+    })
+  }, [filteredData, sortKey, sortDir, columns])
+
+  // Build a CSV string from an array of row objects, using their keys as headers.
+  const generateCSV = data => {
     if (!data || data.length === 0) return ""
     const headers = Object.keys(data[0])
-    const rows = data.map(row => headers.map(h => `"${String(row[h] || "").replace(/"/g, '""')}"`).join(","))
+    const rows = data.map(row =>
+      headers.map(h => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(",")
+    )
     return [headers.join(","), ...rows].join("\n")
   }
 
-  const downloadCSV = () => {
-    const dataToDownload = activeTab === "published" ? experimentalData : predictedData
-    const csv = generateCSV(dataToDownload)
+  const triggerDownload = (csv, filename) => {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
     link.setAttribute("href", url)
-    link.setAttribute("download", `${activeTab}_kinetics.csv`)
+    link.setAttribute("download", filename)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
   }
+
+  // Published: download the complete raw SQL table (all columns, all rows).
+  const downloadRawPublished = () => {
+    if (!experimentalData.length) return
+    triggerDownload(generateCSV(experimentalData), "plastic_kinetics_published_full.csv")
+  }
+
+  const downloadPredicted = () => {
+    triggerDownload(generateCSV(predictedData), "predicted_kinetics.csv")
+  }
+
+  const showLoading = loading && activeTab === "published"
+  const showError = error && activeTab === "published"
 
   return (
     <>
@@ -87,12 +319,16 @@ const KineticsPage = () => {
         </Container>
       </section>
 
-      {/* Sticky tabs */}
-      <div className="sticky z-30 bg-background/95 backdrop-blur-md border-b border-border transition-[top] duration-300 ease-out top-16">
+      {/* Sticky tabs — collapses to top:0 when SiteHeader auto-hides */}
+      <div
+        className={`sticky z-30 bg-background/95 backdrop-blur-md border-b border-border transition-[top] duration-300 ease-out ${
+          headerHidden ? "top-0" : "top-16"
+        }`}
+      >
         <Container>
           <nav className="flex gap-1 overflow-x-auto -mx-2 px-2" aria-label="Kinetics data source">
             <button
-              onClick={() => { setActiveTab("published"); setSearchTerm(""); }}
+              onClick={() => switchTab("published")}
               className={`relative shrink-0 px-4 md:px-5 py-4 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md ${
                 activeTab === "published"
                   ? "text-foreground"
@@ -119,7 +355,7 @@ const KineticsPage = () => {
             </button>
 
             <button
-              onClick={() => { setActiveTab("predicted"); setSearchTerm(""); }}
+              onClick={() => switchTab("predicted")}
               className={`relative shrink-0 px-4 md:px-5 py-4 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md ${
                 activeTab === "predicted"
                   ? "text-foreground"
@@ -162,78 +398,195 @@ const KineticsPage = () => {
       {/* Main content */}
       <section className="py-8 md:py-10">
         <Container>
-          {/* Controls: Search + Download */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <input
-              type="text"
-              placeholder="Search by enzyme, organism, substrate, or any field…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input w-full sm:w-80 text-sm py-2.5"
-            />
+          {/* WIP notice for Predicted tab */}
+          {activeTab === "predicted" && (
+            <div className="mb-6 px-4 py-3 rounded-lg border border-warning/30 bg-warning/5 text-warning">
+              <p className="text-sm font-medium">
+                This section is a work in progress.
+              </p>
+              <p className="text-xs mt-1 text-warning/80">
+                We are actively adding CatPred model predictions. Check back soon for updates.
+              </p>
+            </div>
+          )}
 
-            <button
-              onClick={downloadCSV}
-              disabled={activeTab === "published" && loading}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-white font-medium text-sm hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download CSV
-            </button>
+          {/* Controls: Search + Filters + Download */}
+          <div className="flex flex-col gap-4 mb-4">
+            {/* Row 1: Search + Dropdowns */}
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input w-40 sm:w-48 text-sm py-2"
+              />
+
+              <select
+                value={substrateFilter}
+                onChange={(e) => setSubstrateFilter(e.target.value)}
+                className="input text-sm py-2 pr-8 min-w-[140px]"
+              >
+                <option value="">All substrates</option>
+                {uniqueSubstrates.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select
+                value={organismFilter}
+                onChange={(e) => setOrganismFilter(e.target.value)}
+                className="input text-sm py-2 pr-8 min-w-[160px]"
+              >
+                <option value="">All organisms</option>
+                {uniqueOrganisms.map(o => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+
+              {(searchTerm || substrateFilter || organismFilter) && (
+                <button
+                  onClick={() => {
+                    setSearchTerm("")
+                    setSubstrateFilter("")
+                    setOrganismFilter("")
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            {/* Row 2: Show all fields + Download */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {activeTab === "published" && (
+                  <label className="inline-flex items-center gap-2 text-sm text-secondary-foreground cursor-pointer select-none whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={showAllFields}
+                      onChange={(e) => setShowAllFields(e.target.checked)}
+                      className="accent-accent w-4 h-4"
+                    />
+                    Show all fields
+                  </label>
+                )}
+
+                {activeTab === "published" && !showAllFields && (
+                  <p className="text-xs text-muted-foreground hidden sm:block">
+                    Toggle to see all columns, or download for the complete table.
+                  </p>
+                )}
+              </div>
+
+              {activeTab === "published" ? (
+                <button
+                  className="btn btn-outline"
+                  onClick={downloadRawPublished}
+                  disabled={loading || !experimentalData.length}
+                  title="Download the complete raw plastic_kinetics_published table"
+                >
+                  Download CSV
+                </button>
+              ) : (
+                <button className="btn btn-outline" onClick={downloadPredicted}>
+                  Download CSV
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Data Table */}
-          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-            {loading && activeTab === "published" ? (
+          <div
+            className="w-full max-h-[calc(100vh-280px)] overflow-auto rounded-xl border border-border bg-card shadow-sm"
+            style={{
+              scrollbarWidth: "thin",
+              scrollbarColor: "var(--color-border) transparent",
+            }}
+          >
+            {showLoading ? (
               <div className="px-4 py-12 text-center text-muted-foreground">Loading published data…</div>
-            ) : error ? (
+            ) : showError ? (
               <div className="px-4 py-12 text-center text-destructive">{error}</div>
             ) : (
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Enzyme</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organism</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Substrate</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Temp / pH</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">k<sub>cat</sub> (s⁻¹)</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">K<sub>m</sub> (M)</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">k<sub>cat</sub>/K<sub>m</sub> (M⁻¹s⁻¹)</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source</th>
+              <table
+                className={`border-collapse text-sm ${
+                  fixedLayout ? "w-full table-fixed" : "min-w-full"
+                }`}
+              >
+                <thead className="sticky top-0 z-10">
+                  <tr>
+                    {columns.map(col => {
+                      const sortable = col.sortable !== false
+                      return (
+                        <th
+                          key={col.key}
+                          onClick={sortable ? () => handleSort(col.key) : undefined}
+                          style={fixedLayout && col.width ? { width: col.width } : undefined}
+                          className={`bg-surface-raised align-bottom py-2 px-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${
+                            col.numeric ? "text-right" : "text-left"
+                          } ${fixedLayout ? "" : "whitespace-nowrap"} ${
+                            sortable ? "cursor-pointer select-none" : ""
+                          }`}
+                        >
+                          <span
+                            className={`inline-flex items-start gap-1 ${
+                              col.numeric ? "justify-end" : ""
+                            }`}
+                          >
+                            <span className="leading-tight">
+                              {col.label}
+                              {col.unit && (
+                                <span className="block text-2xs font-normal normal-case tracking-normal opacity-60">
+                                  {col.unit}
+                                </span>
+                              )}
+                            </span>
+                            {sortable && (
+                              <span
+                                className={`text-xs ${
+                                  sortKey === col.key ? "opacity-100" : "opacity-30"
+                                }`}
+                              >
+                                {sortKey === col.key ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                              </span>
+                            )}
+                          </span>
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.length > 0 ? (
-                    filteredData.map((row, idx) => (
-                      <tr key={idx} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3.5 text-sm font-medium text-foreground">{row.enzyme}</td>
-                        <td className="px-4 py-3.5 text-sm text-secondary-foreground italic">{row.species}</td>
-                        <td className="px-4 py-3.5 text-sm text-secondary-foreground">{row.substrate}</td>
-                        <td className="px-4 py-3.5 text-sm text-muted-foreground">{row.temp}°C / pH {row.ph || "N/A"}</td>
-                        <td className="px-4 py-3.5 text-sm font-mono text-secondary-foreground">{row.kcat}</td>
-                        <td className="px-4 py-3.5 text-sm font-mono text-secondary-foreground">{row.km}</td>
-                        <td className="px-4 py-3.5 text-sm font-mono text-accent font-medium">{row.ratio}</td>
-                        <td className="px-4 py-3.5 text-sm">
-                          {activeTab === "published" ? (
-                            <a
-                              href={row.doi}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-accent hover:text-accent-hover underline underline-offset-2 transition-colors"
+                  {sortedData.length > 0 ? (
+                    sortedData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-surface-raised transition-colors">
+                        {columns.map(col => {
+                          const value = row[col.key]
+                          return (
+                            <td
+                              key={col.key}
+                              className={`py-2 px-2.5 align-top ${
+                                col.numeric ? "text-right" : ""
+                              } ${col.cellClass || ""}`}
                             >
-                              View Paper ↗
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">{row.model}</span>
-                          )}
-                        </td>
+                              {col.render
+                                ? col.render(value)
+                                : value === "" || value == null
+                                ? "—"
+                                : value}
+                            </td>
+                          )
+                        })}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="8" className="px-4 py-12 text-center text-muted-foreground italic">
+                      <td
+                        colSpan={columns.length}
+                        className="px-4 py-12 text-center text-muted-foreground italic"
+                      >
                         No matching kinetics record found.
                       </td>
                     </tr>
@@ -244,7 +597,7 @@ const KineticsPage = () => {
           </div>
 
           <p className="text-xs text-muted-foreground mt-4 text-center">
-            {filteredData.length} record{filteredData.length !== 1 ? "s" : ""} shown
+            {sortedData.length} record{sortedData.length !== 1 ? "s" : ""} shown
           </p>
         </Container>
       </section>

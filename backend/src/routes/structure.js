@@ -1,13 +1,15 @@
 // backend/src/routes/structure.js
 //
 // Resolve an ORF / accession to a viewable 3D structure for Mol*.
-// Preference order: experimental PDB (pdb_accessions) → ESMFold2 90pid centroid
-// CIF → ESMFold2 ORF CIF. Predicted URLs follow Alex's S3 layout under
-// petadex-protein-structures (assumed readable; ACL is a parallel ops track).
+// Preference order: experimental PDB (pdb_accessions) → Alex ESMFold2 predicted
+// CIF under petadex-protein-structures.
 //
-// Assumed finetune parallels (confirm with Alex):
-//   esmfold2-centroids/90pid-finetune/...
-//   esmatlas-finetune/...
+// Alex schema (Jul 2026):
+//   {lane}/structures/orf{id}.cif
+//   {lane}/metrics/orf{id}.json
+// Demo lane (public today): esmfold2-centroids/test2
+// Production lane (coming): esmfold2-centroids/60pid
+// Experimental group (was “finetune”): MSA — set STRUCTURE_S3_MSA_LANE when shipped
 import { Router } from 'express';
 import Joi from 'joi';
 import { pool } from '../db.js';
@@ -20,49 +22,91 @@ const STRUCTURE_S3_BASE = (
   'https://petadex-protein-structures.s3.amazonaws.com'
 ).replace(/\/$/, '');
 
-const STRUCTURE_ARRAY_EXT = process.env.STRUCTURE_ARRAY_EXT || '.npy';
+/** Baseline predicted folds. test2 = public demo; switch to 60pid when Alex opens it. */
+const STRUCTURE_S3_LANE = (
+  process.env.STRUCTURE_S3_LANE ||
+  'esmfold2-centroids/test2'
+).replace(/^\/+|\/+$/g, '');
+
+/**
+ * Optional MSA experimental lane (replaces former “finetune” labeling).
+ * Empty → no Base/MSA toggle until Alex ships it.
+ * Example (assumed): esmfold2-centroids/60pid-msa
+ */
+const STRUCTURE_S3_MSA_LANE = (
+  process.env.STRUCTURE_S3_MSA_LANE ||
+  process.env.STRUCTURE_S3_FINETUNE_LANE || // legacy env alias
+  ''
+).replace(/^\/+|\/+$/g, '');
 
 const orfIdSchema = Joi.number().integer().min(1).required();
 const accessionSchema = Joi.string().max(64).required();
-const variantSchema = Joi.string().valid('base', 'finetune').default('base');
+// `finetune` accepted as legacy alias for `msa`
+const variantSchema = Joi.string().valid('base', 'msa', 'finetune').default('base');
 
-function predictedUrls(orfId, { isCentroid90, finetune = false } = {}) {
-  const id = String(orfId);
-  if (isCentroid90) {
-    const root = finetune
-      ? 'esmfold2-centroids/90pid-finetune'
-      : 'esmfold2-centroids/90pid';
-    return {
-      structure_url: `${STRUCTURE_S3_BASE}/${root}/structures/${id}.cif`,
-      metrics_url: `${STRUCTURE_S3_BASE}/${root}/arrays/${id}${STRUCTURE_ARRAY_EXT}`,
-    };
-  }
-  const root = finetune ? 'esmatlas-finetune' : 'esmatlas';
+function normalizeVariant(v) {
+  return v === 'finetune' ? 'msa' : v;
+}
+
+function predictedUrls(orfId, { msa = false } = {}) {
+  const lane = msa ? STRUCTURE_S3_MSA_LANE : STRUCTURE_S3_LANE;
+  if (!lane) return { structure_url: null, metrics_url: null };
+  const key = `orf${orfId}`;
   return {
-    structure_url: `${STRUCTURE_S3_BASE}/${root}/structures/${id}.cif`,
-    metrics_url: `${STRUCTURE_S3_BASE}/${root}/arrays/${id}${STRUCTURE_ARRAY_EXT}`,
+    structure_url: `${STRUCTURE_S3_BASE}/${lane}/structures/${key}.cif`,
+    metrics_url: `${STRUCTURE_S3_BASE}/${lane}/metrics/${key}.json`,
   };
 }
 
-function predictedPayload(orfId, { isCentroid90, accession = null, variant = 'base' } = {}) {
-  const base = predictedUrls(orfId, { isCentroid90, finetune: false });
-  const ft = predictedUrls(orfId, { isCentroid90, finetune: true });
-  const active = variant === 'finetune' ? ft : base;
+function predictedPayload(orfId, { isCentroid, accession = null, variant = 'base' } = {}) {
+  const base = predictedUrls(orfId, { msa: false });
+  const msaUrls = predictedUrls(orfId, { msa: true });
+  const wantMsa = variant === 'msa' && msaUrls.structure_url;
+  const active = wantMsa ? msaUrls : base;
   return {
     orf_id: orfId,
     accession,
-    source: isCentroid90 ? 'esmfold2_centroid_90' : 'esmfold2_orf',
+    source: isCentroid ? 'esmfold2_centroid_60' : 'esmfold2_orf',
     format: 'mmcif',
-    variant,
+    variant: wantMsa ? 'msa' : 'base',
     structure_url: active.structure_url,
     metrics_url: active.metrics_url,
     base_structure_url: base.structure_url,
     base_metrics_url: base.metrics_url,
-    finetune_structure_url: ft.structure_url,
-    finetune_metrics_url: ft.metrics_url,
+    msa_structure_url: msaUrls.structure_url,
+    msa_metrics_url: msaUrls.metrics_url,
+    // legacy aliases (same URLs) so older clients keep working briefly
+    finetune_structure_url: msaUrls.structure_url,
+    finetune_metrics_url: msaUrls.metrics_url,
     method: 'ESMFold2',
     updated_at: null,
+    s3_lane: wantMsa ? STRUCTURE_S3_MSA_LANE : STRUCTURE_S3_LANE,
   };
+}
+
+/** True if the predicted CIF is publicly fetchable (Range GET; HEAD is flaky on this bucket). */
+async function predictedFileExists(url) {
+  if (!url) return false;
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok || res.status === 206) return true;
+    if (res.status === 404 || res.status === 403) return false;
+  } catch {
+    // fall through
+  }
+  try {
+    const head = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(8000),
+    });
+    return head.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function fetchExperimentalByAccession(accession) {
@@ -87,6 +131,8 @@ async function fetchExperimentalByAccession(accession) {
     metrics_url: null,
     base_structure_url: `https://petadex.s3.amazonaws.com/pdb_structs/${row.pdb_id}.pdb`,
     base_metrics_url: null,
+    msa_structure_url: null,
+    msa_metrics_url: null,
     finetune_structure_url: null,
     finetune_metrics_url: null,
     method: row.technique || 'experimental',
@@ -97,10 +143,11 @@ async function fetchExperimentalByAccession(accession) {
   };
 }
 
-async function isCentroid90(orfId) {
+/** True if this ORF is a 60% identity centroid (Alex production lane). */
+async function isCentroid60(orfId) {
   try {
     const { rows } = await pool.query(
-      `SELECT 1 AS ok FROM block_90pid WHERE centroid_orf_id = $1 LIMIT 1`,
+      `SELECT 1 AS ok FROM block_60pid WHERE centroid_orf_id = $1 LIMIT 1`,
       [orfId],
     );
     return rows.length > 0;
@@ -142,23 +189,44 @@ async function orfAccession(orfId) {
   }
 }
 
+async function maybeClearMsaUrls(payload) {
+  if (
+    payload.msa_structure_url &&
+    !(await predictedFileExists(payload.msa_structure_url))
+  ) {
+    payload.msa_structure_url = null;
+    payload.msa_metrics_url = null;
+    payload.finetune_structure_url = null;
+    payload.finetune_metrics_url = null;
+  }
+  return payload;
+}
+
 async function resolveForOrf(orfId, variant = 'base') {
   const accession = await orfAccession(orfId);
   const experimental = await fetchExperimentalByAccession(accession);
   if (experimental) {
     return { ...experimental, orf_id: orfId };
   }
-  const centroid = await isCentroid90(orfId);
-  return predictedPayload(orfId, { isCentroid90: centroid, accession, variant });
+  const centroid = await isCentroid60(orfId);
+  const payload = predictedPayload(orfId, {
+    isCentroid: centroid,
+    accession,
+    variant: normalizeVariant(variant),
+  });
+  if (!(await predictedFileExists(payload.structure_url))) {
+    return null;
+  }
+  return maybeClearMsaUrls(payload);
 }
 
 function parseVariant(req) {
   const { error, value } = variantSchema.validate(req.query.variant ?? 'base');
   if (error) return { error: error.message };
-  return { value };
+  return { value: normalizeVariant(value) };
 }
 
-// GET /api/structure/orf/:orfId?variant=base|finetune
+// GET /api/structure/orf/:orfId?variant=base|msa
 router.get('/orf/:orfId', async (req, res, next) => {
   const { error, value: orfId } = orfIdSchema.validate(Number(req.params.orfId));
   if (error) return res.status(400).json({ error: error.message });
@@ -173,7 +241,11 @@ router.get('/orf/:orfId', async (req, res, next) => {
     if (!rows.length) {
       return res.status(404).json({ error: `ORF ${orfId} not found` });
     }
-    res.json(await resolveForOrf(orfId, variantResult.value));
+    const resolved = await resolveForOrf(orfId, variantResult.value);
+    if (!resolved) {
+      return res.status(404).json({ error: 'No structure available for this ORF' });
+    }
+    res.json(resolved);
   } catch (err) {
     if (err.code === '42P01') {
       return res.status(503).json({ error: 'Structure backing table is unavailable' });
@@ -182,7 +254,7 @@ router.get('/orf/:orfId', async (req, res, next) => {
   }
 });
 
-// GET /api/structure/accession/:accession?variant=base|finetune
+// GET /api/structure/accession/:accession?variant=base|msa
 router.get('/accession/:accession', async (req, res, next) => {
   const { error, value: accession } = accessionSchema.validate(req.params.accession);
   if (error) return res.status(400).json({ error: error.message });
@@ -214,14 +286,20 @@ router.get('/accession/:accession', async (req, res, next) => {
       });
     }
 
-    const centroid = await isCentroid90(orfId);
-    res.json(
+    const centroid = await isCentroid60(orfId);
+    const payload = await maybeClearMsaUrls(
       predictedPayload(orfId, {
-        isCentroid90: centroid,
+        isCentroid: centroid,
         accession,
         variant: variantResult.value,
       }),
     );
+    if (!(await predictedFileExists(payload.structure_url))) {
+      return res.status(404).json({
+        error: 'No structure available for this accession',
+      });
+    }
+    res.json(payload);
   } catch (err) {
     if (err.code === '42P01') {
       return res.status(503).json({ error: 'Structure backing table is unavailable' });
@@ -230,7 +308,7 @@ router.get('/accession/:accession', async (req, res, next) => {
   }
 });
 
-// GET /api/structure/metrics/:orfId?variant=base|finetune
+// GET /api/structure/metrics/:orfId?variant=base|msa
 router.get('/metrics/:orfId', async (req, res, next) => {
   const { error, value: orfId } = orfIdSchema.validate(Number(req.params.orfId));
   if (error) return res.status(400).json({ error: error.message });
@@ -247,6 +325,9 @@ router.get('/metrics/:orfId', async (req, res, next) => {
     }
 
     const resolved = await resolveForOrf(orfId, variantResult.value);
+    if (!resolved) {
+      return res.status(404).json({ error: 'No structure available for this ORF' });
+    }
     if (resolved.source === 'experimental_pdb') {
       return res.json({
         available: false,
@@ -266,12 +347,12 @@ router.get('/metrics/:orfId', async (req, res, next) => {
     }
 
     const metricsUrl =
-      variantResult.value === 'finetune'
-        ? resolved.finetune_metrics_url
+      variantResult.value === 'msa'
+        ? resolved.msa_metrics_url || resolved.finetune_metrics_url
         : resolved.base_metrics_url || resolved.metrics_url;
 
     const summary = await fetchAndSummarizeMetrics(metricsUrl, {
-      isCentroid: resolved.source === 'esmfold2_centroid_90',
+      isCentroid: resolved.source === 'esmfold2_centroid_60',
     });
 
     res.json({
@@ -284,6 +365,43 @@ router.get('/metrics/:orfId', async (req, res, next) => {
     if (err.code === '42P01') {
       return res.status(503).json({ error: 'Structure backing table is unavailable' });
     }
+    next(err);
+  }
+});
+
+/**
+ * Stream predicted CIF through the API so browsers are not blocked by S3 CORS
+ * (bucket currently allows Origin https://petadex.net only; Alex may add localhost later).
+ * GET /api/structure/content/orf/:orfId?variant=base|msa
+ */
+router.get('/content/orf/:orfId', async (req, res, next) => {
+  const { error, value: orfId } = orfIdSchema.validate(Number(req.params.orfId));
+  if (error) return res.status(400).json({ error: error.message });
+  const variantResult = parseVariant(req);
+  if (variantResult.error) return res.status(400).json({ error: variantResult.error });
+
+  try {
+    const resolved = await resolveForOrf(orfId, variantResult.value);
+    if (!resolved?.structure_url) {
+      return res.status(404).json({ error: 'No structure available for this ORF' });
+    }
+    const upstream = await fetch(resolved.structure_url, {
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        error: `Upstream structure fetch failed (${upstream.status})`,
+      });
+    }
+    const ctype =
+      resolved.format === 'mmcif' || resolved.format === 'cif'
+        ? 'chemical/x-mmcif'
+        : upstream.headers.get('content-type') || 'text/plain';
+    res.setHeader('Content-Type', ctype);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    res.send(buf);
+  } catch (err) {
     next(err);
   }
 });

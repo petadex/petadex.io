@@ -6,6 +6,7 @@ import { annotationRecordForAccession } from "../protein/annotation-reference/an
 
 const SOURCE_LABEL = {
   experimental_pdb: "Experimental structure",
+  esmfold2_centroid_60: "ESMFold2 · 60% centroid",
   esmfold2_centroid_90: "ESMFold2 · 90% centroid",
   esmfold2_orf: "ESMFold2 · ORF prediction",
 }
@@ -53,7 +54,7 @@ function PaeHeatmap({ matrix }) {
   if (!matrix?.length) {
     return (
       <p className="m-0 text-sm text-muted-foreground italic">
-        PAE matrix unavailable (S3 arrays not readable yet, or schema pending).
+        PAE matrix unavailable (metrics JSON not readable yet, or schema pending).
       </p>
     )
   }
@@ -92,7 +93,7 @@ function PaeHeatmap({ matrix }) {
 }
 
 /**
- * Alex Folding Viewer: Mol* + base/finetune toggle + metrics + PAE + SAE stub.
+ * Alex Folding Viewer: Mol* + Base/MSA toggle + metrics + PAE + SAE stub.
  */
 export default function FoldingViewer({
   accession = null,
@@ -197,17 +198,29 @@ export default function FoldingViewer({
     : null
 
   const isPredicted =
-    info?.source === "esmfold2_centroid_90" || info?.source === "esmfold2_orf"
+    info?.source === "esmfold2_centroid_60" ||
+    info?.source === "esmfold2_centroid_90" ||
+    info?.source === "esmfold2_orf"
 
   const structureUrl = useMemo(() => {
     if (!info) return null
-    if (variant === "finetune" && info.finetune_structure_url) {
-      return info.finetune_structure_url
+    // Predicted CIFs: load via API proxy (S3 CORS is petadex.net-only today).
+    if (isPredicted && (orfId != null || info.orf_id != null)) {
+      const id = orfId ?? info.orf_id
+      return `${config.apiUrl}/structure/content/orf/${encodeURIComponent(String(id))}?variant=${encodeURIComponent(variant)}`
+    }
+    if (
+      variant === "msa" &&
+      (info.msa_structure_url || info.finetune_structure_url)
+    ) {
+      return info.msa_structure_url || info.finetune_structure_url
     }
     return info.structure_url
-  }, [info, variant])
+  }, [info, variant, isPredicted, orfId])
 
-  const showFinetuneToggle = Boolean(info?.finetune_structure_url)
+  const showMsaToggle = Boolean(
+    info?.msa_structure_url || info?.finetune_structure_url
+  )
 
   const figureContext =
     info?.orf_id != null
@@ -225,7 +238,7 @@ export default function FoldingViewer({
                 {title}
               </h3>
               <div className="flex flex-wrap items-center gap-2">
-                {showFinetuneToggle && status === "ready" ? (
+                {showMsaToggle && status === "ready" ? (
                   <div
                     className="inline-flex rounded-md border border-border overflow-hidden text-xs font-medium"
                     role="group"
@@ -245,13 +258,13 @@ export default function FoldingViewer({
                     <button
                       type="button"
                       className={`px-3 py-1.5 border-l border-border ${
-                        variant === "finetune"
+                        variant === "msa"
                           ? "bg-secondary text-secondary-foreground"
                           : "bg-transparent text-muted-foreground"
                       }`}
-                      onClick={() => setVariant("finetune")}
+                      onClick={() => setVariant("msa")}
                     >
-                      Finetune
+                      MSA
                     </button>
                   </div>
                 ) : null}
@@ -357,7 +370,7 @@ export default function FoldingViewer({
                       {metrics?.disclaimer ||
                         "For centroids / non-PDB predictions, these metrics can’t be validated against an experimental structure."}
                       {metrics && !metrics.available
-                        ? ` (${metrics.reason || "arrays unavailable"})`
+                        ? ` (${metrics.reason || "metrics unavailable"})`
                         : ""}
                     </p>
                   </>
@@ -402,17 +415,16 @@ export default function FoldingViewer({
               Corresponding figures
             </h4>
             <p className="m-0 mt-1 text-xs text-muted-foreground">
-              ESMC finetune / benchmark plots for {figureContext}. Same resolve
-              flow as the viewer (ORFid → CIF + arrays). Charts land when Alex
-              ships Exp. 1–2 results.
+              Base vs MSA benchmark plots for {figureContext}. Charts wait on
+              full folds from Purav (per Alex).
             </p>
           </div>
           <div className="rounded-md border border-dashed border-border bg-secondary/20 p-3 min-h-[120px] flex flex-col justify-center gap-1">
             <p className="m-0 text-xs font-medium text-foreground">
-              ESMC Finetune Graphs
+              Base vs MSA
             </p>
             <p className="m-0 text-xs text-muted-foreground">
-              Exp. 1 / Exp. 2 — base vs finetune (TM, lDDT, …)
+              Exp. 1 / Exp. 2 — TM, lDDT, … (pending Purav full folds)
             </p>
           </div>
           <div className="rounded-md border border-dashed border-border bg-secondary/20 p-3 min-h-[100px] flex flex-col justify-center gap-1">
@@ -425,7 +437,7 @@ export default function FoldingViewer({
           </div>
           <div className="rounded-md border border-dashed border-border bg-secondary/20 p-3 min-h-[80px] flex items-center">
             <p className="m-0 text-xs text-muted-foreground">
-              Figure slot — pending data
+              Figure slot — waiting on Purav
             </p>
           </div>
         </aside>
@@ -433,7 +445,7 @@ export default function FoldingViewer({
 
       {status === "ready" && info ? (
         <div className="p-4 bg-blue-300/40 dark:bg-blue-950/40 rounded-lg border-l-info border-l-4">
-          <p className="m-0 text-sm text-primary dark:text-secondary">
+          <p className="m-0 text-sm text-primary dark:text-secondary-foreground">
             <strong>Tip:</strong> Click and drag to rotate. Scroll to zoom.
             {record
               ? " Hover or click highlighted residues for annotation notes."

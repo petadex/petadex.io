@@ -1,7 +1,8 @@
 // backend/src/lib/structureMetrics.js
 //
-// Parse assumed ESMFold2 quality archives (NPZ / single .npy) into JSON for the
-// Folding Viewer. Soft-fails when S3 is private or schema differs.
+// Parse ESMFold2 quality sidecars into JSON for the Folding Viewer.
+// Supports Alex metrics JSON (test2) and legacy NPZ / .npy archives.
+// Soft-fails when S3 is private or schema differs.
 
 import zlib from 'zlib';
 
@@ -186,10 +187,86 @@ function paeMatrix(entry) {
 }
 
 /**
+ * Downsample a square number[][] PAE matrix.
+ * @param {number[][]} matrix
+ * @returns {number[][] | null}
+ */
+function downsamplePaeMatrix(matrix) {
+  if (!Array.isArray(matrix) || !matrix.length) return null;
+  const n = matrix.length;
+  if (!Array.isArray(matrix[0]) || matrix[0].length !== n) return null;
+  const step = Math.max(1, Math.ceil(n / MAX_PAE_SIDE));
+  const outN = Math.ceil(n / step);
+  const out = new Array(outN);
+  for (let i = 0; i < outN; i++) {
+    const row = new Array(outN);
+    const si = Math.min(n - 1, i * step);
+    for (let j = 0; j < outN; j++) {
+      const sj = Math.min(n - 1, j * step);
+      row[j] = Number(matrix[si][sj]);
+    }
+    out[i] = row;
+  }
+  return out;
+}
+
+/**
+ * Alex metrics JSON sidecar (test2 schema):
+ * { id, seq_len, confidence: { mean_plddt, ptm, per_residue_plddt, pae }, ... }
+ * @param {object} json
+ * @param {{ isCentroid?: boolean }} opts
+ */
+export function summarizeAlexMetricsJson(json, { isCentroid = false } = {}) {
+  const conf = json?.confidence || {};
+  const plddtArr = Array.isArray(conf.per_residue_plddt)
+    ? conf.per_residue_plddt.map(Number)
+    : null;
+  const mean =
+    conf.mean_plddt != null
+      ? Number(conf.mean_plddt)
+      : plddtArr?.length
+        ? plddtArr.reduce((a, b) => a + b, 0) / plddtArr.length
+        : null;
+  const pae = Array.isArray(conf.pae) ? downsamplePaeMatrix(conf.pae) : null;
+
+  return {
+    available: true,
+    mean_plddt: Number.isFinite(mean) ? mean : null,
+    ptm: conf.ptm != null ? Number(conf.ptm) : null,
+    iptm: conf.iptm != null ? Number(conf.iptm) : null,
+    molprobity: null,
+    length: json?.seq_len ?? plddtArr?.length ?? null,
+    plddt: plddtArr
+      ? plddtArr.slice(0, Math.min(plddtArr.length, 4096))
+      : null,
+    pae,
+    experimental: {
+      mean_lddt: null,
+      tm: null,
+      gdt_ts: null,
+    },
+    run: json?.run ?? null,
+    status: json?.status ?? null,
+    validated: false,
+    is_centroid: Boolean(isCentroid),
+    disclaimer: isCentroid
+      ? 'For centroids / non-PDB predictions, these metrics can’t be validated against an experimental structure.'
+      : 'Predicted confidence metrics; not experimental accuracy unless a PDB reference is available.',
+  };
+}
+
+/**
  * @param {Buffer} buf
  * @param {{ isCentroid?: boolean }} opts
  */
 export function summarizeMetricsArchive(buf, { isCentroid = false } = {}) {
+  // Alex JSON metrics sidecar
+  const asText = buf.toString('utf8', 0, Math.min(buf.length, 64)).trimStart();
+  if (asText.startsWith('{') || asText.startsWith('[')) {
+    const json = JSON.parse(buf.toString('utf8'));
+    return summarizeAlexMetricsJson(json, { isCentroid });
+  }
+
   const arrays = parseNumpyArchive(buf);
   // Single .npy fallback: treat as pLDDT vector
   if (arrays.array && !arrays.plddt) {

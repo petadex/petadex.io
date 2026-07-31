@@ -2,21 +2,65 @@ import React from "react"
 import { Link } from "gatsby"
 
 /**
- * Placeholder until Denis delivers BacDrive CSV + join key.
+ * BacDive / BacDrive panel — shows Denis CSV #3 means when present on a BioSample.
  */
-export default function BacDriveStub({ entityLabel = "this record" }) {
+export function BacDivePanel({ bacdive, entityLabel = "this record", note = null }) {
+  if (bacdive) {
+    const fmt = (v, digits = 2) =>
+      v == null || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(digits)
+    return (
+      <section className="rounded-xl border border-border bg-surface-raised p-5">
+        <h3 className="text-base font-semibold text-foreground m-0 mb-1">
+          BacDive environmental means
+        </h3>
+        <p className="text-xs text-muted-foreground m-0 mb-4">
+          Average optimum temperature / pH from BacDive organisms linked to this
+          BioSample (CSV #3). Not 1:1 with all PETadex BioSamples; only
+          those with BacDive organisms that have environmental data.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="label">Avg optimum temperature</div>
+            <div className="mt-1 text-lg font-semibold">
+              {fmt(bacdive.avg_optimum_temp, 1)}
+              {bacdive.avg_optimum_temp != null ? " °C" : ""}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              from {bacdive.n_organisms_temp?.toLocaleString?.() ?? "—"} organism
+              {bacdive.n_organisms_temp === 1 ? "" : "s"}
+            </div>
+          </div>
+          <div>
+            <div className="label">Avg optimum pH</div>
+            <div className="mt-1 text-lg font-semibold">
+              {fmt(bacdive.avg_optimum_ph, 2)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              from {bacdive.n_organisms_ph?.toLocaleString?.() ?? "—"} organism
+              {bacdive.n_organisms_ph === 1 ? "" : "s"}
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="rounded-xl border border-dashed border-border bg-surface-raised p-5">
       <h3 className="text-base font-semibold text-foreground m-0 mb-2">
-        BacDrive enrichment
+        BacDive enrichment
       </h3>
       <p className="text-sm text-muted-foreground m-0">
-        BacDrive / BacDive annotations for {entityLabel} are pending Denis&apos;s
-        CSV upload and join key (biosample or organism). SRA metadata below is
-        live from <span className="font-mono text-xs">sra_metadata</span>.
+        {note ||
+          `No BacDive optimum T/pH means for ${entityLabel} yet. Denis’s CSV #3 covers ~5.1M BioSamples that have BacDive organisms with environmental data (not all PETadex BioSamples).`}
       </p>
     </section>
   )
+}
+
+/** @deprecated use BacDivePanel */
+export default function BacDriveStub(props) {
+  return <BacDivePanel {...props} />
 }
 
 export function NcbiLink({ href, children }) {

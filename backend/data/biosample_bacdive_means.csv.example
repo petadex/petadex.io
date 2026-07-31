@@ -1,0 +1,7 @@
+# Example schema for Denis BacDive CSV #3 (biosample means).
+# Copy the real file to: backend/data/biosample_bacdive_means.csv
+# Or set BACDIVE_MEANS_URL / BACDIVE_MEANS_PATH.
+#
+# Header names are flexible — see bacdiveMeansCache.js aliases.
+biosampleID,n_organisms_temp,avg_optimum_temp,n_organisms_ph,avg_optimum_ph
+SAMN00000000,2,30.0,2,7.0

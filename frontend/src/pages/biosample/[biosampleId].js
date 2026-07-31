@@ -5,7 +5,7 @@ import Seo from "../../components/seo"
 import Container from "../../components/common/Container"
 import config from "../../config"
 import { useScrollHeader } from "../../hooks/useScrollHeader"
-import BacDriveStub, {
+import BacDivePanel, {
   NcbiLink,
   OrganismLink,
   SraRunLink,
@@ -135,7 +135,10 @@ export default function BiosamplePage({ params }) {
               </div>
             </div>
 
-            <BacDriveStub entityLabel={`BioSample ${id}`} />
+            <BacDivePanel
+              bacdive={sample.bacdive || sample.bacdrive}
+              entityLabel={`BioSample ${id}`}
+            />
 
             <div className="card p-6">
               <h2 className="text-lg font-semibold m-0 mb-4">SRA runs</h2>

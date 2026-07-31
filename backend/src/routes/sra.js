@@ -16,6 +16,11 @@ import {
   isCacheReady,
   searchOrganisms,
 } from '../lib/sraStatsCache.js';
+import {
+  ensureBacdiveMeansCache,
+  getBacdiveForBiosample,
+  getBacdiveMeansMeta,
+} from '../lib/bacdiveMeansCache.js';
 
 const router = Router();
 
@@ -55,8 +60,15 @@ function kickOffCacheBuild() {
   });
 }
 
-// Warm cache in background as soon as routes load (no-op if disk cache exists).
+// Warm caches in background as soon as routes load.
 kickOffCacheBuild();
+ensureBacdiveMeansCache().catch(() => {});
+
+// GET /api/sra/bacdive/status — Denis CSV #3 load state
+router.get('/bacdive/status', async (_req, res) => {
+  await ensureBacdiveMeansCache();
+  res.json(getBacdiveMeansMeta());
+});
 
 // GET /api/sra/summary
 router.get('/summary', async (_req, res, next) => {
@@ -254,6 +266,11 @@ router.get('/organism/:name', async (req, res, next) => {
       client.release();
     }
 
+    // BacDive means are per-biosample (CSV #3). Organism-level BacDive lists
+    // (Denis CSV #1/#2) are not published yet — surface coverage hint only.
+    await ensureBacdiveMeansCache();
+    const bacdiveMeta = getBacdiveMeansMeta();
+
     res.json({
       organism: stats.organism,
       n_runs: stats.n_runs,
@@ -263,7 +280,12 @@ router.get('/organism/:name', async (req, res, next) => {
       top_countries,
       top_biomes,
       sample_runs: sampleRuns,
+      bacdive: null,
       bacdrive: null,
+      bacdive_note:
+        bacdiveMeta.status === 'ready'
+          ? 'BacDive optimum T/pH is joined per BioSample (open a BioSample page). Organism-level BacDive CSVs not published yet.'
+          : `BacDive means CSV unavailable (${bacdiveMeta.reason || bacdiveMeta.status}).`,
       enrich,
       source: 'sra_stats_cache',
     });
@@ -330,10 +352,14 @@ router.get('/biosample/:id', async (req, res, next) => {
       return res.status(404).json({ error: `BioSample not found: ${id}` });
     }
 
+    await ensureBacdiveMeansCache();
+    const bacdive = getBacdiveForBiosample(id);
+
     res.json({
       ...rows[0],
       orf_count: null,
-      bacdrive: null,
+      bacdive,
+      bacdrive: bacdive, // alias — Denis says BacDrive; feed is BacDive
       external_link: `https://www.ncbi.nlm.nih.gov/biosample/${encodeURIComponent(id)}`,
     });
   } catch (err) {

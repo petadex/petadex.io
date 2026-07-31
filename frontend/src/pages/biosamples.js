@@ -95,7 +95,8 @@ export default function BiosamplesHubPage() {
           Explore PETadex sample provenance: SRA runs (library ids), NCBI
           BioSamples, and organisms. Data is served from{" "}
           <span className="font-mono text-xs">sra_metadata</span> (Denis S3 CSV
-          ingest). BacDrive enrichment is pending.
+          ingest). BacDive optimum T/pH means join on BioSample when Denis’s CSV
+          #3 is available.
         </p>
 
         {summary && (

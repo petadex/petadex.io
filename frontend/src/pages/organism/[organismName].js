@@ -5,7 +5,7 @@ import Seo from "../../components/seo"
 import Container from "../../components/common/Container"
 import config from "../../config"
 import { useScrollHeader } from "../../hooks/useScrollHeader"
-import BacDriveStub, {
+import BacDivePanel, {
   BiosampleLink,
   SraRunLink,
 } from "../../components/sra/SraShared"
@@ -147,7 +147,11 @@ export default function OrganismPage({ params }) {
               ))}
             </div>
 
-            <BacDriveStub entityLabel={name} />
+            <BacDivePanel
+              bacdive={data.bacdive || data.bacdrive}
+              entityLabel={name}
+              note={data.bacdive_note}
+            />
 
             {(data.top_countries?.length > 0 || data.top_biomes?.length > 0) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

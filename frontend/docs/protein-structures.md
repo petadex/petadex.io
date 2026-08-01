@@ -18,8 +18,8 @@ Everything resolves in **ORFid** terms. Filenames use the `orf{id}` prefix.
 | Lane | Prefix | Files | Status |
 |------|--------|--------|--------|
 | Demo (public today) | `esmfold2-centroids/test2/` | `structures/orf{id}.cif` · `metrics/orf{id}.json` | Working; temporary |
-| Production (Alex) | `esmfold2-centroids/60pid/` | same layout | Not public yet (403 as of Jul 2026) |
-| MSA experimental | set via `STRUCTURE_S3_MSA_LANE` | same layout | Not shipped; replaces former “finetune” label |
+| Production (Alex) | `esmfold2-centroids/60pid/` | same layout | **403** — ask Dennis for public GET |
+| MSA experimental | `esmfold2-centroids/60pid-msa/` | same layout | Path **confirmed** by Alex; **403** until Dennis opens it |
 | Experimental PDBs | public `petadex/pdb_structs/{pdb_id}.pdb` | `.pdb` via `pdb_accessions` | Live |
 
 HTTPS base: `https://petadex-protein-structures.s3.amazonaws.com`
@@ -29,8 +29,8 @@ Env overrides:
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `STRUCTURE_S3_BASE` | `https://petadex-protein-structures.s3.amazonaws.com` | Bucket HTTPS origin |
-| `STRUCTURE_S3_LANE` | `esmfold2-centroids/test2` | Baseline predicted CIF/metrics prefix (flip to `…/60pid` when Alex opens it) |
-| `STRUCTURE_S3_MSA_LANE` | *(empty)* | Optional MSA experimental prefix; empty hides Base/MSA toggle |
+| `STRUCTURE_S3_LANE` | `esmfold2-centroids/test2` | Baseline predicted CIF/metrics prefix (flip to `…/60pid` after Dennis opens public GET) |
+| `STRUCTURE_S3_MSA_LANE` | *(empty)* | Set to `esmfold2-centroids/60pid-msa` once that prefix is public; empty hides Base/MSA toggle |
 | `STRUCTURE_S3_FINETUNE_LANE` | *(legacy alias)* | Still read if `STRUCTURE_S3_MSA_LANE` unset |
 
 Example object URLs for ORF `4981589` (demo lane):
@@ -47,8 +47,16 @@ Production (when public):
 …/esmfold2-centroids/60pid/metrics/orf4981589.json
 ```
 
+MSA experimental (Alex confirmed path; same layout):
+
+```
+…/esmfold2-centroids/60pid-msa/structures/orf4981589.cif
+…/esmfold2-centroids/60pid-msa/metrics/orf4981589.json
+```
+
 **Examples:** the example set *is* whatever is readable on S3 under the active
-lane (Alex confirmed). No separate catalog beyond that.
+lane (Alex confirmed). No separate catalog beyond that. Bucket **listing** is
+still 403 — only known keys are fetchable.
 
 ### Metrics JSON (Alex)
 
@@ -73,10 +81,11 @@ still parsed if pointed at by `metrics_url`.
 
 ### MSA (experimental group; was “finetune”)
 
-Alex: relabel finetuning → **MSA** as the experimental group (concerns about
-finetune). Set `STRUCTURE_S3_MSA_LANE` when that parallel lane ships (same
-`structures/` + `metrics/` layout). API accepts `variant=msa` (and legacy
-`variant=finetune` as an alias).
+Alex confirmed: experimental group is **MSA**, lane
+`esmfold2-centroids/60pid-msa/`, same `structures/` + `metrics/` + `orf{id}`
+layout as base. Set `STRUCTURE_S3_MSA_LANE=esmfold2-centroids/60pid-msa` once
+Dennis opens public GET (probe hides the toggle if objects are still 403).
+API accepts `variant=msa` (and legacy `variant=finetune` as an alias).
 
 ### Figures
 
@@ -127,17 +136,29 @@ optional **Base / MSA** when MSA URLs exist.
 
 | Who | Owns |
 |-----|------|
-| Alex | CIF/metrics ingest, ACL/CORS, open `60pid`, MSA lane path, example objects on S3 |
+| Alex | CIF/metrics ingest, lane naming (`60pid`, `60pid-msa`) |
+| Dennis (S3 admin) | Public GET (and optional listing) on `60pid` + `60pid-msa`; CORS if needed |
 | Purav | Full folds needed before Exp. figures |
 | Frontend / API | Resolve + metrics contract, Folding Viewer |
 
-### Ask Alex (remaining)
+### Resolved (Alex, Jul 31)
 
 - [x] Production prefix → `esmfold2-centroids/60pid` (`test2` is temp demo)
-- [x] Examples = data on S3
+- [x] Examples = data on S3 (no separate catalog)
 - [x] Relabel finetune → MSA
+- [x] MSA lane → `esmfold2-centroids/60pid-msa` (same `structures/` + `metrics/` layout)
 - [x] Figures wait on Purav
-- [ ] Open public read on `60pid` (then set `STRUCTURE_S3_LANE=esmfold2-centroids/60pid`)
-- [ ] MSA lane path on S3
-- [ ] Localhost CORS (optional; proxy already works)
-- [ ] Confirm other example ORF ids under the active lane
+- [x] Alex can’t fix S3 ACL — route to Dennis
+
+### Ask Dennis (outstanding)
+
+- [ ] Public GET on `esmfold2-centroids/60pid/structures/orf*.cif` + `…/metrics/orf*.json` (same ACL as `test2`)
+- [ ] Public GET on `esmfold2-centroids/60pid-msa/…` (same layout) when objects exist
+- [ ] Optional: allow ListObjects on those prefixes (today listing is 403; we can only hit known keys)
+- [ ] Optional: CORS for `http://localhost:8000` (API CIF proxy already works without it)
+
+### After Dennis opens `60pid`
+
+1. Set `STRUCTURE_S3_LANE=esmfold2-centroids/60pid`
+2. Set `STRUCTURE_S3_MSA_LANE=esmfold2-centroids/60pid-msa` (when that prefix is readable)
+3. Smoke-test ORF `4981589` (and any other known keys)

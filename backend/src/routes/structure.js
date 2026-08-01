@@ -8,8 +8,9 @@
 //   {lane}/structures/orf{id}.cif
 //   {lane}/metrics/orf{id}.json
 // Demo lane (public today): esmfold2-centroids/test2
-// Production lane (coming): esmfold2-centroids/60pid
-// Experimental group (was “finetune”): MSA — set STRUCTURE_S3_MSA_LANE when shipped
+// Production lane (ACL pending Dennis): esmfold2-centroids/60pid
+// MSA experimental (Alex confirmed; ACL pending): esmfold2-centroids/60pid-msa
+//   same layout: structures/orf{id}.cif · metrics/orf{id}.json
 import { Router } from 'express';
 import Joi from 'joi';
 import { pool } from '../db.js';
@@ -22,7 +23,7 @@ const STRUCTURE_S3_BASE = (
   'https://petadex-protein-structures.s3.amazonaws.com'
 ).replace(/\/$/, '');
 
-/** Baseline predicted folds. test2 = public demo; switch to 60pid when Alex opens it. */
+/** Baseline predicted folds. test2 = public demo; flip to 60pid after Dennis opens ACL. */
 const STRUCTURE_S3_LANE = (
   process.env.STRUCTURE_S3_LANE ||
   'esmfold2-centroids/test2'
@@ -30,8 +31,10 @@ const STRUCTURE_S3_LANE = (
 
 /**
  * Optional MSA experimental lane (replaces former “finetune” labeling).
- * Empty → no Base/MSA toggle until Alex ships it.
- * Example (assumed): esmfold2-centroids/60pid-msa
+ * Alex confirmed prefix: esmfold2-centroids/60pid-msa (same structures/ + metrics/).
+ * Default empty so we don’t probe a still-private prefix on every resolve;
+ * set STRUCTURE_S3_MSA_LANE=esmfold2-centroids/60pid-msa once Dennis opens public GET
+ * (existence probe hides the Base/MSA toggle if the CIF is still 403).
  */
 const STRUCTURE_S3_MSA_LANE = (
   process.env.STRUCTURE_S3_MSA_LANE ||

@@ -19,6 +19,11 @@ import { pool } from '../db.js'
 import { fetchOrfSequence } from '../lib/orfSequence.js'
 import { computeSeqStats } from '../lib/seqStats.js'
 import { fetchProvenance } from '../lib/orfProvenance.js'
+import {
+  fetchSignalpPrediction,
+  fetchDeeplocPrediction,
+  fetchBiochemProperties,
+} from '../lib/angelaAnnotations.js'
 
 const router = Router()
 
@@ -118,6 +123,33 @@ router.get('/:orfId/domains', async (req, res, next) => {
     if (err.code === '42P01') {
       return res.status(503).json({ error: 'Catalytic-domain backing table is unavailable' })
     }
+    next(err)
+  }
+})
+
+// GET /api/orf/:orfId/annotations — Angela sequence predictions (SignalP live;
+// DeepLoc + biochem soft-fail until tables exist after the next DB update).
+router.get('/:orfId/annotations', async (req, res, next) => {
+  const { error, value: orfId } = orfIdSchema.validate(Number(req.params.orfId))
+  if (error) return res.status(400).json({ error: error.message })
+
+  try {
+    const core = await fetchOrfCore(orfId)
+    if (!core) return res.status(404).json({ error: `ORF ${orfId} not found` })
+
+    const [signalp, localization, biochemical] = await Promise.all([
+      fetchSignalpPrediction(pool, orfId),
+      fetchDeeplocPrediction(pool, orfId),
+      fetchBiochemProperties(pool, orfId),
+    ])
+
+    res.json({
+      orf_id: orfId,
+      signalp,
+      localization,
+      biochemical,
+    })
+  } catch (err) {
     next(err)
   }
 })

@@ -25,6 +25,7 @@ import ProvenancePanel from "../components/corpus/ProvenancePanel.jsx"
 import ClusterContextPanel from "../components/corpus/ClusterContextPanel.jsx"
 import CatalyticDomainsPanel from "../components/corpus/CatalyticDomainsPanel.jsx"
 import ComputedStatsPanel from "../components/corpus/ComputedStatsPanel.jsx"
+import SignalPeptidePanel from "../components/corpus/SignalPeptidePanel.jsx"
 import ComparisonRegion from "../components/corpus/ComparisonRegion.jsx"
 import StructurePanel from "../components/StructurePanel"
 
@@ -70,6 +71,8 @@ export default function CorpusSequenceTemplate({ pageContext }) {
   const [errorMsg, setErrorMsg] = useState(null)
   // Domain selected in the catalytic-domain track → highlighted in SequenceViewer.
   const [domainSelection, setDomainSelection] = useState(null)
+  // Angela SignalP cleavage span (1..cleavage_pos); domains win if both set.
+  const [signalHighlight, setSignalHighlight] = useState(null)
   // Most corpus ORFs have no curated experimental structure; only mount the
   // heavy Mol* viewer once we've confirmed one exists (a 200 from /api/pdb).
   // This avoids the viewer churning on a never-resolving structure lookup.
@@ -200,50 +203,84 @@ export default function CorpusSequenceTemplate({ pageContext }) {
           {orf.orf_type ? ` · ${orf.orf_type}` : ""}
           {orf.length != null ? ` · ${orf.length} aa` : ""}
         </p>
+        <ComparisonRegion
+          variant="inline"
+          sequence={orf.sequence}
+          orfId={orf.id}
+          accession={orf.accession}
+        />
       </header>
 
-      {/* ── Provenance (first-paint fact) ── */}
+      {/* Provenance stays full-width (variable-length sample metadata) */}
       <ProvenancePanel orfOrigin={orf.orfOrigin} provenance={orf.provenance} />
 
-      {/* ── Computed properties (computed from sequence) ── */}
-      <ComputedStatsPanel computed={orf.computed} length={orf.length} />
+      {/* Cluster placement + physico-chem side by side */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <div className="min-w-0 flex flex-col [&>section]:flex-1 [&>section]:h-full">
+          <ClusterContextPanel c90Id={c90Id} ancestors={orf.ancestors} />
+        </div>
+        <div className="min-w-0 flex flex-col [&>section]:flex-1 [&>section]:h-full">
+          <ComputedStatsPanel computed={orf.computed} length={orf.length} />
+        </div>
+      </div>
 
-      {/* ── Cluster context (deterministic structure) ── */}
-      <ClusterContextPanel c90Id={c90Id} ancestors={orf.ancestors} />
+      {/* Angela SignalP sits above the sequence it highlights */}
+      <SignalPeptidePanel
+        orfId={orf.id}
+        seqLength={orf.length}
+        onHighlightRange={setSignalHighlight}
+      />
 
-      {/* ── Sequence display ── */}
+      {/* Sequence needs full width for the residue grid */}
       <section className="card p-6">
-        <h2 className="text-lg font-semibold text-foreground m-0 mb-4">
+        <h2 className="text-lg font-semibold text-foreground m-0 mb-1">
           Sequence
         </h2>
+        {!domainSelection && signalHighlight ? (
+          <p className="text-xs text-muted-foreground m-0 mb-4 inline-flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-teal-700/55" />
+            Highlighted: predicted signal peptide (residues{" "}
+            {signalHighlight.start}–{signalHighlight.end})
+          </p>
+        ) : domainSelection ? (
+          <p className="text-xs text-muted-foreground m-0 mb-4">
+            Highlighted: selected catalytic domain
+            {domainSelection.label ? ` (${domainSelection.label})` : ""}
+          </p>
+        ) : (
+          <div className="mb-3" />
+        )}
         <SequenceViewer
           aminoAcidSequence={orf.sequence}
           nucleotideSequence={null}
-          highlightRange={domainSelection}
+          highlightRange={domainSelection || signalHighlight}
+          autoScrollOnHighlight={Boolean(domainSelection)}
         />
       </section>
 
-      {/* ── Catalytic domains (factual HMM evidence — corpus-keyed, framed as
-            evidence, not function) ── */}
-      <CatalyticDomainsPanel
-        orfId={orf.id}
-        seqLength={orf.length}
-        onSelectDomain={setDomainSelection}
-      />
-
-      {/* ── Structure (only when an external accession exists) ── */}
-      {showStructure && (
-        <section className="card p-6">
-          <StructurePanel accession={orf.accession} />
-        </section>
+      {/* Domains + optional structure: evidence / structure pair when PDB exists */}
+      {showStructure ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
+          <div className="min-w-0">
+            <CatalyticDomainsPanel
+              orfId={orf.id}
+              seqLength={orf.length}
+              onSelectDomain={setDomainSelection}
+            />
+          </div>
+          <div className="min-w-0">
+            <section className="card p-6 h-full">
+              <StructurePanel accession={orf.accession} />
+            </section>
+          </div>
+        </div>
+      ) : (
+        <CatalyticDomainsPanel
+          orfId={orf.id}
+          seqLength={orf.length}
+          onSelectDomain={setDomainSelection}
+        />
       )}
-
-      {/* ── Comparison region (user-initiated, clearly separated from facts) ── */}
-      <ComparisonRegion
-        sequence={orf.sequence}
-        orfId={orf.id}
-        accession={orf.accession}
-      />
     </Container>
   )
 }

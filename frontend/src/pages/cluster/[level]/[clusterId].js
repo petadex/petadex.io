@@ -14,6 +14,7 @@ import Seo from "../../../components/seo"
 import Container from "../../../components/common/Container"
 import config from "../../../config"
 import { useScrollHeader } from "../../../hooks/useScrollHeader"
+import ClusterHierarchyNav from "../../../components/corpus/ClusterHierarchyNav.jsx"
 
 const VALID_LEVELS = new Set(["90", "60", "30"])
 
@@ -96,6 +97,10 @@ export default function ClusterPage({ params }) {
         <p className="mt-2 font-mono text-secondary-foreground">
           cluster_id {clusterId}
         </p>
+        <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
+          Identity hierarchy landing page. Walk the centroid path, pin clusters
+          to compare sequences, and open the centroid ORF for annotations.
+        </p>
 
         <div className="mt-8">
           {status === "loading" && (
@@ -118,35 +123,98 @@ export default function ClusterPage({ params }) {
           )}
 
           {status === "ready" && block && (
-            <div className="card p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="flex flex-col">
-                  <span className="label">Centroid accession</span>
-                  <span className="font-mono text-sm font-semibold text-primary break-all">
-                    {centroidAcc ?? "—"}
-                  </span>
+            <>
+              <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch mb-2">
+                <div className="card p-6 h-full">
+                  <h2 className="text-base font-semibold text-foreground m-0 mb-4">
+                    Centroid
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col">
+                      <span className="label">Accession</span>
+                      <span className="font-mono text-sm font-semibold text-primary break-all">
+                        {centroidAcc ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="label">ORF</span>
+                      {centroidOrf != null ? (
+                        <Link
+                          to={`/sequence/orf/${encodeURIComponent(String(centroidOrf))}`}
+                          className="font-mono text-sm font-semibold text-info hover:underline"
+                        >
+                          {String(centroidOrf)}
+                        </Link>
+                      ) : (
+                        <span className="font-mono text-sm font-semibold text-primary">
+                          —
+                        </span>
+                      )}
+                    </div>
+                    {block.dominant_organism && (
+                      <div className="flex flex-col">
+                        <span className="label">Dominant organism</span>
+                        <span className="text-sm italic text-foreground">
+                          {block.dominant_organism}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="label">Centroid ORF</span>
-                  <span className="font-mono text-sm font-semibold text-primary">
-                    {centroidOrf ?? "—"}
-                  </span>
+
+                <div className="card p-6 h-full">
+                  <h2 className="text-base font-semibold text-foreground m-0 mb-4">
+                    Cluster size
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      ["Members", block.member_count],
+                      ["Sub-clusters", block.child_count],
+                      ["Organisms", block.distinct_organism_count],
+                      ["PAZy", block.n_pazy],
+                      ["NR", block.n_nr],
+                      ["SRA", block.n_sra],
+                    ]
+                      .filter(([, v]) => v != null)
+                      .map(([label, value]) => (
+                        <div key={label} className="flex flex-col">
+                          <span className="text-xs text-muted-foreground">
+                            {label}
+                          </span>
+                          <span className="text-lg font-semibold text-primary tabular-nums">
+                            {String(value)}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                  {extraFields.length > 0 && (
+                    <details className="mt-4 pt-3 border-t border-border/60">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                        All block fields
+                      </summary>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mt-3">
+                        {extraFields.map(([k, v]) => (
+                          <React.Fragment key={k}>
+                            <span className="text-muted-foreground break-all">
+                              {k}
+                            </span>
+                            <span className="font-mono text-secondary-foreground break-all">
+                              {v === null ? "—" : String(v)}
+                            </span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </div>
 
-              {extraFields.length > 0 && (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm border-t border pt-4">
-                  {extraFields.map(([k, v]) => (
-                    <React.Fragment key={k}>
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className="font-mono text-secondary-foreground break-all">
-                        {v === null ? "—" : String(v)}
-                      </span>
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-            </div>
+              <ClusterHierarchyNav
+                level={level}
+                clusterId={clusterId}
+                block={block}
+              />
+            </>
           )}
         </div>
       </Container>

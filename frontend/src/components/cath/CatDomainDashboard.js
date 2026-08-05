@@ -60,8 +60,7 @@ const CatDomainDashboard = ({ catDomains, onSelect }) => {
   return (
     <div className="max-w-3xl">
       <p className="text-sm text-muted-foreground mb-6">
-        Bubble size shows families in atlas. A bigger bubble represents more families (90% clusters) following that
-        fold. Click a domain to read more.
+        Bubble size shows families in atlas. A bigger bubble represents more families (90% clusters) following that fold. Click a domain to read more.
       </p>
       <div className="flex flex-wrap items-end justify-center gap-x-6 gap-y-8 py-4">
         {sorted.map(d => (

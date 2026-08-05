@@ -11,9 +11,9 @@ const CathDomainHero = () => (
       visualized, and interpreted for modeling and experiment design.
     </p>
     <p className="text-muted-foreground text-sm leading-relaxed m-0">
-      Choose a Pfam profile from the literature-review list. When mapped to a PETadex atlas
-      component, live family counts and database links are shown; every entry includes narrative
-      sections, figures, and references.
+      Choose a CATH domain to see its structural architecture, mechanism, representative structures,
+      and the member Pfam HMMs assigned to it. When those HMMs map to a PETadex atlas component,
+      live family counts are shown alongside them.
     </p>
   </header>
 )

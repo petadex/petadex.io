@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "gatsby"
 import config from "../../config"
-import { cathDomainPathForComponent } from "../../utils/cathDomainCatalogLookup"
 import {
   COMPONENT_TO_CATH,
   CATH_HUE,
@@ -250,11 +249,6 @@ function buildTooltip(object, highlightFamilyId) {
     .join("")
 
   const links = []
-  if (object.component != null) {
-    links.push(
-      `<a href="${cathDomainPathForComponent(object.component)}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">CATH domain page</a>`,
-    )
-  }
   if (object.family_id != null && !isCurrent) {
     links.push(
       `<a href="/family/${object.family_id}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">Family page</a>`,

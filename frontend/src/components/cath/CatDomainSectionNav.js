@@ -15,7 +15,7 @@ function navLinkClass(active) {
 
 /**
  * In-page section nav for a CAT-domain view — vertical sidebar on large screens, compact row on
- * small screens. Mirrors `CathDomainSectionNav` for the Pfam-level view.
+ * small screens.
  * @param {{ catDomain: Record<string, unknown>, className?: string }} props
  */
 const CatDomainSectionNav = ({ catDomain, className = "" }) => {

@@ -1,5 +1,6 @@
 import React from "react"
 import { Link } from "gatsby"
+import { pfamEntryUrl } from "../../utils/cathDomainSectionConfig"
 
 /**
  * @param {object} props
@@ -45,9 +46,14 @@ const CatDomainMemberHmms = ({ memberHmms, hmmMethod }) => (
             {memberHmms.map(m => (
               <tr key={m.id} className="border-t border-border hover:bg-surface-raised transition-colors">
                 <td className="px-4 py-2.5 font-mono text-xs text-accent">
-                  <Link to={`/cath-domains?id=${encodeURIComponent(m.id)}`} className="hover:underline">
+                  <a
+                    href={pfamEntryUrl(m.pfamAccession)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
                     {m.pfamAccession}
-                  </Link>
+                  </a>
                 </td>
                 <td className="px-4 py-2.5 text-foreground">{m.displayName}</td>
                 <td className="px-4 py-2.5 text-right text-muted-foreground">

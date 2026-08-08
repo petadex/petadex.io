@@ -61,7 +61,10 @@ const CatDomainMechanismPanel = ({ mechanism }) => {
             Open in EBI M-CSA → {mcsa.enzymeName}
           </a>
           {mcsa.hasDetailedMechanism === false && (
-            <span className="text-sm text-muted-foreground"> (catalytic site only, no step diagram)</span>
+            <span className="text-sm text-muted-foreground">
+              {" "}
+              (catalytic site only, no step diagram)
+            </span>
           )}
         </p>
       )}
@@ -89,16 +92,32 @@ const CatDomainMechanismPanel = ({ mechanism }) => {
           <button
             type="button"
             onClick={() => setShowMore(v => !v)}
-            className="text-sm font-medium text-accent hover:text-accent-hover mb-3"
+            aria-expanded={showMore}
+            className="text-sm font-medium text-accent hover:text-accent-hover mb-2"
           >
             {showMore ? "Hide mechanism details −" : "Show mechanism details +"}
           </button>
-          {showMore &&
-            mechanism.customSummary.split("\n\n").map((para, i) => (
-              <p key={i} className="text-sm text-muted-foreground leading-relaxed mb-4">
-                {para}
-              </p>
-            ))}
+          <div
+            className="grid transition-[grid-template-rows] duration-300 ease-out"
+            style={{ gridTemplateRows: showMore ? "1fr" : "0fr" }}
+          >
+            <div className="overflow-hidden">
+              <div
+                className={`transition-opacity duration-300 ${
+                  showMore ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {mechanism.customSummary.split("\n\n").map((para, i) => (
+                  <p
+                    key={i}
+                    className="text-sm text-muted-foreground leading-relaxed mb-4 last:mb-0"
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </section>

@@ -14,7 +14,7 @@ function navLinkClass(active) {
 }
 
 /**
- * In-page section nav for a CAT-domain view — vertical sidebar on large screens, compact row on
+ * In-page section nav for a CATH-domain view. vertical sidebar on large screens, compact row on
  * small screens.
  * @param {{ catDomain: Record<string, unknown>, className?: string }} props
  */

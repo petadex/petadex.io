@@ -22,6 +22,8 @@ const EMPTY_ANNOTATIONS = Object.freeze([]);
 
 const ProteinViewer = ({
   accession,
+  /** Optional direct PDB file URL (e.g. RCSB download). Skips /api/pdb lookup. */
+  structureUrl = null,
   width = "100%",
   height = "100%",
   showControls = true,
@@ -101,7 +103,7 @@ const ProteinViewer = ({
   }, [hoverTip, pinnedAnnotation, bumpLayout, loading]);
 
   useEffect(() => {
-    if (!accession || typeof window === 'undefined') return;
+    if ((!accession && !structureUrl) || typeof window === 'undefined') return;
 
     let plugin = null;
     let isMounted = true;
@@ -153,18 +155,26 @@ const ProteinViewer = ({
 
         pluginRef.current = plugin;
 
-        const pdbUrl = `${config.apiUrl}/pdb/accession/${accession}`;
-        const response = await fetch(pdbUrl);
+        let fileUrl = structureUrl || null;
+        let label = accession ? `${accession} Structure` : 'Structure';
 
-        if (!response.ok) {
-          throw new Error('No structure available');
+        if (!fileUrl) {
+          const pdbUrl = `${config.apiUrl}/pdb/accession/${accession}`;
+          const response = await fetch(pdbUrl);
+
+          if (!response.ok) {
+            throw new Error('No structure available');
+          }
+
+          const pdbInfo = await response.json();
+
+          if (!isMounted) return;
+
+          fileUrl = pdbInfo.pdb_url;
+          label = `${accession} Structure`;
         }
 
-        const pdbInfo = await response.json();
-
-        if (!isMounted) return;
-
-        const pdbResponse = await fetch(pdbInfo.pdb_url);
+        const pdbResponse = await fetch(fileUrl);
         if (!pdbResponse.ok) {
           throw new Error(`Failed to load PDB file: ${pdbResponse.status}`);
         }
@@ -175,7 +185,7 @@ const ProteinViewer = ({
 
         const data = await plugin.builders.data.rawData({
           data: pdbData,
-          label: `${accession} Structure`
+          label,
         });
 
         const trajectory = await plugin.builders.structure.parseTrajectory(data, 'pdb');
@@ -298,6 +308,7 @@ const ProteinViewer = ({
     };
   }, [
     accession,
+    structureUrl,
     showControls,
     initialStyle,
     enableMeasurement,

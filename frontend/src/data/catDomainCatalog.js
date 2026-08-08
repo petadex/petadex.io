@@ -1,96 +1,8 @@
 /**
- * Canonical catalog for CAT-domain pages.
+ * Canonical catalog for CATH-domain pages.
  *
- * Each entry represents one CATH superfamily shown as a "CATH domain" in the UI.
- * For example, several Pfam profiles in `CATH_DOMAIN_CATALOG` may map to
- * `3.40.50.1820`, the α/β-hydrolase fold.
- *
- * Curate CAT-domain-level content here:
- * - mechanism
- * - literature
- * - HMM discovery methodology
- * - HMM logos
- * - sequence logos
- *
- * Do not list member HMMs or Pfams manually. `buildCatDomainModels.js` derives them
- * from `CATH_DOMAIN_CATALOG` by grouping entries with the same `cathId`.
- *
- * This catalog is still incomplete. The final number of CAT domains is being
- * confirmed, with roughly 13 expected. If a `cathId` appears in
- * `CATH_DOMAIN_CATALOG` but has no entry here, `buildCatDomainModels.js` creates
- * a temporary stub so the page can still render. Adding the real entry here
- * replaces that stub automatically.
- *
- * Store HMM and sequence logo images under `frontend/static/cath/` and reference
- * them here by path.
- *
- * Suggested filenames:
- *   HMM logo:      CAT_<cathId-no-dots>_hmmlogo_<PFXXXXX>.png
- *                  e.g. CAT_340501820_hmmlogo_PF00561.png
- *   Sequence logo: CAT_<cathId-no-dots>_seqlogo_<component-or-label>.png
- *
- * Strip dots from `cathId` in filenames, but keep the full ID in captions and
- * alt text.
- * @typedef {{ label: string, url?: string|null }} CatDomainReference
- * @typedef {{ imageSrc: string, caption: string, alt?: string, pfamAccession?: string|null }} CatDomainLogo
- *
- * @typedef {Object} CatDomainMcsaLink
- * @property {string} entryId          M-CSA entry id, e.g. "163" (numeric id used in M-CSA URLs)
- * @property {string} [enzymeName]     Human label for the linked M-CSA entry
- * @property {boolean} [hasDetailedMechanism]  True if M-CSA has step-by-step mechanism (not just site)
- *
- * @typedef {Object} CatDomainMechanism
- * @property {CatDomainMcsaLink|null} mcsa  Set when a matching M-CSA entry exists; null otherwise
- * @property {string} [customSummary]       Prose mechanism description (always shown if present)
- * @property {{ imageSrc: string, caption: string, alt?: string }|null} [customDiagram]
- *           Fallback/supplementary diagram - required when `mcsa` is null, optional otherwise
- *
- * @typedef {Object} CatDomainHmmMethodNote
- * @property {string} text    Short (1-2 sentence) domain-specific note on how member HMMs
- *                             were identified. For the shared project-wide pipeline
- *                             explanation, don't repeat it here - link `methodologyAnchor`
- *                             to the relevant section of `/methodology` instead.
- * @property {string} [methodologyAnchor]  Anchor id on `/methodology` for "read the full
- *                             pipeline" (e.g. "hmm-generation"). Omit if not yet applicable.
- * @property {CatDomainReference[]} [refs]  Optional citations for the methodology itself
- *
- * @typedef {Object} CatDomainStructureRow
- * @property {string} pdbId           PDB accession, e.g. "6EQE" - verify against RCSB directly,
- *                                     never guess an id
- * @property {string} structuralFocus     What this structure is / who solved it
- * @property {string} [resolution]    e.g. "0.92 Å"
- * @property {string} whatItshows      Why this specific entry is worth looking at
- * @property {string} [url]           Link to the RCSB page
- *
- * @typedef {Object} CatDomainCatalogEntry
- * @property {string} cathId              CATH superfamily id, e.g. "3.40.50.1820" (stable key)
- * @property {string} displayName         Human-readable title, e.g. "α/β hydrolase fold"
- * @property {string} lastUpdated         ISO date
- * @property {string} overview            Short domain identity/discovery blurb (renamed from
- *                                        `summary` - keep this brief; longer content belongs in
- *                                        the sections below, not stuffed back in here)
- * @property {string} [structuralArchitecture]  Freeform prose: the fold itself (β-sheet topology,
- *                                        nucleophile elbow, etc. - the "what does this fold look
- *                                        like" section)
- * @property {CatDomainMechanism} mechanism
- * @property {string} [functionalDiversity]  Freeform prose: how varied the fold's functions are
- *                                        across the wider superfamily (beyond PETadex's own hits)
- * @property {string} [petRelevance]      Freeform prose: why this fold matters specifically for
- *                                        PET/plastic-degrading enzymes - usually the section
- *                                        readers most want, keep it grounded in real member data
- *                                        where possible rather than only general fold literature
- * @property {string} [interactingDomains]  Freeform prose: accessory domains/modules that pair
- *                                        with the catalytic core across the fold (lid domains,
- *                                        P domains, PA domains, etc.) and what they do
- * @property {CatDomainStructureRow[]} [representativeStructures]  Table of solved structures
- *                                        worth looking at for this fold - every pdbId must be
- *                                        verified against RCSB before adding, not guessed
- * @property {CatDomainHmmMethodNote} hmmMethod
- * @property {CatDomainLogo[]} [hmmLogos]       One or more per member HMM, ideally
- * @property {CatDomainLogo[]} [sequenceLogos]  Consensus view, per component or pooled
- * @property {CatDomainReference[]} references  CAT-domain-level literature (distinct from
- *                                               per-Pfam references already in cathDomainCatalog.js)
- * @property {string} [status]  "stub" | "in-progress" | "curated" - drives the WIP banner in the UI
+ * Credit: α/β hydrolase fold narrative from Lisa Chen (UxC999), commit 872eb18
+ * (also present on ad5994e). Remote S3 JSON can still override via fetchCathDomainNarrative.
  */
 
 /** @type {CatDomainCatalogEntry[]} */
@@ -99,6 +11,8 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "3.40.50.1820",
     displayName: "α/β hydrolase fold",
     lastUpdated: "2026-07-24",
+    contentCredit: "Domain writeup drafted by Lisa Chen (UxC999) for the CATH-domain scaffold (commit 872eb18); pending lead review for S3 hosting.",
+    shortIntro: "The α/β-hydrolase fold was first defined by Ollis et al. (1992), who compared five hydrolytic enzymes with no significant sequence similarity - dienelactone hydrolase, haloalkane dehalogenase, wheat serine carboxypeptidase II, acetylcholinesterase, and a Geotrichum candidum lipase - and concluded that they had diverged from a common ancestor while retaining the spatial arrangement of their catalytic machinery.",
     overview:
       "The α/β-hydrolase fold was first defined by Ollis et al. (1992), who compared five hydrolytic enzymes with no significant sequence similarity - dienelactone hydrolase, haloalkane dehalogenase, wheat serine carboxypeptidase II, acetylcholinesterase, and a Geotrichum candidum lipase - and concluded that they had diverged from a common ancestor while retaining the spatial arrangement of their catalytic machinery. Three years later, in 1995, the dedicated ESTHER database (ESTerases, α/β-Hydrolase Enzymes and Relatives) was established to catalogue proteins belonging to this superfamily. The α/β-hydrolase fold is the predominant catalytic fold among PETadex hits, represented by 19 Pfam/HMM profiles in the current catalogue (see the HMMs-used table below).",
     structuralArchitecture:
@@ -169,11 +83,11 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "3.40.710.10",
     displayName: "β-lactamase/transpeptidase-like fold",
     lastUpdated: "2026-07-14",
-    overview: "Curation pending.",
+    overview: "[PENDING INFORMATION]",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: {
       text:
-        "Component-to-CAT-domain mapping not yet confirmed for this fold.",
+        "[PENDING INFORMATION]",
       methodologyAnchor: "hmm-generation",
       refs: [],
     },
@@ -186,11 +100,11 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "3.60.70.12",
     displayName: "Amidase-signature fold",
     lastUpdated: "2026-07-14",
-    overview: "Curation pending.",
+    overview: "[PENDING INFORMATION]",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: {
       text:
-        "Component-to-CAT-domain mapping not yet confirmed for this fold.",
+        "[PENDING INFORMATION]",
       methodologyAnchor: "hmm-generation",
       refs: [],
     },
@@ -203,11 +117,11 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "3.90.1300.10",
     displayName: "Peptidase / hydrolase-associated fold",
     lastUpdated: "2026-07-14",
-    overview: "Curation pending.",
+    overview: "[PENDING INFORMATION]",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: {
       text:
-        "Component-to-CAT-domain mapping not yet confirmed for this fold.",
+        "[PENDING INFORMATION]",
       methodologyAnchor: "hmm-generation",
       refs: [],
     },
@@ -220,11 +134,11 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "2.40.10.10",
     displayName: "Trypsin-like serine protease fold",
     lastUpdated: "2026-07-14",
-    overview: "Curation pending.",
+    overview: "[PENDING INFORMATION]",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: {
       text:
-        "Component-to-CAT-domain mapping not yet confirmed for this fold.",
+        "[PENDING INFORMATION]",
       methodologyAnchor: "hmm-generation",
       refs: [],
     },
@@ -237,11 +151,11 @@ export const CAT_DOMAIN_CATALOG = [
     cathId: "2.60.40.420",
     displayName: "Multicopper oxidase-like fold",
     lastUpdated: "2026-07-14",
-    overview: "Curation pending.",
+    overview: "[PENDING INFORMATION]",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: {
       text:
-        "Component-to-CAT-domain mapping not yet confirmed for this fold.",
+        "[PENDING INFORMATION]",
       methodologyAnchor: "hmm-generation",
       refs: [],
     },

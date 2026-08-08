@@ -1,4 +1,5 @@
 import React from "react"
+import ProteinViewer from "../protein/ProteinViewer"
 
 /**
  * Renders one paragraph's text, turning **bold** markers into real <strong> elements.
@@ -61,24 +62,29 @@ export const CatDomainStructureEmbed = ({ structureEmbedPdbId }) => {
     structureEmbedPdbId && /^[0-9][A-Za-z0-9]{3}$/.test(structureEmbedPdbId)
       ? structureEmbedPdbId.toUpperCase()
       : null
-  const embedUrl = embedPdbId ? `https://molstar.org/viewer/?pdb=${embedPdbId}` : null
 
-  if (!embedUrl) return null
+  if (!embedPdbId) return null
+
+  const structureUrl = `https://files.rcsb.org/download/${embedPdbId}.pdb`
 
   return (
     <div className="rounded-xl border border-border bg-muted/10 overflow-hidden mt-6">
       <div className="px-4 py-2 border-b border-border bg-muted/20">
-        <p className="text-sm font-medium text-foreground m-0">
-          In-page 3D embed (Mol*): {embedPdbId}
-        </p>
+        <p className="text-sm font-medium text-foreground m-0">Structure · {embedPdbId}</p>
       </div>
-      <iframe
-        title={`Molstar viewer ${embedPdbId}`}
-        src={embedUrl}
-        className="w-full h-[420px] border-0"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-      />
+      <div className="bg-neutral-950" style={{ height: 420 }}>
+        <ProteinViewer
+          key={embedPdbId}
+          structureUrl={structureUrl}
+          accession={embedPdbId}
+          initialStyle="cartoon"
+          showControls={false}
+          height="100%"
+        />
+      </div>
+      <p className="text-xs text-muted-foreground px-4 py-2 m-0 border-t border-border bg-muted/10">
+        Rotate: left-click. Zoom: scroll. Pan: right-click.
+      </p>
     </div>
   )
 }

@@ -23,7 +23,7 @@ function emptyCatEntry(cathId) {
     cathId,
     displayName: cathId,
     lastUpdated: "—",
-    overview: "This CATH domain hasn't been curated yet — it was detected from member HMM assignments.",
+    overview: "This CATH domain has not been curated yet. It was detected from member HMM assignments.",
     mechanism: { mcsa: null, customSummary: "", customDiagram: null },
     hmmMethod: { text: "Curation pending.", refs: [] },
     hmmLogos: [],
@@ -34,9 +34,9 @@ function emptyCatEntry(cathId) {
 }
 
 /**
- * Build CAT-domain models by grouping merged Pfam/HMM domain models (the output of
- * `mergeCatalogWithAtlasComponents`) by their `cathId`, then attaching curated CAT-level
- * content from `CAT_DOMAIN_CATALOG` when available — or an auto-generated stub when not.
+ * Build CATH-domain models by grouping merged Pfam/HMM domain models (the output of
+ * `mergeCatalogWithAtlasComponents`) by their `cathId`, then attaching curated CATH-level
+ * content from `CAT_DOMAIN_CATALOG` when available, or an auto-generated stub when not.
  *
  * @param {ReturnType<typeof import("./mergeCatalogWithAtlas.js").buildDomainModelFromCatalog>[]} pfamDomainModels
  * @returns {CatDomainModel[]}

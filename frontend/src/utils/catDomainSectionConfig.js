@@ -1,4 +1,4 @@
-/** Hardcoded narrative sections — every CAT-domain page renders all of these. */
+/** Hardcoded narrative sections — every CATH-domain page renders all of these. */
 export const CAT_NARRATIVE_SECTIONS = [
   { key: "structuralArchitecture", title: "Structural architecture" },
   { key: "mechanism", title: "Mechanism" },
@@ -26,7 +26,7 @@ export function getAllCatSections() {
 }
 
 /**
- * Fixed sidebar / in-page nav for every CAT-domain page.
+ * Fixed sidebar / in-page nav for every CATH-domain page.
  * @param {Record<string, unknown>} _catDomain
  */
 export function getCatSectionNavItems(_catDomain) {
@@ -39,13 +39,13 @@ export function getCatSectionNavItems(_catDomain) {
 }
 
 /**
- * Label for the CAT-domain selector dropdown.
+ * Label for the CATH-domain selector dropdown.
  * @param {{ cathId: string, displayName: string, memberCount?: number }} catDomain
  */
 export function formatCatDomainSelectLabel(catDomain) {
   const id = String(catDomain?.cathId || "").trim()
   const name = String(catDomain?.displayName || "").trim()
-  const base = id && name ? `${id} — ${name}` : id || name || "Unresolved CATH domain"
+  const base = id && name ? `${id}: ${name}` : id || name || "Unresolved CATH domain"
   return catDomain?.memberCount
     ? `${base} (${catDomain.memberCount} HMM${catDomain.memberCount === 1 ? "" : "s"})`
     : base

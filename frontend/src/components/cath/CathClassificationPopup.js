@@ -2,21 +2,16 @@ import React, { useState, useEffect, useCallback } from "react"
 
 const STORAGE_KEY = "petadex:cathDomainIntroDismissed"
 
-// widthPct controls the taper — each step narrower than the last, creating the funnel shape
+// Corpus size matches site-wide ~307M ORF / Logan corpus wording (search, index, orf routes).
 const FUNNEL_STEPS = [
-  { label: "Billions of sequences", widthPct: 100 },
+  { label: "~307M sequences", widthPct: 100 },
   { label: "HMM scanning", widthPct: 78 },
   { label: "42 atlas components", widthPct: 52 },
   { label: "CATH domains", widthPct: 28 },
 ]
 
-/**
- * Shown once (per browser) when someone lands on the CAT-domain view, explaining why the
- * classification exists. Dismissal is permanent via localStorage, per an explicit "don't show
- * again" choice — not just closing the popup.
- */
 const CathClassificationPopup = () => {
-  const [dismissed, setDismissed] = useState(true) // default hidden until we check storage (avoids SSR flash)
+  const [dismissed, setDismissed] = useState(true)
   const [dontShowChecked, setDontShowChecked] = useState(false)
 
   useEffect(() => {
@@ -25,7 +20,6 @@ const CathClassificationPopup = () => {
       const stored = window.localStorage.getItem(STORAGE_KEY)
       setDismissed(stored === "true")
     } catch {
-      // localStorage unavailable (privacy mode, etc.) — just show the popup every time
       setDismissed(false)
     }
   }, [])
@@ -35,7 +29,7 @@ const CathClassificationPopup = () => {
       try {
         window.localStorage.setItem(STORAGE_KEY, "true")
       } catch {
-        // ignore write failures — worst case it shows again next visit
+        // ignore
       }
     }
     setDismissed(true)
@@ -82,10 +76,7 @@ const CathClassificationPopup = () => {
         </div>
 
         <p className="text-base text-muted-foreground leading-relaxed mb-6">
-          PETadex scans an enormous number of raw sequences. Classifying by structural fold
-          compresses that into a small number of CATH domains — few enough that someone can
-          actually curate and read one page per domain, with every raw hit inheriting that
-          domain's mechanism and literature.
+          [PENDING INFORMATION]
         </p>
 
         <div className="flex items-center justify-between gap-3">

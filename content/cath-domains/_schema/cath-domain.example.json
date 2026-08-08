@@ -1,0 +1,18 @@
+{
+  "cathId": "3.40.50.1820",
+  "shortIntro": "HUMAN: 1-2 sentence teaser shown before Read full details.",
+  "overview": "HUMAN: optional longer overview after expand.",
+  "structuralArchitecture": "HUMAN",
+  "mechanism": {
+    "steps": [
+      { "title": "Activation", "description": "HUMAN" },
+      { "title": "Acylation", "description": "HUMAN" },
+      { "title": "Deacylation", "description": "HUMAN" }
+    ],
+    "customSummary": "HUMAN optional"
+  },
+  "functionalDiversity": "HUMAN",
+  "interactingDomains": "HUMAN",
+  "representativeStructuresNote": "HUMAN: why care about these PDBs.",
+  "references": [{ "label": "Author et al. (year). Title.", "url": "https://doi.org/..." }]
+}

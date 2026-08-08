@@ -14,7 +14,7 @@ const CatDomainReferences = ({ references }) => (
         Literature
       </h2>
       {!references?.length ? (
-        <p className="text-muted-foreground text-sm m-0">No CAT-domain-level literature curated yet.</p>
+        <p className="text-muted-foreground text-sm m-0">No CATH-domain-level literature curated yet.</p>
       ) : (
         <ul className="list-disc pl-5 space-y-2.5 text-sm text-muted-foreground leading-relaxed m-0">
           {references.map((ref, i) => (

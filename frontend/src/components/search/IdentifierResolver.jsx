@@ -215,15 +215,33 @@ const ListResult = ({ result, onLoadMore, loadingMore }) => (
   <div className="card text-left p-6">
     <div className="flex items-center gap-3 mb-1 flex-wrap">
       <TypeBadge type="library_id" />
-      <span className="font-mono text-sm text-secondary-foreground">
+      <Link
+        to={`/sra/${encodeURIComponent(result.library_id)}`}
+        className="font-mono text-sm text-info hover:underline"
+      >
         {result.library_id}
-      </span>
+      </Link>
+      <a
+        href={`https://www.ncbi.nlm.nih.gov/sra/?term=${encodeURIComponent(result.library_id)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-muted-foreground hover:text-info"
+      >
+        NCBI ↗
+      </a>
     </div>
     <p className="text-sm text-muted-foreground mb-4">
       <strong className="text-primary">
         {result.pagination.total.toLocaleString()}
       </strong>{" "}
-      ORFs in this library — showing {result.orf_ids.length}
+      ORFs in this library — showing {result.orf_ids.length}. Open the{" "}
+      <Link
+        to={`/sra/${encodeURIComponent(result.library_id)}`}
+        className="text-info hover:underline"
+      >
+        SRA run page
+      </Link>{" "}
+      for sample metadata.
     </p>
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
       {result.orf_ids.map(orfId => (

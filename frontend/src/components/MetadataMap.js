@@ -108,8 +108,16 @@ const MetadataMap = () => {
             <p style="margin:0.25rem 0;"><strong>Country:</strong> ${props.country}</p>
             <p style="margin:0.25rem 0;"><strong>Continent:</strong> ${props.continent}</p>
             <p style="margin:0.25rem 0;"><strong>Biome:</strong> ${props.biome}</p>
-            <p style="margin:0.25rem 0;"><strong>Organism:</strong> ${props.organism}</p>
+            <p style="margin:0.25rem 0;"><strong>Organism:</strong>
+              <a href="/organism/${encodeURIComponent(props.organism)}"
+                 style="color:#2563eb;text-decoration:none;font-style:italic;">
+                ${props.organism}
+              </a>
+            </p>
             ${elevationLine}
+            <p style="margin:0.5rem 0 0;">
+              <a href="/biosamples" style="color:#2563eb;font-size:0.8rem;">Browse biosamples →</a>
+            </p>
           </div>
         `;
 

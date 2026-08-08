@@ -7,6 +7,7 @@
 // populated (`sra` / `nr` / `pazy`). See "01 - Per-Sequence Annotation Plan"
 // (fact vs. comparison) and "02 - Backend Routing Plan" (the orf_origin dispatch).
 import React from "react"
+import { Link } from "gatsby"
 
 const ORIGIN_META = {
   0: {
@@ -120,18 +121,28 @@ export default function ProvenancePanel({ orfOrigin, provenance }) {
       <div className="divide-y divide-border/60">
         {accession && (
           <Row label={meta.key === "sra" ? "Library / run" : "Accession"}>
-            {externalLink ? (
-              <a
-                href={externalLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-info hover:underline break-all"
-              >
-                {accession}
-              </a>
-            ) : (
-              <span className="font-mono break-all">{accession}</span>
-            )}
+            <span className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              {meta.key === "sra" ? (
+                <Link
+                  to={`/sra/${encodeURIComponent(accession)}`}
+                  className="font-mono text-info hover:underline break-all"
+                >
+                  {accession}
+                </Link>
+              ) : (
+                <span className="font-mono break-all">{accession}</span>
+              )}
+              {externalLink && (
+                <a
+                  href={externalLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-info"
+                >
+                  NCBI ↗
+                </a>
+              )}
+            </span>
           </Row>
         )}
 
@@ -141,9 +152,35 @@ export default function ProvenancePanel({ orfOrigin, provenance }) {
 
         {knownEntries.map(([k, v]) => (
           <Row key={k} label={FIELD_LABELS[k]}>
-            <span className={ITALIC_FIELDS.has(k) ? "italic" : undefined}>
-              {String(v)}
-            </span>
+            {k === "biosample" ? (
+              <span className="inline-flex flex-wrap items-baseline gap-x-2">
+                <Link
+                  to={`/biosample/${encodeURIComponent(String(v))}`}
+                  className="font-mono text-info hover:underline break-all"
+                >
+                  {String(v)}
+                </Link>
+                <a
+                  href={`https://www.ncbi.nlm.nih.gov/biosample/${encodeURIComponent(String(v))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-info"
+                >
+                  NCBI ↗
+                </a>
+              </span>
+            ) : k === "organism" ? (
+              <Link
+                to={`/organism/${encodeURIComponent(String(v))}`}
+                className="italic text-info hover:underline"
+              >
+                {String(v)}
+              </Link>
+            ) : (
+              <span className={ITALIC_FIELDS.has(k) ? "italic" : undefined}>
+                {String(v)}
+              </span>
+            )}
           </Row>
         ))}
       </div>

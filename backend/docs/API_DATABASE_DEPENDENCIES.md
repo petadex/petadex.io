@@ -47,6 +47,15 @@
 | `/api/orf/:orfId` | GET | None |
 | `/api/pdb/accession/:accession` | GET | pdb_accessions |
 | `/api/pdb/:pdb_id` | GET | pdb_accessions |
+| `/api/sra/summary` | GET | sra_metadata |
+| `/api/sra/run/:acc` | GET | sra_metadata, logan_catalytic_orfs |
+| `/api/sra/run/:acc/orfs` | GET | logan_catalytic_orfs |
+| `/api/sra/biosample/:id` | GET | sra_metadata, logan_catalytic_orfs |
+| `/api/sra/biosample/:id/runs` | GET | sra_metadata |
+| `/api/sra/organism` | GET | sra_metadata |
+| `/api/sra/organism/:name` | GET | sra_metadata |
+| `/api/sra/organism/:name/biosamples` | GET | sra_metadata |
+| `/api/sra/bacdive/status` | GET | (file cache; BacDive CSV #3) |
 | `/api/petadex-domains/by-accession/:accession` | GET | None |
 | `/api/petadex-domains/:orfId` | GET | None |
 | `/api/plate-data/comparison` | GET | accession_activity_view, gene_metadata |
@@ -990,6 +999,19 @@ SELECT pdb_id, accession, technique, relaxed, date_created, date_entered, alignm
 </details>
 
 ---
+
+## SRA / BioSample Routes
+
+Base: `/api/sra`
+
+Hubs for SRA runs, BioSamples, and organisms from `sra_metadata`, plus BacDive
+means overlay (`bacdiveMeansCache.js`, CSV #3). Soft-fails when CSV/S3 unavailable.
+
+See `frontend/docs/sra-biosamples.md`.
+
+### GET `/api/sra/bacdive/status`
+
+Load state for BacDive biosample means cache (row count / source / errors).
 
 ## PetadexDomains Routes
 

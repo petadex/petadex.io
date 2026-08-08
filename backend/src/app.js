@@ -26,6 +26,7 @@ import resolveRoutes from './routes/resolve.js';
 import clusterRoutes from './routes/cluster.js';
 import orfRoutes from './routes/orf.js';
 import kineticsRoutes from './routes/kinetics.js';
+import sraRoutes from './routes/sra.js';
 import { pool } from './db.js';
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/gene-metadata', geneMetadataRoutes);
 app.use('/api/plate-data', plateDataRoutes);
 app.use('/api/gene-details', geneDetailsRoutes);
 app.use('/api/pdb', pdbRoutes);
+app.use('/api/sra', sraRoutes);
 app.use('/api/enzymes', enzymesRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/atlas', atlasRoutes);

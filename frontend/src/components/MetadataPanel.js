@@ -301,14 +301,20 @@ export default function MetadataPanel({ metadata, accession }) {
                   borderLeft: "3px solid #e5e7eb"
                 }}>
                   <div style={{ fontWeight: "600", color: "#374151" }}>BioSample</div>
-                  <div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "baseline" }}>
+                    <a
+                      href={`/biosample/${encodeURIComponent(researchData.biosample)}`}
+                      style={{ color: "#3b82f6", textDecoration: "none", fontFamily: "monospace" }}
+                    >
+                      {researchData.biosample}
+                    </a>
                     <a
                       href={`https://www.ncbi.nlm.nih.gov/biosample/${researchData.biosample}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: "#3b82f6", textDecoration: "none" }}
+                      style={{ color: "#6b7280", fontSize: "0.75rem", textDecoration: "none" }}
                     >
-                      {researchData.biosample}
+                      NCBI ↗
                     </a>
                   </div>
                 </div>
@@ -325,14 +331,20 @@ export default function MetadataPanel({ metadata, accession }) {
                   borderLeft: "3px solid #e5e7eb"
                 }}>
                   <div style={{ fontWeight: "600", color: "#374151" }}>SRA</div>
-                  <div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "baseline" }}>
+                    <a
+                      href={`/sra/${encodeURIComponent(researchData.sra_accession)}`}
+                      style={{ color: "#3b82f6", textDecoration: "none", fontFamily: "monospace" }}
+                    >
+                      {researchData.sra_accession}
+                    </a>
                     <a
                       href={`https://www.ncbi.nlm.nih.gov/sra/${researchData.sra_accession}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: "#3b82f6", textDecoration: "none" }}
+                      style={{ color: "#6b7280", fontSize: "0.75rem", textDecoration: "none" }}
                     >
-                      {researchData.sra_accession}
+                      NCBI ↗
                     </a>
                   </div>
                 </div>
@@ -390,8 +402,13 @@ export default function MetadataPanel({ metadata, accession }) {
                   borderLeft: "3px solid #e5e7eb"
                 }}>
                   <div style={{ fontWeight: "600", color: "#374151" }}>Organism</div>
-                  <div style={{ color: "#6b7280", fontStyle: "italic" }}>
-                    {researchData.organism}
+                  <div>
+                    <a
+                      href={`/organism/${encodeURIComponent(researchData.organism)}`}
+                      style={{ color: "#3b82f6", textDecoration: "none", fontStyle: "italic" }}
+                    >
+                      {researchData.organism}
+                    </a>
                   </div>
                 </div>
               )}

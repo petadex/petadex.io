@@ -3,12 +3,108 @@ import { Link } from "gatsby"
 import { useTheme } from "../context/ThemeContext"
 
 const NAV_ITEMS = [
-  { label: "Halo Assay", path: "/halo-assay", key: "halo-assay" },
+  {
+    label: "Activity",
+    path: "/activity",
+    key: "activity",
+    children: [
+      { label: "Kinetics", path: "/kinetics", key: "kinetics" },
+      { label: "Substrates", path: "/substrates", key: "substrates" },
+      { label: "Halo Assay", path: "/halo-assay", key: "halo-assay" },
+    ],
+  },
   { label: "Enzymes", path: "/enzymes", key: "enzymes" },
   { label: "Search", path: "/search", key: "search" },
   { label: "CATH domains", path: "/cath-domains", key: "cath-domains" },
   { label: "Atlas", path: "/atlas", key: "atlas" },
 ]
+
+const ChevronDownIcon = ({ open }) => (
+  <svg
+    className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+)
+
+// Desktop nav dropdown — opens on hover or click, closes on outside click / Escape.
+const NavDropdown = ({ item }) => {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+  const closeTimer = useRef(null)
+
+  const openMenu = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+  // Small delay so moving the pointer across the gap to the panel doesn't close it.
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setOpen(false), 120)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = e => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    const onKeyDown = e => {
+      if (e.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [open])
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative"
+      onMouseEnter={openMenu}
+      onMouseLeave={scheduleClose}
+    >
+      {/* Clicking navigates to the Activity hub; hover/focus reveals the quick menu. */}
+      <Link
+        to={item.path}
+        onFocus={openMenu}
+        className="flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+        activeClassName="text-foreground border-b-2 border-accent"
+        partiallyActive
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {item.label}
+        <ChevronDownIcon open={open} />
+      </Link>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-48 rounded-lg border border-border bg-background/95 backdrop-blur-md shadow-lg py-1 z-50">
+          {item.children.map(child => (
+            <Link
+              key={child.key}
+              to={child.path}
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
+              activeClassName="text-foreground bg-muted"
+            >
+              {child.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const SunIcon = () => (
   <svg className="w-5 h-5 fill-yellow-500" viewBox="0 0 20 20">
@@ -93,17 +189,41 @@ const SiteHeader = () => {
         </div>
 
         <nav className="p-4 space-y-1">
-          {NAV_ITEMS.map(item => (
-            <Link
-              key={item.key}
-              to={item.path}
-              onClick={closeMobileMenu}
-              className="flex items-center px-4 py-3 rounded-lg text-base font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground border-r-2 border-accent"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV_ITEMS.map(item =>
+            item.children ? (
+              <div key={item.key} className="pt-2 first:pt-0">
+                <Link
+                  to={item.path}
+                  onClick={closeMobileMenu}
+                  className="block px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                  activeClassName="text-accent"
+                >
+                  {item.label}
+                </Link>
+                {item.children.map(child => (
+                  <Link
+                    key={child.key}
+                    to={child.path}
+                    onClick={closeMobileMenu}
+                    className="flex items-center px-4 py-3 rounded-lg text-base font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground border-r-2 border-accent"
+                  >
+                    {child.label}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <Link
+                key={item.key}
+                to={item.path}
+                onClick={closeMobileMenu}
+                className="flex items-center px-4 py-3 rounded-lg text-base font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground border-r-2 border-accent"
+              >
+                {item.label}
+              </Link>
+            )
+          )}
         </nav>
       </div>
 
@@ -130,17 +250,21 @@ const SiteHeader = () => {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-x-1" aria-label="Main navigation">
-            {NAV_ITEMS.map(item => (
-              <Link
-                key={item.key}
-                to={item.path}
-                className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-muted  "
-                activeClassName="text-foreground border-b-2 border-accent"
-                partiallyActive={item.key === "enzymes"}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {NAV_ITEMS.map(item =>
+              item.children ? (
+                <NavDropdown key={item.key} item={item} />
+              ) : (
+                <Link
+                  key={item.key}
+                  to={item.path}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-muted  "
+                  activeClassName="text-foreground border-b-2 border-accent"
+                  partiallyActive={item.key === "enzymes"}
+                >
+                  {item.label}
+                </Link>
+              )
+            )}
           </nav>
 
           {/* Right controls */}

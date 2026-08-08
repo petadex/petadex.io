@@ -17,23 +17,26 @@ wipes an externally set focus (sidebar neighbor clicks stay selected).
 ### 2. Lineage to the root
 
 With a focused tip, the tree highlights the unique path from that tip up to the
-root. The sidebar explains how many ancestral nodes are on that path.
+root. The sidebar shows that path as a short tip→ancestors→root visual plus a
+step count (not a paragraph).
 
 ### 3. Closest sequences
 
 The sidebar lists the closest tips by **tree distance** (branch-length path via
-the last common ancestor; “steps” = edge count). Selecting a neighbor re-focuses
-the tree and bumps `zoomNonce` so re-zoom works even when the same tip is already
-focused.
+the last common ancestor; “steps” = edge count), with a distance ruler and a
+per-row bar. Selecting a neighbor re-focuses the tree and bumps `zoomNonce` so
+re-zoom works even when the same tip is already focused.
+
+Focused tips also show **identity to family centroid** (`family_pid`) when present.
 
 ### 4. Show nearby only
 
-Toggle **Dim distant sequences** around the focus tip:
+Toggle **Dim far tips** around the focus tip:
 
-- **By tree distance** — tips within a distance cutoff of the focus
+- **By steps** — tips within N topological hops of the focus (default)
 - **Closest N** — the N nearest tips (slider max = number of other tips in the tree)
 
-Non-neighborhood leaves are dimmed. **Show full tree again** turns the filter off.
+Non-neighborhood leaves are dimmed. **Show all** turns the filter off.
 
 ### 5. Color by metadata
 
@@ -71,7 +74,7 @@ families with a tree show “View phylogeny” from search results.
 | File | Purpose |
 |------|---------|
 | `frontend/src/components/phyloTree/PhyloNavSidebar.jsx` | Focus, path, neighborhood, neighbors, color-by UI |
-| `frontend/src/components/phyloTree/treeTopology.js` | Tree index, path-to-root, LCA, k-NN, radius neighborhood |
+| `frontend/src/components/phyloTree/treeTopology.js` | Tree index, path-to-root, LCA, k-NN, hop neighborhood |
 | `frontend/src/components/phyloTree/metadataColors.js` | Color modes + legend helpers |
 | `frontend/src/pages/phylo-tree-prototype.js` | Optional family-ID entry page using the same panel |
 
@@ -98,7 +101,7 @@ S3 family_{id}.nwk ──► PhyloTreePanel ──► PhyloTreeViewer
                               │               ⟕ blast_nr_metadata)
                               │
                               └─ showNavTools?
-                                    ├─ treeTopology (path / k-NN / radius)
+                                    ├─ treeTopology (path / k-NN / hops)
                                     ├─ metadataColors
                                     └─ PhyloNavSidebar
 ```
@@ -118,8 +121,8 @@ on `[focusedLeafId, zoomNonce, zoomToLeaf]`.
 - Open `/family/182` and `/tree/182` — sidebar present; Newick loads.
 - Focus via search or click — lineage path highlights; ancestor count updates.
 - Closest sequences list sorts by tree distance; click focuses + zooms.
-- Dim distant sequences — filtering updates with distance / Closest N; Show full tree again turns it off
-- Color modes update tip colors / legend; organism/country only when metadata exists.
+- Dim far tips — filtering updates with steps / Closest N; Show all turns it off.
+- Color modes update tip colors / legend with category %; organism/country only when metadata exists.
 - Zoom back to an already-focused tip still recenters the viewport.
 - Empty search does not clear a focus set from the sidebar.
 
@@ -129,7 +132,7 @@ on `[focusedLeafId, zoomNonce, zoomToLeaf]`.
   e.g. 182, 21080, 47364).
 - Organism/country coloring depends on `blast_nr_metadata` coverage; many tips
   may be uncolored for those modes.
-- Neighborhood controls use patristic distance on the displayed tree topology;
-  they are not BLAST or sequence-identity neighbors.
+- Neighborhood “By steps” uses topological hops; neighbor ranking still uses
+  patristic distance. Neither is BLAST / sequence-identity neighbors.
 - `/phylo-tree-prototype` is a convenience entry for demos; production entry
   points remain family pages, `/tree/:id`, and search “View phylogeny”.

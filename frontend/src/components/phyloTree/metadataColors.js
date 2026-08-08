@@ -1,9 +1,9 @@
 import { COMPONENT_SHADE_CSS } from "../../utils/cathColors"
 
 export const COLOR_MODES = [
-  { id: "none", label: "None (keep search highlights only)" },
-  { id: "component", label: "Domain component (CATH atlas)" },
-  { id: "family_pid", label: "% identity to family center" },
+  { id: "none", label: "None" },
+  { id: "component", label: "Component" },
+  { id: "family_pid", label: "Identity to centroid" },
   { id: "organism", label: "Organism" },
   { id: "country", label: "Country" },
 ]
@@ -99,46 +99,84 @@ export function createLeafColorGetter(mode, memberIndex) {
   return null
 }
 
+function pctLabel(count, total) {
+  if (!total) return "0%"
+  return `${((100 * count) / total).toFixed(count === total || count === 0 ? 0 : 1)}%`
+}
+
 /**
- * Legend entries for the current color mode.
- * @returns {{ label: string, color: string }[]}
+ * Legend entries for the current color mode (includes % of family tips).
+ * @returns {{ label: string, color: string, pct?: string, count?: number }[]}
  */
 export function buildColorLegend(mode, memberIndex) {
   if (!mode || mode === "none") return []
+  const total = memberIndex.size || 0
 
   if (mode === "family_pid") {
     return [
-      { label: "0% identity", color: familyPidColor(0) },
+      { label: "0%", color: familyPidColor(0) },
       { label: "50%", color: familyPidColor(50) },
-      { label: "100% identity", color: familyPidColor(100) },
+      { label: "100%", color: familyPidColor(100) },
       { label: "Unknown", color: UNKNOWN },
     ]
   }
 
   if (mode === "component") {
-    const comps = new Set()
+    const counts = new Map()
+    let unknown = 0
     for (const m of memberIndex.values()) {
-      if (m.component != null) comps.add(Number(m.component))
+      if (m.component == null) {
+        unknown += 1
+        continue
+      }
+      const c = Number(m.component)
+      counts.set(c, (counts.get(c) || 0) + 1)
     }
-    return [...comps]
-      .sort((a, b) => a - b)
-      .map(c => ({
+    const entries = [...counts.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([c, n]) => ({
         label: `Component ${c}`,
         color: COMPONENT_SHADE_CSS[c] || UNKNOWN,
+        count: n,
+        pct: pctLabel(n, total),
       }))
-      .concat([{ label: "Unknown", color: UNKNOWN }])
+    if (unknown) {
+      entries.push({
+        label: "Unknown",
+        color: UNKNOWN,
+        count: unknown,
+        pct: pctLabel(unknown, total),
+      })
+    }
+    return entries
   }
 
   if (mode === "organism" || mode === "country") {
-    const values = []
-    for (const m of memberIndex.values()) values.push(m[mode])
-    const colorMap = buildCategoryColorMap(values)
-    const entries = [...colorMap.entries()].map(([label, color]) => ({ label, color }))
-    // Cap legend length for readability
+    const counts = new Map()
+    for (const m of memberIndex.values()) {
+      const key = String(m[mode] || "").trim() || "Unknown"
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    const colorMap = buildCategoryColorMap(counts.keys())
+    const entries = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([label, n]) => ({
+        label,
+        color: colorMap.get(label) || UNKNOWN,
+        count: n,
+        pct: pctLabel(n, total),
+      }))
     if (entries.length <= 12) return entries
+    const shown = entries.slice(0, 11)
+    const restCount = entries.slice(11).reduce((s, e) => s + e.count, 0)
     return [
-      ...entries.slice(0, 11),
-      { label: `+${entries.length - 11} more`, color: UNKNOWN },
+      ...shown,
+      {
+        label: `+${entries.length - 11} more`,
+        color: UNKNOWN,
+        count: restCount,
+        pct: pctLabel(restCount, total),
+      },
     ]
   }
 

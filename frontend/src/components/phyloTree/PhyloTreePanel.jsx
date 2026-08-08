@@ -7,12 +7,12 @@ import { useFamilyTree } from "./useFamilyTree"
 import { useFamilyMemberIndex } from "./useFamilyMemberIndex"
 import {
   buildTreeIndex,
+  leavesWithinHops,
   leavesWithinKNearest,
-  leavesWithinRadius,
-  maxPatristicFromFocus,
+  maxHopsFromFocus,
   nearestNeighbors,
   pathUidsForLeaf,
-  suggestNeighborhoodRadius,
+  suggestNeighborhoodHops,
 } from "./treeTopology"
 import { createLeafColorGetter, buildColorLegend } from "./metadataColors"
 
@@ -43,8 +43,8 @@ export default function PhyloTreePanel({
   })
   const [focusedLeafId, setFocusedLeafId] = useState(null)
   const [neighborhoodActive, setNeighborhoodActive] = useState(false)
-  const [neighborhoodMode, setNeighborhoodMode] = useState("radius")
-  const [radius, setRadius] = useState(0)
+  const [neighborhoodMode, setNeighborhoodMode] = useState("hops")
+  const [hopRadius, setHopRadius] = useState(1)
   const [kNearest, setKNearest] = useState(10)
   const [colorMode, setColorMode] = useState("none")
   const [zoomNonce, setZoomNonce] = useState(0)
@@ -75,7 +75,7 @@ export default function PhyloTreePanel({
 
   useEffect(() => {
     if (!showNavTools || !focusedLeafId || !treeIndex) return
-    setRadius(suggestNeighborhoodRadius(focusedLeafId, treeIndex))
+    setHopRadius(suggestNeighborhoodHops(focusedLeafId, treeIndex))
   }, [showNavTools, focusedLeafId, treeIndex])
 
   const pathUids = useMemo(() => {
@@ -89,9 +89,9 @@ export default function PhyloTreePanel({
     return nearestNeighbors(focusedLeafId, treeIndex, { limit: 20 })
   }, [showNavTools, focusedLeafId, treeIndex])
 
-  const maxRadius = useMemo(() => {
+  const maxHopRadius = useMemo(() => {
     if (!showNavTools || !focusedLeafId || !treeIndex) return 1
-    return Math.max(maxPatristicFromFocus(focusedLeafId, treeIndex), 0.001)
+    return Math.max(maxHopsFromFocus(focusedLeafId, treeIndex), 1)
   }, [showNavTools, focusedLeafId, treeIndex])
 
   // k can be at most (#leaves − 1); no fixed 50 cap.
@@ -104,6 +104,10 @@ export default function PhyloTreePanel({
     setKNearest(k => Math.min(Math.max(1, k), maxKNearest))
   }, [maxKNearest])
 
+  useEffect(() => {
+    setHopRadius(h => Math.min(Math.max(0, h), maxHopRadius))
+  }, [maxHopRadius])
+
   // Local neighborhood dims tips when the clade-view toggle is on and a tip is focused.
   const neighborhoodOn = Boolean(
     showNavTools && neighborhoodActive && focusedLeafId && treeIndex,
@@ -114,14 +118,14 @@ export default function PhyloTreePanel({
     if (neighborhoodMode === "knn") {
       return leavesWithinKNearest(focusedLeafId, treeIndex, kNearest)
     }
-    return leavesWithinRadius(focusedLeafId, treeIndex, radius)
+    return leavesWithinHops(focusedLeafId, treeIndex, hopRadius)
   }, [
     neighborhoodOn,
     focusedLeafId,
     treeIndex,
     neighborhoodMode,
     kNearest,
-    radius,
+    hopRadius,
   ])
 
   const getLeafColor = useMemo(() => {
@@ -234,11 +238,11 @@ export default function PhyloTreePanel({
             neighbors={neighbors}
             neighborhoodActive={neighborhoodActive}
             neighborhoodMode={neighborhoodMode}
-            radius={radius}
-            maxRadius={maxRadius}
+            hopRadius={hopRadius}
+            maxHopRadius={maxHopRadius}
             kNearest={kNearest}
             maxKNearest={maxKNearest}
-            onRadiusChange={setRadius}
+            onHopRadiusChange={setHopRadius}
             onKNearestChange={setKNearest}
             onNeighborhoodModeChange={setNeighborhoodMode}
             onToggleNeighborhood={setNeighborhoodActive}

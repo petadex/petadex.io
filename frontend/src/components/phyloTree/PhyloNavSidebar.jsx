@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useMemo } from "react"
 import { Link } from "gatsby"
 import { leafDisplayLabel } from "./leafUtils"
 import { COLOR_MODES } from "./metadataColors"
@@ -26,8 +26,80 @@ function closestCountPresets(maxK) {
 }
 
 /**
- * Navigation sidebar for family trees: focus, lineage path, nearby filter,
- * closest-sequence list, and metadata coloring.
+ * Compact visual path: tip → ancestors → root (no paragraph).
+ */
+function LineageVisual({ tipLabel, ancestorCount }) {
+  const steps = Math.max(0, ancestorCount)
+  const nodes = ["tip", ...Array.from({ length: Math.min(steps, 6) }, (_, i) => `a${i}`), "root"]
+  return (
+    <div className="mt-2" aria-label={`${steps} steps from tip to root`}>
+      <div className="flex items-center gap-1 overflow-x-auto py-1">
+        {nodes.map((id, i) => {
+          const isTip = i === 0
+          const isRoot = i === nodes.length - 1
+          return (
+            <React.Fragment key={id}>
+              {i > 0 && (
+                <span className="h-px w-3 shrink-0 bg-destructive/70" aria-hidden />
+              )}
+              <span
+                className={`shrink-0 rounded-full border ${
+                  isTip
+                    ? "w-2.5 h-2.5 bg-destructive border-destructive"
+                    : isRoot
+                      ? "w-2.5 h-2.5 bg-foreground border-foreground"
+                      : "w-2 h-2 bg-destructive/40 border-destructive/50"
+                }`}
+                title={isTip ? tipLabel : isRoot ? "root" : "ancestor"}
+              />
+            </React.Fragment>
+          )
+        })}
+      </div>
+      <p className="m-0 mt-1 font-mono text-xs text-foreground truncate">{tipLabel}</p>
+      <p className="m-0 text-xs text-muted-foreground">
+        {steps} step{steps === 1 ? "" : "s"} → root
+        {steps > 6 ? " (path shortened)" : ""}
+      </p>
+    </div>
+  )
+}
+
+function DistanceRuler({ neighbors }) {
+  const maxDist = useMemo(() => {
+    let m = 0
+    for (const n of neighbors || []) {
+      if (Number.isFinite(n.patristic) && n.patristic > m) m = n.patristic
+    }
+    return m || 1
+  }, [neighbors])
+
+  if (!neighbors?.length) return null
+
+  return (
+    <div className="mb-2 rounded border border-border bg-muted/20 px-2 py-1.5">
+      <div className="flex justify-between text-2xs text-muted-foreground mb-1">
+        <span>0</span>
+        <span>tree distance</span>
+        <span className="font-mono">{formatTreeDistance(maxDist)}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-border overflow-hidden relative">
+        <div
+          className="absolute inset-y-0 left-0 bg-accent/70"
+          style={{ width: "100%" }}
+          aria-hidden
+        />
+      </div>
+      <div className="mt-1 flex justify-between text-2xs text-muted-foreground">
+        <span>near</span>
+        <span>far</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Navigation sidebar for family trees — short labels only (Pixeldom4 review).
  */
 export default function PhyloNavSidebar({
   focusedLeafId,
@@ -35,12 +107,12 @@ export default function PhyloNavSidebar({
   pathLength,
   neighbors,
   neighborhoodActive,
-  neighborhoodMode, // "radius" | "knn"
-  radius,
-  maxRadius,
+  neighborhoodMode, // "hops" | "knn"
+  hopRadius,
+  maxHopRadius,
   kNearest,
   maxKNearest = 50,
-  onRadiusChange,
+  onHopRadiusChange,
   onKNearestChange,
   onNeighborhoodModeChange,
   onToggleNeighborhood,
@@ -58,99 +130,94 @@ export default function PhyloNavSidebar({
     : null
   const closestShortcuts = closestCountPresets(maxKNearest)
   const ancestorCount = Math.max(0, pathLength - 1)
+  const maxNeighborDist = useMemo(() => {
+    let m = 0
+    for (const n of neighbors || []) {
+      if (Number.isFinite(n.patristic) && n.patristic > m) m = n.patristic
+    }
+    return m || 1
+  }, [neighbors])
 
   return (
     <aside
-      className="flex flex-col gap-4 text-sm self-start lg:sticky lg:top-4 w-full max-h-[65vh] overflow-y-auto overscroll-contain pr-1"
+      className="flex flex-col gap-3 text-sm self-start lg:sticky lg:top-4 w-full max-h-[65vh] overflow-y-auto overscroll-contain pr-1"
       style={{ scrollbarGutter: "stable" }}
     >
       <section className="rounded-lg border border-border bg-card p-3">
         <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Selected sequence
+          Selected
         </h3>
         {focusedLeafId ? (
           <div className="mt-2 space-y-1">
-            <p className="m-0 font-mono text-foreground font-medium">{focusLabel}</p>
-            <p className="m-0 text-xs text-muted-foreground">
-              Enzyme {focusedLeafId}
-              {focusMember?.component != null && ` · component ${focusMember.component}`}
-              {focusMember?.family_pid != null &&
-                ` · ${Number(focusMember.family_pid).toFixed(1)}% identity to family center`}
-            </p>
+            <p className="m-0 font-mono text-foreground font-medium truncate">{focusLabel}</p>
+            {focusMember?.family_pid != null && (
+              <p className="m-0 text-xs text-foreground">
+                Identity to family centroid:{" "}
+                <span className="font-mono font-semibold">
+                  {Number(focusMember.family_pid).toFixed(1)}%
+                </span>
+              </p>
+            )}
+            {focusMember?.component != null && (
+              <p className="m-0 text-xs text-muted-foreground">
+                Component {focusMember.component}
+              </p>
+            )}
             <Link
               to={`/enzyme/${focusedLeafId}`}
               className="text-accent hover:underline text-xs"
               target="_blank"
             >
-              Open enzyme page →
+              Enzyme page →
             </Link>
           </div>
         ) : (
-          <p className="mt-2 mb-0 text-muted-foreground text-xs">
-            Search or click a tip on the tree to select a sequence.
-          </p>
+          <p className="mt-2 mb-0 text-muted-foreground text-xs">Select a tip.</p>
         )}
       </section>
 
       <section className="rounded-lg border border-border bg-card p-3">
         <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Lineage to the root
+          Path to root
         </h3>
         {focusedLeafId && pathLength > 0 ? (
-          <div className="mt-2">
-            <p className="m-0 text-foreground">
-              <span className="font-mono">{focusLabel}</span>
-              <span className="text-muted-foreground">
-                {" "}
-                → {ancestorCount} ancestral node
-                {ancestorCount === 1 ? "" : "s"} → root of this family tree
-              </span>
-            </p>
-            <p className="mt-1 mb-0 text-xs text-muted-foreground">
-              The red line on the tree shows this path from the tip back to the root.
-            </p>
+          <>
+            <LineageVisual tipLabel={focusLabel} ancestorCount={ancestorCount} />
             <button
               type="button"
               className="btn btn-secondary btn-sm mt-2"
               onClick={() => onSelectNeighbor?.(focusedLeafId)}
             >
-              Zoom back to this sequence
+              Re-zoom
             </button>
-          </div>
+          </>
         ) : (
-          <p className="mt-2 mb-0 text-muted-foreground text-xs">
-            Select a sequence to see how it connects back to the root of the tree.
-          </p>
+          <p className="mt-2 mb-0 text-muted-foreground text-xs">Select a tip.</p>
         )}
       </section>
 
       <section className="rounded-lg border border-border bg-card p-3">
         <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Show nearby only
+          Nearby
         </h3>
-        <p className="mt-1 mb-2 text-xs text-muted-foreground">
-          Dim sequences that are far from the selection so the local region is easier
-          to read. Distance means how far apart two tips are along the tree branches
-          (tree distance), not a BLAST score.
-        </p>
-        <label className="flex items-center gap-2 cursor-pointer mb-3">
+        <label className="flex items-center gap-2 cursor-pointer mt-2 mb-2">
           <input
             type="checkbox"
             checked={neighborhoodActive}
             disabled={!focusedLeafId}
             onChange={e => onToggleNeighborhood?.(e.target.checked)}
           />
-          <span>Dim distant sequences</span>
+          <span>Dim far tips</span>
         </label>
 
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-2">
           <button
             type="button"
-            className={`btn btn-sm ${neighborhoodMode === "radius" ? "btn-primary" : "btn-secondary"}`}
+            className={`btn btn-sm ${neighborhoodMode === "hops" ? "btn-primary" : "btn-secondary"}`}
             disabled={!focusedLeafId}
-            onClick={() => onNeighborhoodModeChange?.("radius")}
+            onClick={() => onNeighborhoodModeChange?.("hops")}
           >
-            By tree distance
+            By steps
           </button>
           <button
             type="button"
@@ -162,30 +229,29 @@ export default function PhyloNavSidebar({
           </button>
         </div>
 
-        {neighborhoodMode === "radius" ? (
-          <div className="mb-3">
+        {neighborhoodMode === "hops" ? (
+          <div className="mb-2">
             <label className="flex justify-between text-xs text-muted-foreground mb-1">
-              <span>How far to include</span>
-              <span className="font-mono">{formatTreeDistance(radius)}</span>
+              <span>Max steps</span>
+              <span className="font-mono">
+                {hopRadius} / {maxHopRadius}
+              </span>
             </label>
             <input
               type="range"
               className="w-full"
               min={0}
-              max={Math.max(maxRadius, 0.001)}
-              step={Math.max(maxRadius / 200, 0.0001)}
-              value={Math.min(radius, Math.max(maxRadius, 0))}
+              max={Math.max(maxHopRadius, 1)}
+              step={1}
+              value={Math.min(hopRadius, Math.max(maxHopRadius, 0))}
               disabled={!focusedLeafId}
-              onChange={e => onRadiusChange?.(Number(e.target.value))}
+              onChange={e => onHopRadiusChange?.(Number(e.target.value))}
             />
-            <p className="mt-1 mb-0 text-xs text-muted-foreground">
-              Keep tips within this tree distance of the selection; fade the rest.
-            </p>
           </div>
         ) : (
-          <div className="mb-3">
+          <div className="mb-2">
             <label className="flex justify-between text-xs text-muted-foreground mb-1">
-              <span>How many closest tips</span>
+              <span>Keep N closest</span>
               <span className="font-mono">
                 {kNearest} / {maxKNearest}
               </span>
@@ -200,10 +266,7 @@ export default function PhyloNavSidebar({
               disabled={!focusedLeafId}
               onChange={e => onKNearestChange?.(Number(e.target.value))}
             />
-            <p className="mt-1 mb-2 text-xs text-muted-foreground">
-              Keep only the N closest tips (plus the selection); fade everything else.
-            </p>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 mt-1">
               {closestShortcuts.map(k => (
                 <button
                   key={k}
@@ -212,7 +275,7 @@ export default function PhyloNavSidebar({
                   disabled={!focusedLeafId}
                   onClick={() => onKNearestChange?.(k)}
                 >
-                  {k === maxKNearest ? `All (${k})` : `Closest ${k}`}
+                  {k === maxKNearest ? `All` : `${k}`}
                 </button>
               ))}
             </div>
@@ -225,29 +288,27 @@ export default function PhyloNavSidebar({
           disabled={!neighborhoodActive}
           onClick={() => onClearNeighborhood?.()}
         >
-          Show full tree again
+          Show all
         </button>
       </section>
 
       <section className="rounded-lg border border-border bg-card p-3">
         <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Closest sequences
+          Closest
         </h3>
-        <p className="mt-1 mb-2 text-xs text-muted-foreground">
-          Ranked by tree distance (shorter branch path = closer). “Steps” is how many
-          branches you cross on that path.
-        </p>
+        <DistanceRuler neighbors={neighbors} />
         {!focusedLeafId ? (
-          <p className="mb-0 text-muted-foreground text-xs">
-            Select a sequence to list its closest neighbors.
-          </p>
+          <p className="mb-0 text-muted-foreground text-xs">Select a tip.</p>
         ) : !neighbors.length ? (
-          <p className="mb-0 text-muted-foreground text-xs">No other tips in this tree.</p>
+          <p className="mb-0 text-muted-foreground text-xs">No neighbors.</p>
         ) : (
           <ul className="m-0 p-0 list-none max-h-64 overflow-y-auto divide-y divide-border">
             {neighbors.map(n => {
               const label = leafDisplayLabel(n.enzymeId, memberIndex) || n.enzymeId
-              const m = memberIndex.get(String(n.enzymeId))
+              const barPct = Math.min(
+                100,
+                (100 * (Number.isFinite(n.patristic) ? n.patristic : 0)) / maxNeighborDist,
+              )
               return (
                 <li key={n.enzymeId} className="py-1.5">
                   <button
@@ -255,13 +316,18 @@ export default function PhyloNavSidebar({
                     className="w-full text-left hover:bg-muted/40 rounded px-1 py-0.5"
                     onClick={() => onSelectNeighbor?.(n.enzymeId)}
                   >
-                    <div className="font-mono text-foreground truncate">{label}</div>
-                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-2">
-                      <span>distance {formatTreeDistance(n.patristic)}</span>
+                    <div className="font-mono text-foreground truncate text-xs">{label}</div>
+                    <div className="mt-0.5 h-1 rounded-full bg-border overflow-hidden">
+                      <div
+                        className="h-full bg-accent/80"
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                    <div className="text-2xs text-muted-foreground flex gap-x-2 mt-0.5">
+                      <span>{formatTreeDistance(n.patristic)}</span>
                       <span>
                         {n.hops} step{n.hops === 1 ? "" : "s"}
                       </span>
-                      {m?.component != null && <span>component {m.component}</span>}
                     </div>
                   </button>
                 </li>
@@ -273,16 +339,14 @@ export default function PhyloNavSidebar({
 
       <section className="rounded-lg border border-border bg-card p-3">
         <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Color the tips
+          Color tips
         </h3>
-        <label className="block mt-2 text-xs text-muted-foreground mb-1" htmlFor="phylo-color-mode">
-          Color by
-        </label>
         <select
           id="phylo-color-mode"
-          className="input w-full text-sm"
+          className="input w-full text-sm mt-2"
           value={colorMode}
           onChange={e => onColorModeChange?.(e.target.value)}
+          aria-label="Color by"
         >
           {COLOR_MODES.map(m => (
             <option key={m.id} value={m.id}>
@@ -298,7 +362,10 @@ export default function PhyloNavSidebar({
                   className="inline-block w-3 h-3 rounded-sm shrink-0 border border-border"
                   style={{ background: entry.color }}
                 />
-                <span className="truncate text-muted-foreground">{entry.label}</span>
+                <span className="truncate text-muted-foreground flex-1">{entry.label}</span>
+                {entry.pct != null && (
+                  <span className="font-mono text-muted-foreground shrink-0">{entry.pct}</span>
+                )}
               </li>
             ))}
           </ul>

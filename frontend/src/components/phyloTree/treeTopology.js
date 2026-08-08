@@ -196,6 +196,23 @@ export function leavesWithinRadius(enzymeId, index, radius) {
 }
 
 /**
+ * Focus tip + all leaves within `maxHops` topological steps.
+ * @returns {Set<string>}
+ */
+export function leavesWithinHops(enzymeId, index, maxHops) {
+  const focus = String(enzymeId)
+  const visible = new Set([focus])
+  const hopsLimit = Math.max(0, Math.floor(Number(maxHops) || 0))
+  if (!index.leafUidByEnzymeId.has(focus)) return visible
+
+  for (const id of index.leafEnzymeIds) {
+    if (id === focus) continue
+    if (topologicalHops(focus, id, index) <= hopsLimit) visible.add(id)
+  }
+  return visible
+}
+
+/**
  * Focus tip + k nearest neighbors (by patristic distance).
  * @returns {Set<string>}
  */
@@ -223,6 +240,18 @@ export function suggestNeighborhoodRadius(enzymeId, index) {
 }
 
 /**
+ * Suggest a default hop radius (median hops among 10 nearest tips).
+ */
+export function suggestNeighborhoodHops(enzymeId, index) {
+  const neighbors = nearestNeighbors(enzymeId, index, { limit: 10 })
+  if (!neighbors.length) return 1
+  const hops = neighbors.map(n => n.hops).filter(h => Number.isFinite(h))
+  if (!hops.length) return 1
+  const sorted = [...hops].sort((a, b) => a - b)
+  return Math.max(1, sorted[Math.floor(sorted.length / 2)] || sorted[0] || 1)
+}
+
+/**
  * Max finite patristic distance from focus to any other tip (for slider max).
  */
 export function maxPatristicFromFocus(enzymeId, index) {
@@ -232,6 +261,20 @@ export function maxPatristicFromFocus(enzymeId, index) {
     if (id === focus) continue
     const d = patristicDistance(focus, id, index)
     if (Number.isFinite(d) && d > max) max = d
+  }
+  return max
+}
+
+/**
+ * Max topological hops from focus to any other tip.
+ */
+export function maxHopsFromFocus(enzymeId, index) {
+  const focus = String(enzymeId)
+  let max = 0
+  for (const id of index.leafEnzymeIds) {
+    if (id === focus) continue
+    const h = topologicalHops(focus, id, index)
+    if (Number.isFinite(h) && h > max) max = h
   }
   return max
 }

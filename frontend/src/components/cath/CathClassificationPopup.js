@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from "react"
 
 const STORAGE_KEY = "petadex:cathDomainIntroDismissed"
 
-// Corpus size matches site-wide ~307M ORF / Logan corpus wording (search, index, orf routes).
+// Corpus size is pending Dennis's updated figure (307M was confirmed outdated).
 const FUNNEL_STEPS = [
-  { label: "~307M sequences", widthPct: 100 },
+  { label: "Sequences (exact corpus size TBD)", widthPct: 100 },
   { label: "HMM scanning", widthPct: 78 },
   { label: "42 atlas components", widthPct: 52 },
   { label: "CATH domains", widthPct: 28 },

@@ -219,15 +219,15 @@ async function suggestAccessions(q) {
   const { rows } = await pool.query(
     `SELECT match_value
        FROM (
-         SELECT genbank_accession_id AS match_value
-           FROM pazy_catalytic_orfs
-          WHERE genbank_accession_id ILIKE $1
-          LIMIT $3
-         UNION
-         SELECT genbank_accession_id AS match_value
-           FROM nr_catalytic_orfs
-          WHERE genbank_accession_id ILIKE $1
-          LIMIT $3
+         (SELECT genbank_accession_id AS match_value
+            FROM pazy_catalytic_orfs
+           WHERE genbank_accession_id ILIKE $1
+           LIMIT $3)
+         UNION ALL
+         (SELECT genbank_accession_id AS match_value
+            FROM nr_catalytic_orfs
+           WHERE genbank_accession_id ILIKE $1
+           LIMIT $3)
        ) m
       ORDER BY (m.match_value ILIKE $2) DESC, length(m.match_value), m.match_value
       LIMIT $3`,
@@ -273,8 +273,14 @@ async function suggest(legs, q) {
   });
 
   // Widen the accession leg to individual (non-centroid) accessions.
+  // Soft-fail: a broken provenance probe must not kill the whole suggest() response.
   if (legs.includes('genbank_acc')) {
-    tasks.push(suggestAccessions(q));
+    tasks.push(
+      suggestAccessions(q).catch(err => {
+        console.error('suggestAccessions failed:', err.message || err);
+        return [];
+      }),
+    );
   }
 
   const perLeg = await Promise.all(tasks);

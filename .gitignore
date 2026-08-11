@@ -23,6 +23,9 @@ _site/
 # Details at https://github.com/github/pages-gem/issues/768
 Gemfile.lock
 
+# macOS
+.DS_Store
+
 # Project specific
 local/*
 local*

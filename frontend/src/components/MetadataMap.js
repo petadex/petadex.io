@@ -40,6 +40,30 @@ function probeWebGL() {
   }
 }
 
+const VECTOR_STYLE =
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
+// Low-memory fallback. Vector tiles cost far more GPU/JS memory than raster —
+// glyph atlases, sprite sheets and tessellated geometry are all allocated
+// during style load, which is exactly where 2 GB iPads lose the context.
+// Plain raster tiles need none of that.
+const RASTER_STYLE = {
+  version: 8,
+  sources: {
+    carto: {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors © CARTO",
+    },
+  },
+  layers: [{ id: "carto-raster", type: "raster", source: "carto" }],
+};
+
 const MetadataMap = () => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -86,6 +110,7 @@ const MetadataMap = () => {
     if (mapRef.current) return;
 
     let restoreTimer;
+    let styleLoaded = false;
     setMapFailure(null); // clear any overlay left over from a previous tier
     logDiag(`UA: ${navigator.userAgent}`);
 
@@ -99,17 +124,18 @@ const MetadataMap = () => {
     try {
       map = new maplibregl.Map({
         container,
-        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+        style: renderTier > 0 ? RASTER_STYLE : VECTOR_STYLE,
         center: [0, 20],
         zoom: 0,
-        // A 4096² drawing buffer is ~67 MB of GPU memory; iPads under
-        // WKWebView routinely lose the context at that size. Tier 1 cuts it
-        // to ~16 MB, which is enough to keep a 600px map alive.
-        ...(renderTier > 0
-          ? { maxCanvasSize: [2048, 2048], pixelRatio: 1 }
-          : {}),
+        // pixelRatio 1 quarters the drawing buffer (~9 MB → ~2.3 MB at this
+        // container size). Secondary to the raster swap, but free.
+        ...(renderTier > 0 ? { pixelRatio: 1 } : {}),
       });
-      logDiag(`map constructed (tier ${renderTier})`);
+      logDiag(
+        `map constructed (tier ${renderTier}, ${
+          renderTier > 0 ? "raster" : "vector"
+        })`
+      );
     } catch (err) {
       logDiag(`Map constructor threw: ${err}`);
       const gl = probeWebGL();
@@ -127,17 +153,21 @@ const MetadataMap = () => {
     // restore, so this is recoverable — the overlay must not latch, or it
     // would hide a map that came back.
     map.on("webglcontextlost", () => {
-      logDiag(`WebGL context LOST (tier ${renderTier})`);
-      setMapFailure(
-        "This browser dropped the map's graphics context — usually too many WebGL pages open at once. Close other tabs, or try Safari."
+      logDiag(
+        `WebGL context LOST (tier ${renderTier}, style ${
+          styleLoaded ? "loaded" : "still loading"
+        })`
       );
-      // If MapLibre's own restore doesn't land, rebuild once at a smaller
-      // drawing buffer instead of leaving a permanently dead map.
+      setMapFailure(
+        "This browser dropped the map's graphics context — the device ran out of memory rendering it."
+      );
+      // If MapLibre's own restore doesn't land, rebuild once on the cheap
+      // raster basemap instead of leaving a permanently dead map.
       if (renderTier === 0) {
         restoreTimer = setTimeout(() => {
-          logDiag("no restore after 4s — rebuilding at reduced resolution");
+          logDiag("no restore after 3s — rebuilding on raster basemap");
           setRenderTier(1);
-        }, 4000);
+        }, 3000);
       }
     });
     map.on("webglcontextrestored", () => {
@@ -147,6 +177,7 @@ const MetadataMap = () => {
     });
 
     map.on("load", () => {
+      styleLoaded = true;
       logDiag("style loaded");
       // iOS Safari occasionally reports a stale container size during the
       // sticky-header/tab layout pass; re-measure once the style is up.

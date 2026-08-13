@@ -28,7 +28,7 @@ function probeWebGL() {
     return {
       ok: false,
       reason: gl1
-        ? "WebGL1 is available but WebGL2 is not — this browser/device cannot run MapLibre v5."
+        ? "WebGL1 is available but WebGL2 is not, this browser/device cannot run MapLibre v5."
         : "No WebGL context of any version could be created (Lockdown Mode, low memory, or an unsupported device).",
     };
   } catch (err) {
@@ -139,7 +139,7 @@ const MetadataMap = () => {
     } catch (err) {
       logDiag(`Map constructor threw: ${err}`);
       const gl = probeWebGL();
-      logDiag(gl.ok ? `WebGL2 itself is OK — renderer: ${gl.renderer}` : gl.reason);
+      logDiag(gl.ok ? `WebGL2 itself is OK, renderer: ${gl.renderer}` : gl.reason);
       setMapFailure(gl.ok ? String(err) : gl.reason);
       return;
     }
@@ -159,13 +159,13 @@ const MetadataMap = () => {
         })`
       );
       setMapFailure(
-        "This browser dropped the map's graphics context — the device ran out of memory rendering it."
+        "This browser dropped the map's graphics context, the device ran out of memory rendering it."
       );
       // If MapLibre's own restore doesn't land, rebuild once on the cheap
       // raster basemap instead of leaving a permanently dead map.
       if (renderTier === 0) {
         restoreTimer = setTimeout(() => {
-          logDiag("no restore after 3s — rebuilding on raster basemap");
+          logDiag("no restore after 3s, rebuilding on raster basemap");
           setRenderTier(1);
         }, 3000);
       }
@@ -192,7 +192,7 @@ const MetadataMap = () => {
 
       map.once("idle", () => {
         logDiag(
-          `first frame idle — tiles loaded: ${map.areTilesLoaded()}, rendered features: ${
+          `first frame idle, tiles loaded: ${map.areTilesLoaded()}, rendered features: ${
             map.queryRenderedFeatures().length
           }`
         );

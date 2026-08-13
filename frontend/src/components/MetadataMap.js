@@ -2,6 +2,40 @@ import React, { useEffect, useRef, useState } from "react";
 import config from "../config";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+// MapLibre GL v5 dropped the WebGL1 fallback — it requests a "webgl2" context
+// and throws "Failed to initialize WebGL" if it can't get one. iOS/iPadOS
+// denies WebGL2 in Lockdown Mode, under memory pressure, and on iPadOS < 15,
+// so probe up front and report instead of rendering an empty box.
+function probeWebGL() {
+  if (typeof document === "undefined") return { ok: false, reason: "no document" };
+  let canvas;
+  try {
+    canvas = document.createElement("canvas");
+    const gl2 = canvas.getContext("webgl2");
+    if (gl2) {
+      const info = gl2.getExtension("WEBGL_debug_renderer_info");
+      return {
+        ok: true,
+        renderer: info
+          ? gl2.getParameter(info.UNMASKED_RENDERER_WEBGL)
+          : gl2.getParameter(gl2.RENDERER),
+      };
+    }
+    const gl1 = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    return {
+      ok: false,
+      reason: gl1
+        ? "WebGL1 is available but WebGL2 is not — this browser/device cannot run MapLibre v5."
+        : "No WebGL context of any version could be created (Lockdown Mode, low memory, or an unsupported device).",
+    };
+  } catch (err) {
+    return { ok: false, reason: `WebGL probe threw: ${err}` };
+  } finally {
+    // Free the probe context immediately; iOS caps live WebGL contexts.
+    if (canvas) canvas.width = canvas.height = 0;
+  }
+}
+
 const MetadataMap = () => {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -9,6 +43,15 @@ const MetadataMap = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
+  const [mapFailure, setMapFailure] = useState(null);
+  const [diagnostics, setDiagnostics] = useState([]);
+
+  const logDiag = message =>
+    setDiagnostics(prev => [...prev, message].slice(-25));
+
+  const showDebug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("mapdebug");
 
   useEffect(() => {
     async function fetchLocations() {
@@ -36,18 +79,50 @@ const MetadataMap = () => {
     if (typeof window === "undefined" || loading || error || !locations.length) return;
     if (mapRef.current) return;
 
+    const gl = probeWebGL();
+    logDiag(`UA: ${navigator.userAgent}`);
+    logDiag(
+      gl.ok ? `WebGL2 OK — renderer: ${gl.renderer}` : `WebGL2 unavailable — ${gl.reason}`
+    );
+    if (!gl.ok) {
+      setMapFailure(gl.reason);
+      return;
+    }
+
+    const container = mapContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    logDiag(`Container: ${Math.round(rect.width)}x${Math.round(rect.height)}px`);
+
     const maplibregl = require("maplibre-gl");
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-      center: [0, 20],
-      zoom: 0,
-    });
+    let map;
+    try {
+      map = new maplibregl.Map({
+        container,
+        style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+        center: [0, 20],
+        zoom: 0,
+      });
+    } catch (err) {
+      logDiag(`Map constructor threw: ${err}`);
+      setMapFailure(String(err));
+      return;
+    }
 
     map.addControl(new maplibregl.NavigationControl(), "top-right");
 
+    // Without these, every failure below this point is an invisible blank box.
+    map.on("error", e => logDiag(`map error: ${e?.error?.message || e?.error || e}`));
+    map.getCanvas().addEventListener("webglcontextlost", () => {
+      logDiag("WebGL context lost (iOS reclaims contexts under memory pressure)");
+      setMapFailure("The browser dropped the map's WebGL context. Reload the page.");
+    });
+
     map.on("load", () => {
+      logDiag("style loaded");
+      // iOS Safari occasionally reports a stale container size during the
+      // sticky-header/tab layout pass; re-measure once the style is up.
+      map.resize();
       const geojson = {
         type: "FeatureCollection",
         features: locations.map(loc => ({
@@ -198,10 +273,27 @@ const MetadataMap = () => {
         </div>
       )}
 
-      <div
-        ref={mapContainerRef}
-        className='w-full h-[600px] rounded-lg border border-border overflow-hidden'
-      />
+      <div className='relative w-full h-[600px] rounded-lg border border-border overflow-hidden'>
+        <div ref={mapContainerRef} className='absolute inset-0' />
+        {mapFailure && (
+          <div className='absolute inset-0 flex items-center justify-center p-6 bg-surface'>
+            <div className='max-w-md text-center'>
+              <p className='text-primary font-semibold mb-2'>
+                The map could not be rendered on this device
+              </p>
+              <p className='text-sm text-muted-foreground'>{mapFailure}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Append ?mapdebug=1 to read the render trace on a device with no
+          devtools access (iPad Chrome/Safari cannot be remote-inspected). */}
+      {(mapFailure || showDebug) && diagnostics.length > 0 && (
+        <pre className='mt-4 p-3 text-2xs whitespace-pre-wrap break-words bg-surface border border-border rounded-sm text-muted-foreground'>
+          {diagnostics.join("\n")}
+        </pre>
+      )}
     </div>
   );
 };

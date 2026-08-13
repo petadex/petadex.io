@@ -123,6 +123,21 @@ const MetadataMap = () => {
       // iOS Safari occasionally reports a stale container size during the
       // sticky-header/tab layout pass; re-measure once the style is up.
       map.resize();
+
+      // Distinguishes "the canvas never got a size" from "it rendered but is
+      // not visible" — the latter points at CSS compositing, not MapLibre.
+      const canvas = map.getCanvas();
+      logDiag(
+        `canvas backing ${canvas.width}x${canvas.height}, css ${canvas.clientWidth}x${canvas.clientHeight}, dpr ${window.devicePixelRatio}`
+      );
+
+      map.once("idle", () => {
+        logDiag(
+          `first frame idle — tiles loaded: ${map.areTilesLoaded()}, rendered features: ${
+            map.queryRenderedFeatures().length
+          }`
+        );
+      });
       const geojson = {
         type: "FeatureCollection",
         features: locations.map(loc => ({

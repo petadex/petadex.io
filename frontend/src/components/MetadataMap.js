@@ -349,7 +349,14 @@ const MetadataMap = () => {
       )}
 
       <div className='relative w-full h-[600px] rounded-lg border border-border overflow-hidden'>
-        <div ref={mapContainerRef} className='absolute inset-0' />
+        {/* Sized with w/h-full, not `absolute inset-0`: MapLibre adds its own
+            `.maplibregl-map { position: relative }` rule, which has the same
+            specificity as Tailwind's `.absolute` and wins whenever
+            maplibre-gl.css is emitted after the utilities. The inset offsets
+            then apply to nothing, the container collapses to 0px, and
+            `overflow: hidden` clips the canvas — a blank box with a
+            fully-loaded map inside it. */}
+        <div ref={mapContainerRef} className='w-full h-full' />
         {mapFailure && (
           <div className='absolute inset-0 flex items-center justify-center p-6 bg-surface'>
             <div className='max-w-md text-center'>

@@ -3,25 +3,28 @@ import config from "../config";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 // MapLibre GL v5 dropped the WebGL1 fallback — it requests a "webgl2" context
-// and throws "Failed to initialize WebGL" if it can't get one. iOS/iPadOS
-// denies WebGL2 in Lockdown Mode, under memory pressure, and on iPadOS < 15,
-// so probe up front and report instead of rendering an empty box.
+// and throws "Failed to initialize WebGL" if it can't get one.
+//
+// Only called AFTER the map has already failed. iOS/WKWebView caps the number
+// of live WebGL contexts per process and evicts the oldest when the cap is hit,
+// so probing pre-flight would itself be a cause of the failure it reports.
 function probeWebGL() {
   if (typeof document === "undefined") return { ok: false, reason: "no document" };
-  let canvas;
+  let gl;
   try {
-    canvas = document.createElement("canvas");
-    const gl2 = canvas.getContext("webgl2");
-    if (gl2) {
-      const info = gl2.getExtension("WEBGL_debug_renderer_info");
+    const canvas = document.createElement("canvas");
+    gl = canvas.getContext("webgl2");
+    if (gl) {
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
       return {
         ok: true,
         renderer: info
-          ? gl2.getParameter(info.UNMASKED_RENDERER_WEBGL)
-          : gl2.getParameter(gl2.RENDERER),
+          ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL)
+          : gl.getParameter(gl.RENDERER),
       };
     }
     const gl1 = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    gl = gl1;
     return {
       ok: false,
       reason: gl1
@@ -31,8 +34,9 @@ function probeWebGL() {
   } catch (err) {
     return { ok: false, reason: `WebGL probe threw: ${err}` };
   } finally {
-    // Free the probe context immediately; iOS caps live WebGL contexts.
-    if (canvas) canvas.width = canvas.height = 0;
+    // Setting width/height to 0 does NOT release a context; only this does.
+    // Leaking it would consume one of the device's few remaining slots.
+    if (gl) gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }
 
@@ -45,6 +49,8 @@ const MetadataMap = () => {
   const [stats, setStats] = useState(null);
   const [mapFailure, setMapFailure] = useState(null);
   const [diagnostics, setDiagnostics] = useState([]);
+  // 0 = native resolution; 1 = reduced GPU footprint after a context loss.
+  const [renderTier, setRenderTier] = useState(0);
 
   const logDiag = message =>
     setDiagnostics(prev => [...prev, message].slice(-25));
@@ -79,15 +85,9 @@ const MetadataMap = () => {
     if (typeof window === "undefined" || loading || error || !locations.length) return;
     if (mapRef.current) return;
 
-    const gl = probeWebGL();
+    let restoreTimer;
+    setMapFailure(null); // clear any overlay left over from a previous tier
     logDiag(`UA: ${navigator.userAgent}`);
-    logDiag(
-      gl.ok ? `WebGL2 OK — renderer: ${gl.renderer}` : `WebGL2 unavailable — ${gl.reason}`
-    );
-    if (!gl.ok) {
-      setMapFailure(gl.reason);
-      return;
-    }
 
     const container = mapContainerRef.current;
     const rect = container.getBoundingClientRect();
@@ -102,10 +102,19 @@ const MetadataMap = () => {
         style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         center: [0, 20],
         zoom: 0,
+        // A 4096² drawing buffer is ~67 MB of GPU memory; iPads under
+        // WKWebView routinely lose the context at that size. Tier 1 cuts it
+        // to ~16 MB, which is enough to keep a 600px map alive.
+        ...(renderTier > 0
+          ? { maxCanvasSize: [2048, 2048], pixelRatio: 1 }
+          : {}),
       });
+      logDiag(`map constructed (tier ${renderTier})`);
     } catch (err) {
       logDiag(`Map constructor threw: ${err}`);
-      setMapFailure(String(err));
+      const gl = probeWebGL();
+      logDiag(gl.ok ? `WebGL2 itself is OK — renderer: ${gl.renderer}` : gl.reason);
+      setMapFailure(gl.ok ? String(err) : gl.reason);
       return;
     }
 
@@ -113,9 +122,28 @@ const MetadataMap = () => {
 
     // Without these, every failure below this point is an invisible blank box.
     map.on("error", e => logDiag(`map error: ${e?.error?.message || e?.error || e}`));
-    map.getCanvas().addEventListener("webglcontextlost", () => {
-      logDiag("WebGL context lost (iOS reclaims contexts under memory pressure)");
-      setMapFailure("The browser dropped the map's WebGL context. Reload the page.");
+
+    // MapLibre calls preventDefault() on loss and re-applies the style on
+    // restore, so this is recoverable — the overlay must not latch, or it
+    // would hide a map that came back.
+    map.on("webglcontextlost", () => {
+      logDiag(`WebGL context LOST (tier ${renderTier})`);
+      setMapFailure(
+        "This browser dropped the map's graphics context — usually too many WebGL pages open at once. Close other tabs, or try Safari."
+      );
+      // If MapLibre's own restore doesn't land, rebuild once at a smaller
+      // drawing buffer instead of leaving a permanently dead map.
+      if (renderTier === 0) {
+        restoreTimer = setTimeout(() => {
+          logDiag("no restore after 4s — rebuilding at reduced resolution");
+          setRenderTier(1);
+        }, 4000);
+      }
+    });
+    map.on("webglcontextrestored", () => {
+      logDiag("WebGL context restored");
+      clearTimeout(restoreTimer);
+      setMapFailure(null);
     });
 
     map.on("load", () => {
@@ -220,10 +248,11 @@ const MetadataMap = () => {
     mapRef.current = map;
 
     return () => {
+      clearTimeout(restoreTimer);
       map.remove();
       mapRef.current = null;
     };
-  }, [loading, error, locations]);
+  }, [loading, error, locations, renderTier]);
 
   if (loading) {
     return (

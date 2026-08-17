@@ -44,7 +44,7 @@ npm ci
 # dev mode w/ nodemon
 npm run dev
 
-# production (used by PM2)
+# production mode locally
 npm start
 
 # lint & test
@@ -58,14 +58,6 @@ cp .env.example .env
 
 ---
 
-## PM2 & Systemd (production on EC2)
-
-```bash
-pm2 start src/index.js --name petadex-backend
-pm2 save
-pm2 startup systemd -u ec2-user --hp /home/ec2-user
-```
----
 
 ## API endpoints
 
@@ -110,9 +102,15 @@ See interactive docs at `` (Swagger UI).
 
 ## Deployment summary
 
-1. CI pushes to `main` trigger **backend-deploy.yml**.
-2. GitHub Actions SSH to EC2 (`appleboy/ssh-action`) -> `git pull && npm ci && pm2 restart`.
-3. NGINX (port 443) proxies `/api/` → `http://localhost:3001/api/`.
+The backend is serverless. There is no server to SSH into, no PM2 process and no
+NGINX proxy — the EC2→Lambda migration removed all three.
+
+1. A push to `main` touching `backend/**` triggers **backend-ci-deploy.yml**.
+2. The workflow runs `npm ci && npm test`, then `npx serverless@3 deploy`.
+3. API Gateway (HTTP API) routes `/{proxy+}` and `/` to the `petadex-backend`
+   Lambda, which wraps this Express app via `src/handler.js`.
+4. The Lambda is VPC-bound so it can reach RDS. AWS credentials and DB settings
+   come from GitHub Secrets.
 
 
 ## Check for bottlenecks in DB

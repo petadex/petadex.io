@@ -40,8 +40,10 @@ app.use(cors({
     // Do not re-add a domain this project does not own.
     'http://localhost:8000',   // Gatsby dev (frontend/)
     'http://localhost:9000',   // Gatsby serve
-    'http://localhost:3000',   // Next dev (web/)
-    'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001'
+    'http://localhost:3000'    // Next dev (web/)
+    // The ec2-44-222-238-66 origin was removed 2026-08-16. That instance no
+    // longer exists (no EC2 instance in the account holds that address) and the
+    // backend has run on Lambda since the EC2 migration.
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

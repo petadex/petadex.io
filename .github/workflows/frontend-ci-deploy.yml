@@ -14,9 +14,10 @@ on:
         description: 'Backend API URL (leave empty to use secret)'
         required: false
         type: string
-        # Was https://api.petadex.net/api until 2026-08-16. That hostname
-        # resolves to 54.147.204.62 (the decommissioned EC2 box) and every
-        # connection times out, so this default silently built an empty site.
+        # Was https://api.petadex.net/api until 2026-08-16. That hostname still
+        # resolves, but to an address that serves nothing, so every connection
+        # times out and the default silently built an empty site. Point this at
+        # the API Gateway endpoint until the api.petadex.net record is fixed.
         default: 'https://8ww706wo68.execute-api.us-east-1.amazonaws.com/api'
 
 permissions:

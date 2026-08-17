@@ -60,9 +60,25 @@ const apiUrl = normalizeUrl(
   required("NEXT_PUBLIC_API_URL", process.env.NEXT_PUBLIC_API_URL)
 )
 
+/**
+ * Absolute origin this deployment is served from.
+ *
+ * On Vercel, preview deployments get a different hostname every time, so
+ * `NEXT_PUBLIC_VERCEL_URL` (which Vercel injects automatically, as a bare
+ * hostname with no scheme) is used when `NEXT_PUBLIC_SITE_URL` is unset. That
+ * keeps canonical and Open Graph URLs pointing at the deployment actually being
+ * viewed instead of at production. Set `NEXT_PUBLIC_SITE_URL` explicitly for the
+ * Production environment so canonicals use the real domain rather than the
+ * generated *.vercel.app one.
+ */
+const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL
 const siteUrl = normalizeUrl(
   "NEXT_PUBLIC_SITE_URL",
-  required("NEXT_PUBLIC_SITE_URL", process.env.NEXT_PUBLIC_SITE_URL)
+  process.env.NEXT_PUBLIC_SITE_URL?.trim()
+    ? process.env.NEXT_PUBLIC_SITE_URL
+    : vercelUrl
+      ? `https://${vercelUrl}`
+      : required("NEXT_PUBLIC_SITE_URL", process.env.NEXT_PUBLIC_SITE_URL)
 )
 
 const searchApiUrl = process.env.NEXT_PUBLIC_SEARCH_API_URL

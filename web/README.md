@@ -112,6 +112,11 @@ src/
 
 ## Conventions
 
+The full contributor guide — how to add a page, how to add an endpoint, and why
+each rule exists — is in [`../CONTRIBUTING.md`](../CONTRIBUTING.md). The planned
+URL contract and what each route replaces is in [`ROUTES.md`](ROUTES.md). The
+highlights:
+
 **A failed fetch fails the build.** `apiFetch` throws on any non-2xx. This is
 load-bearing: Gatsby's `createPages` swallowed fetch errors and logged them, so a
 green CI run published a site with zero sequence, enzyme and family pages. Use
@@ -129,7 +134,6 @@ them per component: BHET12.5 `#2E86AB`, BHET25 `#A23B72`, BHET50 `#F18F01`.
 
 ## Not done yet
 
-- Vercel project (root directory `web/`, ignore-build-step path filter)
 - Test framework — Vitest + Playwright assumed in the CI plan, not chosen
 - Typed client generated from OpenAPI. `backend/docs/openapi.yaml` documents 4 of
   ~25 mounted routes, so types are hand-written until the spec is completed.

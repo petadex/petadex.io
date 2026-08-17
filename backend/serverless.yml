@@ -31,6 +31,17 @@ provider:
           Resource:
             - arn:aws:s3:::petadex
             - arn:aws:s3:::petadex/*
+  # Access logging on the HTTP API $default stage. Verified disabled
+  # (AccessLogSettings: null) on 2026-08-16, which is why no per-route traffic
+  # data exists for the API. Declared here rather than set with the CLI so the
+  # next `serverless deploy` cannot silently revert it.
+  #
+  # routeKey and path are the fields that make this useful for the rebuild: they
+  # are what tells you which endpoints are actually being called before anything
+  # gets removed at cutover.
+  logs:
+    httpApi:
+      format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","routeKey":"$context.routeKey","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","responseLatency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","userAgent":"$context.identity.userAgent","errorMessage":"$context.error.message"}'
   vpc:
     securityGroupIds:
       - sg-05566dc054d55ac83

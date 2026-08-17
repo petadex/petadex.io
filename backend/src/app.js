@@ -11,7 +11,7 @@ import YAML from 'yamljs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import fastaaRoutes from './routes/fastaa.js';
-import aaSeqFeaturesRoutes from './routes/aaSeqFeatures.js';
+// aaSeqFeatures unmounted 2026-08-16 — see the mount site below.
 import geneMetadataRoutes from './routes/geneMetadata.js';
 import plateDataRoutes from './routes/plateData.js';
 import geneDetailsRoutes from './routes/geneDetails.js';
@@ -35,12 +35,12 @@ app.use(cors({
   origin: [
     'https://petadex.net',
     'https://www.petadex.net',
-    'https://petadex.org',
-    'https://www.petadex.org',
-    'https://api.petadex.org',
-    'http://localhost:8000',
-    'http://localhost:9000',
-    'http://localhost:3000',
+    // petadex.org entries removed 2026-08-16: the domain is unregistered, so
+    // whoever registers it would have inherited a standing CORS grant.
+    // Do not re-add a domain this project does not own.
+    'http://localhost:8000',   // Gatsby dev (frontend/)
+    'http://localhost:9000',   // Gatsby serve
+    'http://localhost:3000',   // Next dev (web/)
     'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001'
   ],
   credentials: true,
@@ -50,7 +50,14 @@ app.use(cors({
 
 app.use(express.json());
 app.use('/api/fastaa', fastaaRoutes);
-app.use('/api/aa-seq-features', aaSeqFeaturesRoutes);
+// UNMOUNTED 2026-08-16. Every request to /api/aa-seq-features returned 500 in
+// production because the `aa_seq_features` relation does not exist:
+//   GET /api/aa-seq-features -> 500 {"error":"Internal server error"}
+// verified against the live API while /health and /api/fastaa returned 200.
+// The route file is kept at src/routes/aaSeqFeatures.js so it can be remounted
+// unchanged if the table is ever created. Remounting it before then only
+// restores the 500.
+// app.use('/api/aa-seq-features', aaSeqFeaturesRoutes);
 app.use('/api/gene-metadata', geneMetadataRoutes);
 app.use('/api/plate-data', plateDataRoutes);
 app.use('/api/gene-details', geneDetailsRoutes);

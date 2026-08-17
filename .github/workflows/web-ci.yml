@@ -1,0 +1,62 @@
+name: Web CI
+
+# Tests and static checks for the Next app in web/.
+#
+# Vercel owns builds and preview deploys; this workflow owns the checks, per the
+# CI plan. Keeping them separate means a failing check reads as "code is broken"
+# rather than "the site did not ship".
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  check:
+    name: Typecheck, lint, format
+    runs-on: ubuntu-latest
+
+    env:
+      # The checks compile the app but never call the API. These satisfy the
+      # fail-fast validation in src/lib/env.ts without pointing CI at anything
+      # real; a check run must not depend on production being up.
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Build
+        run: npm run build

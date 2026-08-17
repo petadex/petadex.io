@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/*
+ * Dark mode is driven by a `data-theme` attribute on <html>, with the OS
+ * preference as the fallback. The old site had a ThemeContext toggle; wiring the
+ * variant here at init means adding that toggle later is a component change, not
+ * a styling migration.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+
+  /* Substrate colors. Canonical across the site — charts, legends, tables.
+     Redefining these anywhere else is a bug. */
+  --color-bhet-125: #2e86ab;
+  --color-bhet-25: #a23b72;
+  --color-bhet-50: #f18f01;
+
+  /* Taxonomic domains, carried over from the atlas visualization. */
+  --color-bacteria: #4ecdc4;
+  --color-archaea: #ff6b6b;
+  --color-eukaryota: #ffd93d;
+  --color-viruses: #b482ff;
+}
+
+/*
+ * Semantic surface tokens. Components reference these rather than raw palette
+ * values, so a theme change is edited in one place.
+ */
+:root {
+  --background: #ffffff;
+  --surface: #f8fafc;
+  --border: #e2e8f0;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --accent: #0d7f8c;
+}
+
+[data-theme="dark"] {
+  --background: #0b1120;
+  --surface: #131c2e;
+  --border: #26334a;
+  --foreground: #e8edf5;
+  --muted: #94a3b8;
+  --accent: #4ecdc4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0b1120;
+    --surface: #131c2e;
+    --border: #26334a;
+    --foreground: #e8edf5;
+    --muted: #94a3b8;
+    --accent: #4ecdc4;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessions, sequences and gene IDs are read character by character. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

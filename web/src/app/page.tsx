@@ -1,7 +1,12 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
+import { ActivityBandPreview } from "@/components/home/ActivityBandPreview"
+import { AtlasBandPreview } from "@/components/home/AtlasBandPreview"
 import { AtlasHeroMap } from "@/components/home/AtlasHeroMap"
 import { CitationCard } from "@/components/home/CitationCard"
+import { EntryBand } from "@/components/home/EntryBand"
+import { EnzymesBandPreview } from "@/components/home/EnzymesBandPreview"
+import { SearchBandPreview } from "@/components/home/SearchBandPreview"
 import { fetchCorpusSummary, formatCount, parseCount } from "@/lib/api"
 import { buildMetadata } from "@/lib/seo"
 
@@ -70,44 +75,6 @@ const HERO_LEGEND: readonly { c: string; l: string }[] = [
   { c: "#6FB7E8", l: "L-aa peptidase" },
 ]
 
-interface EntryPoint {
-  href: string
-  step: string
-  title: string
-  description: string
-}
-
-const ENTRY_POINTS: readonly EntryPoint[] = [
-  {
-    href: "/atlas",
-    step: "01",
-    title: "Browse the atlas",
-    description:
-      "Every enzyme family in one UMAP embedding, colored by CATH structural class. Zoom into a neighborhood and open any family.",
-  },
-  {
-    href: "/search",
-    step: "02",
-    title: "Search by sequence",
-    description:
-      "Paste a FASTA sequence. DIAMOND aligns it against the catalytic corpus and returns nearest neighbors with alignment and activity context.",
-  },
-  {
-    href: "/substrate",
-    step: "03",
-    title: "Compare BHET activity",
-    description:
-      "Plate-reader hydrolysis for synthesized genes at 12.5, 25 and 50 mM BHET, as a timeseries and as a substrate-versus-substrate scatter.",
-  },
-  {
-    href: "/enzymes",
-    step: "04",
-    title: "Resolve an identifier",
-    description:
-      "Paste an ORF id, a GenBank accession or an SRA library id and land on its cluster block, or browse families by structural component.",
-  },
-]
-
 export default async function HomePage() {
   const summary = await fetchCorpusSummary()
 
@@ -115,6 +82,8 @@ export default async function HomePage() {
   const clusters90 = parseCount(summary.clusters_90pid)
   const families = parseCount(summary.total_families)
   const characterized = parseCount(summary.pazy_total)
+  const characterizedPct =
+    characterized !== null && families ? (characterized / families) * 100 : null
 
   /**
    * The corpus as a funnel: raw ORFs collapse into clusters, clusters into
@@ -148,7 +117,9 @@ export default async function HomePage() {
     <>
       {/* Hero + corpus funnel together fill the viewport below the sticky
           h-14 header on first load (md+); the atlas canvas absorbs whatever
-          space the funnel bar doesn't need. */}
+          space the funnel bar doesn't need. Ordinary scroll below — no
+          scroll-snap; see removed SnapScrollRoot for why (traps scroll with
+          a single snap point once the entry bands stopped being panels). */}
       <div className="md:flex md:h-[calc(100dvh-3.5rem)] md:flex-col">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <section className="border-border relative border-b bg-[#0e0e0e] md:flex md:min-h-0 md:flex-1 md:flex-col">
@@ -177,7 +148,7 @@ export default async function HomePage() {
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
-                    href="/atlas"
+                    href="#start"
                     className="bg-accent text-accent-contrast hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
                   >
                     Start exploring
@@ -212,7 +183,7 @@ export default async function HomePage() {
              Desktop : fills whatever height the hero section has left
                        after the funnel bar below claims its own          */}
           <div className="border-border relative h-85 w-full overflow-hidden border-b md:h-auto md:min-h-0 md:flex-1">
-            <AtlasHeroMap interactive />
+            <AtlasHeroMap interactive initialCx={-0.55} />
 
             {/* Vignette — only needed on desktop where the title overlaps */}
             <div
@@ -290,58 +261,118 @@ export default async function HomePage() {
         </section>
       </div>
 
-      {/* ── Entry points ──────────────────────────────────────────────── */}
-      <section id="start" className="border-border border-b">
-        <div className="mx-auto max-w-6xl px-6 py-16">
-          <div className="mb-10 flex flex-wrap items-end justify-between gap-y-4">
-            <div>
-              <p className="text-2xs text-muted-foreground font-semibold tracking-[0.18em] uppercase">
-                Start here
-              </p>
-              <h2 className="text-foreground mt-2 text-3xl font-semibold tracking-tight">
-                Four ways into the data
-              </h2>
-            </div>
-            <p className="text-muted-foreground max-w-md text-sm">
-              PETadex is a launchpad, not a paper. Pick the tool that matches
-              the question.
-            </p>
-          </div>
+      {/* ── Entry points ──────────────────────────────────────────────────
+          One page panel holding all four tools — `id="start"` is the
+          landing target for the hero's "Start exploring" link, and
+          `scroll-mt-14` clears the sticky header when it's the jump target.
+          Individual tools are rows within this single panel rather than
+          full-viewport screens of their own; see EntryBand.tsx. */}
+      <section id="start" className="border-border scroll-mt-14 border-b">
+        <div className="mx-auto max-w-6xl px-6 pt-12">
+          <p className="text-2xs text-muted-foreground font-semibold tracking-[0.18em] uppercase">
+            Start here
+          </p>
+          <h2 className="text-foreground mt-2 text-3xl font-semibold tracking-tight">
+            Four ways into the data
+          </h2>
+          <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
+            Ordered by how directly each one answers a question someone shows up
+            with: search first, then the database front door, then measured
+            activity, then the zero-input explore path. Same slot structure in
+            every band.
+          </p>
+        </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {ENTRY_POINTS.map(entry => (
-              <Link
-                key={entry.href}
-                href={entry.href}
-                className="group border-border bg-surface hover:border-accent/50 flex flex-col rounded-xl border p-5 transition-colors"
-              >
-                <span className="text-2xs text-muted-foreground font-mono tracking-widest">
-                  {entry.step}
-                </span>
-                <h3 className="text-foreground mt-3 text-base leading-snug font-semibold">
-                  {entry.title}
-                </h3>
-                <p className="text-muted-foreground mt-2 flex-1 text-sm leading-relaxed">
-                  {entry.description}
-                </p>
-                <span className="text-accent mt-4 inline-flex items-center gap-1 text-sm font-medium transition-transform group-hover:translate-x-0.5">
-                  Open
-                  <svg
-                    aria-hidden
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="size-3.5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M3 10a1 1 0 011-1h10.586l-3.293-3.293a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L14.586 11H4a1 1 0 01-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-              </Link>
-            ))}
-          </div>
+        <div className="mx-auto max-w-6xl px-6">
+          <EntryBand
+            index="01"
+            question="Have we seen this sequence before?"
+            title="Search by sequence"
+            lead="Run a DIAMOND search to return results ordered by identity, coverage and e-value, each hit enriched with metadata."
+            description="The set of homologous sequences estimates the metadata of the query sequence. Metadata features can generate starting hypotheses for the query sequence. Results are bookmarkable, and sharable by URL."
+            chips={[
+              { label: `${formatCount(catalyticOrfs, "compact")} ORFs` },
+              { label: "32 shards" },
+              { label: "~44s end to end" },
+            ]}
+            cta={{ label: "Open search", href: "/search" }}
+            secondary={{ label: "Try an example", href: "/search" }}
+            visual={
+              <SearchBandPreview
+                orfCountLabel={formatCount(catalyticOrfs, "compact")}
+              />
+            }
+          />
+
+          <EntryBand
+            index="02"
+            question="I have an accession, what else is known about it?"
+            title="Browse enzymes, resolve ids"
+            lead="Enter an ORF ID, GenBank accession, or SRA library ID to retrieve its entry enriched with PETadex computations, including environmental metadata, domain annotations, structure predictions, and cluster neighbors."
+            description="Uniform computation across the corpus ensures unstudied sequences possess the same annotation layers as studied ones. Each layer is explicitly labeled as curated, computed, or propagated."
+            chips={[
+              { label: "PAZy-curated entries" },
+              { label: "clusters at 90% id" },
+              { label: "ORF · GenBank · SRA" },
+            ]}
+            cta={{ label: "Open enzymes", href: "/enzymes" }}
+            secondary={{ label: "Resolve an identifier", href: "/enzymes" }}
+            visual={<EnzymesBandPreview />}
+            visualFirst
+          />
+
+          <EntryBand
+            index="03"
+            question="I’m interested in the enzymes that are known to have enzymatic activity"
+            title="Compare measured activity"
+            lead="Access aggregated enzyme measurements compiled from published literature and internal assays."
+            description="The dataset includes 464 kinetic datapoints with substrate annotations linked to DOIs, alongside initial halo assay readouts. Assay conditions are preserved in their original state rather than normalized, enabling direct analysis of disagreeing studies without data smoothing. Additional assay methodologies are being continuously integrated."
+            chips={[
+              { label: "— genes assayed", known: false },
+              { label: "— replicates", known: false },
+              { label: "3 BHET concentrations" },
+            ]}
+            cta={{ label: "Open activity", href: "/substrate" }}
+            secondary={{ label: "Download the assay data", href: "/substrate" }}
+            visual={<ActivityBandPreview />}
+          />
+
+          <EntryBand
+            index="04"
+            question="What is the shape of the dataset and how much of it has already been explored?"
+            title="Browse the atlas"
+            lead="Navigate the atlas without an initial query to identify structural families of interest."
+            description={
+              <>
+                The map plots family centroids where spatial layout serves
+                strictly as an orientation tool, not a quantitative measure of
+                distance. It visualizes the boundary of current
+                characterization, which currently spans only{" "}
+                <span className="text-white/90">
+                  {characterizedPct !== null
+                    ? `${characterizedPct.toFixed(1)}%`
+                    : "—"}
+                </span>{" "}
+                of the {formatCount(families)} families. Recolor the layout by
+                structural class, environment, or characterization status to
+                isolate data gaps and identify uncharacterized families
+                adjacent to known active sequences.
+              </>
+            }
+            chips={[
+              { label: `${formatCount(families, "compact")} family centroids` },
+              { label: "—% characterized", known: false },
+              { label: "CATH class coloring" },
+            ]}
+            cta={{ label: "Open the atlas", href: "/atlas" }}
+            secondary={{ label: "Browse by component", href: "/atlas" }}
+            visual={
+              <AtlasBandPreview
+                familyCountLabel={formatCount(families, "compact")}
+              />
+            }
+            visualFirst
+          />
         </div>
       </section>
 

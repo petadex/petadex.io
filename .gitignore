@@ -35,6 +35,7 @@ TMP*
 *tmp
 *TMP
 .claude/*
+.cursor/*
 
 # Atlas poster exports (generated SVGs + cached atlas data)
 atlas-poster/

@@ -170,26 +170,36 @@ interface HoverState {
 export interface AtlasHeroMapProps {
   interactive?: boolean
   className?: string
+  /** Desktop resting camera x — more negative pans the rendered cloud further right. */
+  initialCx?: number
 }
 
 /**
  * Default camera, nudged left on a narrow viewport so clusters sit better in
  * the shorter, narrower mobile canvas. Computed once at mount rather than in
- * an effect so there's no post-mount camera jump.
+ * an effect so there's no post-mount camera jump. `desktopCx` is a prop
+ * rather than a constant because screen-space shift = cx * scale, and scale
+ * differs a lot between the wide hero and the much narrower atlas band
+ * preview — the same cx reads as a small nudge in one and pins the cloud
+ * against the edge in the other.
  */
-function computeInitialCam(): Camera {
+function computeInitialCam(desktopCx: number): Camera {
   if (typeof window !== "undefined" && window.innerWidth < 768) {
     return { zoom: 1.0, cx: 0, cy: -0.03 }
   }
-  return { zoom: 1.0, cx: -0.2, cy: 0.05 }
+  return { zoom: 1.0, cx: desktopCx, cy: 0.05 }
 }
 
-export function AtlasHeroMap({ interactive = true, className = "" }: AtlasHeroMapProps) {
+export function AtlasHeroMap({
+  interactive = true,
+  className = "",
+  initialCx = -0.2,
+}: AtlasHeroMapProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState<CanvasSize>({ w: 1000, h: 600, dpr: 1 })
   const [hover, setHover] = useState<HoverState | null>(null)
-  const [cam, setCam] = useState<Camera>(computeInitialCam)
+  const [cam, setCam] = useState<Camera>(() => computeInitialCam(initialCx))
   const [isDragging, setIsDragging] = useState(false)
   const dragRef = useRef<DragState | null>(null)
   const camRef = useRef<Camera>(cam)

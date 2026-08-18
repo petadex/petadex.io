@@ -29,18 +29,18 @@ export default function Error({
       <h1 className="text-foreground text-3xl font-semibold tracking-tight">
         Something went wrong
       </h1>
-      <p className="text-muted mt-3 max-w-prose text-base leading-relaxed">
+      <p className="text-muted-foreground mt-3 max-w-prose text-base leading-relaxed">
         This page could not be rendered. The data it needs was unavailable.
       </p>
 
       {showDetail && (
-        <pre className="border-border bg-surface text-muted mt-6 max-w-full overflow-x-auto rounded-lg border p-4 font-mono text-xs">
+        <pre className="border-border bg-surface text-muted-foreground mt-6 max-w-full overflow-x-auto rounded-lg border p-4 font-mono text-xs">
           {error.message}
         </pre>
       )}
 
       {error.digest && (
-        <p className="text-muted tabular mt-3 font-mono text-xs">
+        <p className="text-muted-foreground tabular mt-3 font-mono text-xs">
           digest: {error.digest}
         </p>
       )}

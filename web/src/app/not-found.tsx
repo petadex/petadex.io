@@ -11,11 +11,11 @@ export const metadata = buildMetadata({
 export default function NotFound() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-24">
-      <p className="text-muted tabular font-mono text-sm">404</p>
+      <p className="text-muted-foreground tabular font-mono text-sm">404</p>
       <h1 className="text-foreground mt-2 text-3xl font-semibold tracking-tight">
         Page not found
       </h1>
-      <p className="text-muted mt-3 max-w-prose text-base leading-relaxed">
+      <p className="text-muted-foreground mt-3 max-w-prose text-base leading-relaxed">
         This route does not exist. If you followed a link from the old site, it
         may not have been rebuilt yet — moved pages redirect and removed pages
         return 410, so a 404 here means the path was never published.

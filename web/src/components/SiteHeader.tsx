@@ -18,13 +18,15 @@ export function SiteHeader() {
           className="text-foreground text-base font-semibold tracking-tight"
         >
           {SITE_NAME}
-          <span className="text-muted ml-1.5 text-xs font-normal">rebuild</span>
+          <span className="text-muted-foreground ml-1.5 text-xs font-normal">
+            rebuild
+          </span>
         </Link>
 
         <nav aria-label="Main">
           <a
             href="https://github.com/petadex/petadex.io"
-            className="text-muted hover:text-foreground text-sm transition-colors"
+            className="text-muted-foreground hover:text-foreground text-sm transition-colors"
             target="_blank"
             rel="noreferrer noopener"
           >

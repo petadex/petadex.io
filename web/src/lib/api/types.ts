@@ -57,18 +57,53 @@ export interface GeneMetadata {
   date_entered: string | null
 }
 
-/** One point in the family-atlas UMAP embedding (~64k of them). */
+/**
+ * One point in the family-atlas UMAP embedding (64,730 of them).
+ *
+ * Field types verified against the live S3 export (2026-05-27): `family_id` and
+ * `component` are JSON numbers, not the strings the counts elsewhere use.
+ * `taxonomy` is a semicolon-delimited lineage, not a single rank.
+ */
 export interface AtlasPoint {
-  family_id: string
+  family_id: number
   umap_x: number
   umap_y: number
   family_size: number
   organism: string | null
   taxonomy: string | null
   country: string | null
-  component: string | null
+  component: number | null
   cath_domain: string | null
   domain_name: string | null
+}
+
+/**
+ * GET /api/resolve/summary — the single-row `corpus_summary` matview.
+ *
+ * Every count crosses the wire as a string: they are Postgres `bigint`s, and
+ * `pg` returns those as strings rather than silently losing precision past
+ * 2^53. Parse before formatting; do not treat these as numbers.
+ *
+ * The route is a `SELECT *` pass-through, so columns may be added upstream
+ * without a backend change. Fields are optional here for that reason.
+ */
+export interface CorpusSummary {
+  id?: number
+  /** Every catalytic ORF in the corpus. The widest number on the site. */
+  catalytic_core_total?: string
+  /** ORFs contributed by the Logan SRA assembly. */
+  sra_total?: string
+  /** ORFs contributed by NCBI NR. */
+  nr_total?: string
+  /** Experimentally characterized entries from PAZy. */
+  pazy_total?: string
+  clusters_90pid?: string
+  clusters_60pid?: string
+  clusters_30pid?: string
+  total_enzymes?: string
+  total_families?: string
+  total_components?: string
+  total_variants?: string
 }
 
 /** Envelope returned by GET /api/atlas/umap and by the S3 atlas export. */

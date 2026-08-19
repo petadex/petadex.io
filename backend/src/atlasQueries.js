@@ -67,10 +67,11 @@ export const ATLAS_COMPONENTS_FROM_FAMILY_ATLAS = `
  */
 export const ATLAS_COMPONENTS_FROM_BASE_TABLES = `
   WITH counts AS (
-    SELECT component, COUNT(DISTINCT family)::int AS family_count
-    FROM enzyme_taxonomy
-    WHERE component IS NOT NULL
-    GROUP BY component
+    SELECT et.component, COUNT(DISTINCT et.family)::int AS family_count
+    FROM enzyme_taxonomy et
+    INNER JOIN family_umap_coordinates fuc ON fuc.family_id = et.family
+    WHERE et.component IS NOT NULL
+    GROUP BY et.component
   ),
   rep AS (
     SELECT DISTINCT ON (et.component)

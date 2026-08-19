@@ -197,8 +197,7 @@ function useKnownFunctions(cathId) {
 const CathDomainOverviewPanel = ({ catDomain, expanded, onToggleExpanded }) => {
   const stub = catDomain.isStub()
   const classLabel = catDomain.classLabel()
-  const cathBreakdown = catDomain.breakdown()
-  const { uniquePdbs, namedSpecies } = useDomainRollupStats(catDomain.cathId)
+  const { namedSpecies } = useDomainRollupStats(catDomain.cathId)
   const { clusters30, clusters60, clusters90 } = useSequenceDiversity(catDomain.cathId)
   const knownFunctions = useKnownFunctions(catDomain.cathId)
 
@@ -317,33 +316,9 @@ const CathDomainOverviewPanel = ({ catDomain, expanded, onToggleExpanded }) => {
             )}
           </div>
 
-          <div className="mx-4 mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Classification
-            </span>
-            <dl className="mt-1 space-y-0.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-2xs text-muted-foreground">Class</dt>
-                <dd className="text-sm text-foreground text-right m-0">{cathBreakdown.className}</dd>
-              </div>
-              {cathBreakdown.architectureName && (
-                <div className="flex items-baseline justify-between gap-2">
-                  <dt className="text-2xs text-muted-foreground">Architecture</dt>
-                  <dd className="text-sm text-foreground text-right m-0">{cathBreakdown.architectureName}</dd>
-                </div>
-              )}
-              {cathBreakdown.topologyName && (
-                <div className="flex items-baseline justify-between gap-2">
-                  <dt className="text-2xs text-muted-foreground">Topology</dt>
-                  <dd className="text-sm text-foreground text-right m-0">{cathBreakdown.topologyName}</dd>
-                </div>
-              )}
-            </dl>
-          </div>
-
           <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
             <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Member HMMs
+              Enzyme Families
             </span>
             {catDomain.totalFamilyCount != null ? (
               <Link
@@ -357,14 +332,16 @@ const CathDomainOverviewPanel = ({ catDomain, expanded, onToggleExpanded }) => {
             )}
           </div>
 
-          <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Predicted Structures
-            </span>
-            <span className="text-sm font-semibold text-foreground tabular-nums">
-              {uniquePdbs != null ? uniquePdbs.toLocaleString() : "—"}
-            </span>
-          </div>
+          {catDomain.mechanism?.catalyticTriad && (
+            <div className="mx-4 mt-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Catalytic Triad
+              </span>
+              <p className="text-sm text-foreground font-mono m-0 mt-0.5">
+                {catDomain.mechanism.catalyticTriad.residues}
+              </p>
+            </div>
+          )}
 
           <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
             <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -396,9 +373,7 @@ const CathDomainOverviewPanel = ({ catDomain, expanded, onToggleExpanded }) => {
             )}
           </div>
 
-          <div className="px-4 mt-3 pb-3.5">
-            <span className="text-2xs text-muted-foreground/70">Updated {catDomain.lastUpdated}</span>
-          </div>
+          <div className="pb-3.5" />
         </div>
 
         {/* glossy sheen, painted on top of everything so it reads as a foil highlight sweeping

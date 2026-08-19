@@ -132,7 +132,12 @@ export const CATH_DOMAIN_CATALOG = [
     },
     mechanismComment:
       "The catalytic triad performs a nucleophilic attack on the carboxyl group of the PET, forming an acyl-intermediate. The oxyanion hole stabilizes this tetrahedral intermediate using their amide backbones, while the tryptophans pi-pi stack with the TPA benzene rings. Water then replaces the nucleophile, and the PET is removed from the protein.",
-    mechanism: { mcsa: null, customSummary: "", customDiagram: null },
+    mechanism: {
+      mcsa: null,
+      customSummary: "",
+      customDiagram: null,
+      catalyticTriad: { enzyme: "FAST-PETase", residues: "Ser–His–Asp" },
+    },
     functionalDiversity:
       "The α/β-hydrolase fold is remarkably functionally diverse. Beyond esterases and lipases, documented members include peptidases, epoxide hydrolases, dehalogenases, and even non-catalytic proteins that keep the fold purely as a structural scaffold. Some peptidase families resemble the fold closely enough to trip up automated classification tools. Dimitriou et al. (2017) mapped the conserved structural elements around the catalytic machinery across 40 α/β-hydrolase families, showing how one shared framework has been repurposed for many different reactions. The takeaway: knowing a protein has this fold tells you its shape, not what it does - substrate specificity and function have to be determined separately.",
     interactingDomains:

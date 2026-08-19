@@ -26,6 +26,7 @@ import resolveRoutes from './routes/resolve.js';
 import clusterRoutes from './routes/cluster.js';
 import orfRoutes from './routes/orf.js';
 import kineticsRoutes from './routes/kinetics.js';
+import literatureRoutes from './routes/literature.js';
 import { pool } from './db.js';
 
 const app = express();
@@ -65,6 +66,7 @@ app.use('/api/resolve', resolveRoutes);
 app.use('/api/cluster', clusterRoutes);
 app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
+app.use('/api/literature', literatureRoutes);
 
 // Root: no HTML UI — API lives under /api/*. Browsers hitting :3001/ alone see this instead of "Cannot GET /".
 app.get('/', (req, res) => {

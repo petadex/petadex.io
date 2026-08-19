@@ -1,0 +1,187 @@
+[
+  {
+    "doi": "10.1038/s41586-020-2149-4",
+    "paper_title": "An engineered PET depolymerase to break down and recycle plastic bottles",
+    "authors": ["Tournier V", "Topham CM", "Gilles A", "David B", "Martins CF", "et al."],
+    "date_published": "2020-04-08",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1126/science.aad5505",
+      "10.1073/pnas.1718804115"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 4
+  },
+  {
+    "doi": "10.1126/science.aad5505",
+    "paper_title": "A bacterium that degrades and assimilates poly(ethylene terephthalate)",
+    "authors": ["Yoshida S", "Hiraga K", "Takehana T", "Taniguchi I", "Yamaji H", "et al."],
+    "date_published": "2016-03-11",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1128/AEM.01768-09"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 2
+  },
+  {
+    "doi": "10.1073/pnas.1718804115",
+    "paper_title": "Characterization and engineering of a plastic-degrading aromatic polyesterase",
+    "authors": ["Austin HP", "Allen MD", "Donohoe BS", "Dorschel NA", "Kearns FL", "et al."],
+    "date_published": "2018-05-08",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1126/science.aad5505",
+      "10.1038/ncomms14845"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 3
+  },
+  {
+    "doi": "10.1038/ncomms14845",
+    "paper_title": "Structural studies reveal the molecular mechanism of PETase",
+    "authors": ["Han X", "Liu W", "Huang JW", "Ma J", "Zheng Y", "et al."],
+    "date_published": "2017-10-13",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1126/science.aad5505"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 1
+  },
+  {
+    "doi": "10.1128/AEM.01768-09",
+    "paper_title": "Purification, characterization, and cloning of a cutinase from Fusarium",
+    "authors": ["Chen S", "Su L", "Chen J", "Wu J"],
+    "date_published": "2009-10-01",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [],
+    "plastics_studied": ["PET", "PCL"],
+    "proteins_studied_count": 1
+  },
+  {
+    "doi": "10.1038/s41589-022-01016-4",
+    "paper_title": "Machine learning-aided engineering of hydrolases for PET depolymerization",
+    "authors": ["Lu H", "Diaz DJ", "Czarnecki NJ", "Zhu C", "Kim W", "et al."],
+    "date_published": "2022-04-28",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1038/s41586-020-2149-4",
+      "10.1126/science.aad5505",
+      "10.1073/pnas.1718804115"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 12
+  },
+  {
+    "doi": "10.1038/s41586-022-04748-4",
+    "paper_title": "Catalytic chemoenzymatic one-pot conversion of PET",
+    "authors": ["Knott BC", "Erickson E", "Allen MD", "Gado JE", "Graham R", "et al."],
+    "date_published": "2022-05-01",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1038/s41586-020-2149-4",
+      "10.1126/science.aad5505"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 5
+  },
+  {
+    "doi": "10.1021/acs.biomac.0c00434",
+    "paper_title": "Enzymatic degradation of polyethylene terephthalate",
+    "authors": ["Kawai F", "Kawase T", "Kawabe T", "et al."],
+    "date_published": "2020-06-15",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1126/science.aad5505",
+      "10.1128/AEM.01768-09"
+    ],
+    "plastics_studied": ["PET", "PLA"],
+    "proteins_studied_count": 6
+  },
+  {
+    "doi": "10.1128/AEM.02733-18",
+    "paper_title": "Biodegradation of polyester polyurethane by endophytic fungi",
+    "authors": ["Russell JR", "Huang J", "Anand P", "Kucera K", "Sandoval AG", "et al."],
+    "date_published": "2019-03-01",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [],
+    "plastics_studied": ["PUR"],
+    "proteins_studied_count": 3
+  },
+  {
+    "doi": "10.1038/s41467-021-25349-z",
+    "paper_title": "Conversion of polyethylene into a recyclable feedstock",
+    "authors": ["Sullivan KP", "Werner AZ", "Ramirez KJ", "Ellis LD", "et al."],
+    "date_published": "2021-08-01",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [],
+    "plastics_studied": ["PE"],
+    "proteins_studied_count": 2
+  },
+  {
+    "doi": "10.1126/science.abh2313",
+    "paper_title": "Computational redesign of a PETase for plastic recycling",
+    "authors": ["Cui Y", "Chen Y", "Liu X", "Dong S", "et al."],
+    "date_published": "2021-04-30",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1126/science.aad5505",
+      "10.1073/pnas.1718804115",
+      "10.1038/ncomms14845"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 8
+  },
+  {
+    "doi": "10.1021/acscatal.1c00987",
+    "paper_title": "Structural and functional characterization of a PLA-degrading esterase",
+    "authors": ["Hajighasemi M", "Tchigvintsev A", "et al."],
+    "date_published": "2021-07-12",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1021/acs.biomac.0c00434"
+    ],
+    "plastics_studied": ["PLA"],
+    "proteins_studied_count": 2
+  },
+  {
+    "doi": "10.1039/D2GC01234A",
+    "paper_title": "Comparative study of polyester hydrolases on PET and PBAT",
+    "authors": ["Wei R", "Song C", "Gräsing D", "et al."],
+    "date_published": "2022-09-20",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1038/s41586-020-2149-4",
+      "10.1126/science.aad5505"
+    ],
+    "plastics_studied": ["PET", "PBAT"],
+    "proteins_studied_count": 7
+  },
+  {
+    "doi": "10.1016/j.nbt.2018.02.007",
+    "paper_title": "Fungal cutinases in plastic degradation",
+    "authors": ["Nikolaivits E", "Kanelli M", "et al."],
+    "date_published": "2018-05-25",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1128/AEM.01768-09"
+    ],
+    "plastics_studied": ["PET", "PCL", "PBS"],
+    "proteins_studied_count": 4
+  },
+  {
+    "doi": "10.1038/s41587-023-01855-z",
+    "paper_title": "Fast enzymatic PET hydrolysis at low temperatures",
+    "authors": ["Bell EL", "Smithson R", "Kilbride S", "et al."],
+    "date_published": "2023-06-15",
+    "paper_summary": "[PENDING SUMMARY]",
+    "citations_in_dataset": [
+      "10.1038/s41586-020-2149-4",
+      "10.1038/s41589-022-01016-4",
+      "10.1126/science.abh2313"
+    ],
+    "plastics_studied": ["PET"],
+    "proteins_studied_count": 9
+  }
+]

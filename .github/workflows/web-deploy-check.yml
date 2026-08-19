@@ -1,0 +1,56 @@
+name: Web Deploy Check
+
+# Runs the same mocked E2E spec used in web-ci.yml, a second time, against
+# the real Vercel deployment that just went live -- per the Homepage Test
+# Plan's CI-placement note: "the only way to catch the missing-env-var class
+# of failure". A local build always uses this workflow's own dummy
+# NEXT_PUBLIC_* values, so it can never catch a Vercel project setting that's
+# missing or wrong; this can, because nothing about the target is mocked.
+#
+# deployment_status fires once Vercel's GitHub App finishes creating a
+# Deployment for a push (both "Preview" and "Production" environments), with
+# a real target_url to hit.
+
+on:
+  deployment_status:
+
+concurrency:
+  group: web-deploy-check-${{ github.event.deployment.id }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-live:
+    name: E2E (live, against the deployed URL)
+    if: >
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.creator.login == 'vercel[bot]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E against ${{ github.event.deployment_status.target_url }}
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ github.event.deployment_status.target_url }}
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-live
+          path: web/playwright-report/
+          retention-days: 14

@@ -28,14 +28,18 @@ defaults:
 
 jobs:
   check:
-    name: Typecheck, lint, format
+    name: Typecheck, lint, format, test, build
     runs-on: ubuntu-latest
 
     env:
-      # The checks compile the app but never call the API. These satisfy the
-      # fail-fast validation in src/lib/env.ts without pointing CI at anything
-      # real; a check run must not depend on production being up.
-      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+      # The checks compile the app but never call the real API. These satisfy
+      # the fail-fast validation in src/lib/env.ts without pointing CI at
+      # anything real; a check run must not depend on production being up.
+      # Build still needs something answering -- see the mock API step below;
+      # "/" fetches its headline counts server-side during the build's static
+      # generation of "/", so an unreachable API fails the build outright
+      # (by design -- see lib/api/corpus.ts).
+      NEXT_PUBLIC_API_URL: http://localhost:3011/api
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
     steps:
@@ -58,5 +62,50 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Unit + component tests
+        run: npm run test
+
+      - name: Start mock API (for the build's server-side prerender of "/")
+        run: |
+          node e2e/mock-api-server.mjs &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3011/api/resolve/summary > /dev/null && exit 0
+            sleep 1
+          done
+          echo "mock-api-server never came up" >&2
+          exit 1
+
       - name: Build
         run: npm run build
+
+  e2e-mocked:
+    name: E2E (mocked, local build)
+    runs-on: ubuntu-latest
+    needs: check
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E (Playwright starts the mock API + a local build itself)
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3011/api
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 14

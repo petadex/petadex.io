@@ -1,0 +1,40 @@
+{
+  "points": [
+    {
+      "family_id": 1,
+      "umap_x": 0.1,
+      "umap_y": 0.2,
+      "family_size": 120,
+      "organism": "Ideonella sakaiensis",
+      "taxonomy": "Bacteria;Proteobacteria",
+      "country": "Japan",
+      "component": 0,
+      "cath_domain": "3.40.50.1820",
+      "domain_name": "alpha/beta-Hydrolase"
+    },
+    {
+      "family_id": 2,
+      "umap_x": -0.3,
+      "umap_y": 0.4,
+      "family_size": 45,
+      "organism": null,
+      "taxonomy": "Bacteria;Firmicutes",
+      "country": null,
+      "component": 1,
+      "cath_domain": "3.40.630.10",
+      "domain_name": "DD-peptidase"
+    },
+    {
+      "family_id": 3,
+      "umap_x": 0.05,
+      "umap_y": -0.25,
+      "family_size": 8,
+      "organism": null,
+      "taxonomy": null,
+      "country": null,
+      "component": 2,
+      "cath_domain": null,
+      "domain_name": "Amidase"
+    }
+  ]
+}

@@ -175,7 +175,7 @@ export function ActivityBandPreview() {
         <div className="min-h-0 flex-1">
           <ScatterChart />
         </div>
-        <span className="font-mono text-[9px] text-white/40">
+        <span className="text-muted-foreground font-mono text-[9px]">
           shape only — awaiting assay export
         </span>
       </div>

@@ -1,0 +1,14 @@
+{
+  "id": 1,
+  "catalytic_core_total": "307155746",
+  "sra_total": "290123456",
+  "nr_total": "17032290",
+  "pazy_total": "464",
+  "clusters_90pid": "18234567",
+  "clusters_60pid": "9123456",
+  "clusters_30pid": "4012345",
+  "total_enzymes": "1050000",
+  "total_families": "64730",
+  "total_components": "412",
+  "total_variants": "1050000"
+}

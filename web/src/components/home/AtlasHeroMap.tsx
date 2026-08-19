@@ -35,17 +35,105 @@ interface FallbackCluster {
 }
 
 const FALLBACK_CLUSTERS: readonly FallbackCluster[] = [
-  { label: "α/β Hydrolase", color: "#4F8FE8", cx: 0.3, cy: 0.05, sx: 0.18, sy: 0.16, n: 720 },
-  { label: "α/β Hydrolase", color: "#4F8FE8", cx: -0.18, cy: -0.02, sx: 0.07, sy: 0.07, n: 110 },
-  { label: "DD-peptidase", color: "#2ECC71", cx: -0.3, cy: 0.5, sx: 0.08, sy: 0.07, n: 240 },
-  { label: "Amidase", color: "#E74C4C", cx: 0.34, cy: 0.55, sx: 0.07, sy: 0.07, n: 220 },
-  { label: "Trypsin-like", color: "#9B5BE0", cx: -0.42, cy: -0.05, sx: 0.05, sy: 0.06, n: 95 },
-  { label: "Arylesterase", color: "#F2C94C", cx: 0.04, cy: 0.42, sx: 0.05, sy: 0.04, n: 70 },
-  { label: "Arylesterase", color: "#F2C94C", cx: -0.05, cy: -0.3, sx: 0.04, sy: 0.04, n: 60 },
-  { label: "Cupredoxin", color: "#F2994A", cx: 0.02, cy: 0.05, sx: 0.025, sy: 0.025, n: 40 },
-  { label: "L-amino peptidase", color: "#6FB7E8", cx: 0.42, cy: 0.42, sx: 0.05, sy: 0.04, n: 80 },
-  { label: "Other", color: "#EC4899", cx: -0.1, cy: 0.35, sx: 0.02, sy: 0.02, n: 18 },
-  { label: "Other", color: "#14B8A6", cx: 0.4, cy: -0.3, sx: 0.02, sy: 0.02, n: 12 },
+  {
+    label: "α/β Hydrolase",
+    color: "#4F8FE8",
+    cx: 0.3,
+    cy: 0.05,
+    sx: 0.18,
+    sy: 0.16,
+    n: 720,
+  },
+  {
+    label: "α/β Hydrolase",
+    color: "#4F8FE8",
+    cx: -0.18,
+    cy: -0.02,
+    sx: 0.07,
+    sy: 0.07,
+    n: 110,
+  },
+  {
+    label: "DD-peptidase",
+    color: "#2ECC71",
+    cx: -0.3,
+    cy: 0.5,
+    sx: 0.08,
+    sy: 0.07,
+    n: 240,
+  },
+  {
+    label: "Amidase",
+    color: "#E74C4C",
+    cx: 0.34,
+    cy: 0.55,
+    sx: 0.07,
+    sy: 0.07,
+    n: 220,
+  },
+  {
+    label: "Trypsin-like",
+    color: "#9B5BE0",
+    cx: -0.42,
+    cy: -0.05,
+    sx: 0.05,
+    sy: 0.06,
+    n: 95,
+  },
+  {
+    label: "Arylesterase",
+    color: "#F2C94C",
+    cx: 0.04,
+    cy: 0.42,
+    sx: 0.05,
+    sy: 0.04,
+    n: 70,
+  },
+  {
+    label: "Arylesterase",
+    color: "#F2C94C",
+    cx: -0.05,
+    cy: -0.3,
+    sx: 0.04,
+    sy: 0.04,
+    n: 60,
+  },
+  {
+    label: "Cupredoxin",
+    color: "#F2994A",
+    cx: 0.02,
+    cy: 0.05,
+    sx: 0.025,
+    sy: 0.025,
+    n: 40,
+  },
+  {
+    label: "L-amino peptidase",
+    color: "#6FB7E8",
+    cx: 0.42,
+    cy: 0.42,
+    sx: 0.05,
+    sy: 0.04,
+    n: 80,
+  },
+  {
+    label: "Other",
+    color: "#EC4899",
+    cx: -0.1,
+    cy: 0.35,
+    sx: 0.02,
+    sy: 0.02,
+    n: 18,
+  },
+  {
+    label: "Other",
+    color: "#14B8A6",
+    cx: 0.4,
+    cy: -0.3,
+    sx: 0.02,
+    sy: 0.02,
+    n: 12,
+  },
 ]
 
 const COMPONENT_COLORS: Readonly<Record<number, string>> = {
@@ -110,7 +198,9 @@ function generateFallbackPoints(): HeroPoint[] {
   return pts
 }
 
-function normalizeApiPoints(apiPoints: AtlasPoint[] | null): HeroPoint[] | null {
+function normalizeApiPoints(
+  apiPoints: AtlasPoint[] | null
+): HeroPoint[] | null {
   if (!apiPoints?.length) return null
   const xs = apiPoints.map(p => p.umap_x)
   const ys = apiPoints.map(p => p.umap_y)
@@ -127,7 +217,9 @@ function normalizeApiPoints(apiPoints: AtlasPoint[] | null): HeroPoint[] | null 
       p.component != null
         ? COMPONENT_COLORS[p.component % 10] || "#64748b"
         : "#64748b",
-    label: p.domain_name || (p.component != null ? `Component ${p.component}` : "Unassigned"),
+    label:
+      p.domain_name ||
+      (p.component != null ? `Component ${p.component}` : "Unassigned"),
     size: Math.max(1, Math.min(25, p.family_size || 1)),
     familyId: p.family_id,
     component: p.component,
@@ -285,7 +377,10 @@ export function AtlasHeroMap({
       if (px < -10 || px > w + 10 || py < -10 || py > h + 10) continue
       const r = (1.4 + Math.log2(p.size + 1) * 0.45) * Math.min(2, cam.zoom)
       ctx.fillStyle = p.color
-      ctx.globalAlpha = Math.min(0.35, (0.04 + p.size * 0.003) * Math.min(cam.zoom, 3))
+      ctx.globalAlpha = Math.min(
+        0.35,
+        (0.04 + p.size * 0.003) * Math.min(cam.zoom, 3)
+      )
       ctx.beginPath()
       ctx.arc(px, py, r, 0, Math.PI * 2)
       ctx.fill()
@@ -296,7 +391,8 @@ export function AtlasHeroMap({
     // Hover ring
     if (hover) {
       const [px, py] = project(hover.point.x, hover.point.y)
-      const r = (1.4 + Math.log2(hover.point.size + 1) * 0.45) * Math.min(2, cam.zoom)
+      const r =
+        (1.4 + Math.log2(hover.point.size + 1) * 0.45) * Math.min(2, cam.zoom)
       ctx.strokeStyle = "#fff"
       ctx.lineWidth = 1.5
       ctx.beginPath()
@@ -309,8 +405,15 @@ export function AtlasHeroMap({
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!interactive) return
     // Don't capture touch pointers — lets single-finger vertical swipes scroll the page natively
-    if (e.pointerType !== "touch") e.currentTarget.setPointerCapture?.(e.pointerId)
-    dragRef.current = { x: e.clientX, y: e.clientY, cx: cam.cx, cy: cam.cy, moved: false }
+    if (e.pointerType !== "touch")
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      cx: cam.cx,
+      cy: cam.cy,
+      moved: false,
+    }
     setIsDragging(true)
   }
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -348,13 +451,18 @@ export function AtlasHeroMap({
   }
   const onPointerUp = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const drag = dragRef.current
-    if (e.pointerType !== "touch") e.currentTarget.releasePointerCapture?.(e.pointerId)
+    if (e.pointerType !== "touch")
+      e.currentTarget.releasePointerCapture?.(e.pointerId)
     dragRef.current = null
     setIsDragging(false)
 
     // Tap (no drag) — navigate to family page
     if (drag && !drag.moved && hover?.point?.familyId != null) {
-      window.open(`/family/${hover.point.familyId}`, "_blank", "noopener,noreferrer")
+      window.open(
+        `/family/${hover.point.familyId}`,
+        "_blank",
+        "noopener,noreferrer"
+      )
     }
   }
 
@@ -384,7 +492,10 @@ export function AtlasHeroMap({
       if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX
         const dy = e.touches[0].clientY - e.touches[1].clientY
-        pinchRef.current = { dist: Math.hypot(dx, dy), startZoom: camRef.current.zoom }
+        pinchRef.current = {
+          dist: Math.hypot(dx, dy),
+          startZoom: camRef.current.zoom,
+        }
       }
     }
     const onTouchMove = (e: TouchEvent) => {
@@ -394,7 +505,10 @@ export function AtlasHeroMap({
       const dy = e.touches[0].clientY - e.touches[1].clientY
       const scale = Math.hypot(dx, dy) / pinchRef.current.dist
       const startZoom = pinchRef.current.startZoom
-      setCam(c => ({ ...c, zoom: Math.min(8, Math.max(0.5, startZoom * scale)) }))
+      setCam(c => ({
+        ...c,
+        zoom: Math.min(8, Math.max(0.5, startZoom * scale)),
+      }))
     }
     const onTouchEnd = () => {
       pinchRef.current = null
@@ -410,7 +524,10 @@ export function AtlasHeroMap({
   }, [interactive])
 
   return (
-    <div className={`relative h-full w-full overflow-hidden ${className}`} ref={wrapRef}>
+    <div
+      className={`relative h-full w-full overflow-hidden ${className}`}
+      ref={wrapRef}
+    >
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-pan-y select-none"
@@ -452,11 +569,12 @@ export function AtlasHeroMap({
               />
               <span className="text-foreground">{hover.point.label}</span>
             </div>
-            {hover.point.cathDomain != null && String(hover.point.cathDomain).trim() !== "" && (
-              <div className="text-muted-foreground mt-0.5">
-                CATH: {hover.point.cathDomain}
-              </div>
-            )}
+            {hover.point.cathDomain != null &&
+              String(hover.point.cathDomain).trim() !== "" && (
+                <div className="text-muted-foreground mt-0.5">
+                  CATH: {hover.point.cathDomain}
+                </div>
+              )}
             {hover.point.component != null && (
               <div className="text-muted-foreground mt-0.5">
                 Component: {hover.point.component}

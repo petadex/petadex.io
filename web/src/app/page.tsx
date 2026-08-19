@@ -115,12 +115,35 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* Edge fade — pinned to the viewport (not the document), so content
+          dissolves into the background as it scrolls under the sticky
+          header and off the bottom of the screen, rather than clipping
+          abruptly. Homepage-scoped: lives here rather than in the root
+          layout, so it unmounts on navigation instead of following every
+          route. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-18 z-40 h-20"
+        style={{
+          background:
+            "linear-gradient(to bottom, var(--background) 0%, transparent 100%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-40 h-20"
+        style={{
+          background:
+            "linear-gradient(to top, var(--background) 0%, transparent 100%)",
+        }}
+      />
+
       {/* Hero + corpus funnel together fill the viewport below the sticky
-          h-14 header on first load (md+); the atlas canvas absorbs whatever
+          h-18 header on first load (md+); the atlas canvas absorbs whatever
           space the funnel bar doesn't need. Ordinary scroll below — no
           scroll-snap; see removed SnapScrollRoot for why (traps scroll with
           a single snap point once the entry bands stopped being panels). */}
-      <div className="md:flex md:h-[calc(100dvh-3.5rem)] md:flex-col">
+      <div className="md:flex md:h-[calc(100dvh-4.5rem)] md:flex-col">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <section className="border-border relative border-b bg-[#0e0e0e] md:flex md:min-h-0 md:flex-1 md:flex-col">
           {/* Title block
@@ -243,16 +266,19 @@ export default async function HomePage() {
                   <dt className="text-foreground mt-2 text-sm font-medium">
                     {item.label}
                   </dt>
-                  <p className="text-muted-foreground text-2xs mt-1 font-mono">
+                  {/* dt/dd only: a <dl>'s wrapping <div> may not contain a
+                     bare <p>, so the caption and exact figure are additional
+                     <dd>s rather than paragraphs. */}
+                  <dd className="text-muted-foreground text-2xs mt-1 font-mono">
                     {item.caption}
-                  </p>
+                  </dd>
                   {/* The exact figure only earns a line when the headline
                     abbreviates it. "211" over "211" is noise. */}
                   {formatCount(item.value, "compact") !==
                     formatCount(item.value) && (
-                    <p className="text-muted-foreground/70 text-2xs tabular mt-0.5 font-mono">
+                    <dd className="text-muted-foreground text-2xs tabular mt-0.5 font-mono">
                       {formatCount(item.value)}
-                    </p>
+                    </dd>
                   )}
                 </div>
               ))}
@@ -264,10 +290,10 @@ export default async function HomePage() {
       {/* ── Entry points ──────────────────────────────────────────────────
           One page panel holding all four tools — `id="start"` is the
           landing target for the hero's "Start exploring" link, and
-          `scroll-mt-14` clears the sticky header when it's the jump target.
+          `scroll-mt-18` clears the sticky header when it's the jump target.
           Individual tools are rows within this single panel rather than
           full-viewport screens of their own; see EntryBand.tsx. */}
-      <section id="start" className="border-border scroll-mt-14 border-b">
+      <section id="start" className="border-border scroll-mt-18 border-b">
         <div className="mx-auto max-w-6xl px-6 pt-12">
           <p className="text-2xs text-muted-foreground font-semibold tracking-[0.18em] uppercase">
             Start here
@@ -355,8 +381,8 @@ export default async function HomePage() {
                 </span>{" "}
                 of the {formatCount(families)} families. Recolor the layout by
                 structural class, environment, or characterization status to
-                isolate data gaps and identify uncharacterized families
-                adjacent to known active sequences.
+                isolate data gaps and identify uncharacterized families adjacent
+                to known active sequences.
               </>
             }
             chips={[

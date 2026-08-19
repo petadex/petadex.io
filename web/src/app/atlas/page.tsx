@@ -55,7 +55,7 @@ export default async function AtlasPage({
     <div
       style={{
         position: "fixed",
-        top: 56,
+        top: 72,
         left: 0,
         right: 0,
         bottom: 0,

@@ -80,15 +80,17 @@ npm run start             # serves the production build on :3000
 
 ## Scripts
 
-| Command             | Does                                           |
-| ------------------- | ---------------------------------------------- |
-| `npm run dev`       | Dev server on :3000                            |
-| `npm run build`     | Production build                               |
-| `npm run start`     | Serve the production build                     |
-| `npm run typecheck` | `tsc --noEmit`                                 |
-| `npm run lint`      | ESLint                                         |
-| `npm run format`    | Prettier, writes                               |
-| `npm run check`     | typecheck + lint + format check — what CI runs |
+| Command             | Does                                                                |
+| ------------------- | ------------------------------------------------------------------- |
+| `npm run dev`       | Dev server on :3000                                                 |
+| `npm run build`     | Production build                                                    |
+| `npm run start`     | Serve the production build                                          |
+| `npm run typecheck` | `tsc --noEmit`                                                      |
+| `npm run lint`      | ESLint                                                              |
+| `npm run format`    | Prettier, writes                                                    |
+| `npm run check`     | typecheck + lint + format check — what CI runs                      |
+| `npm run test`      | Unit + component tests (Vitest)                                     |
+| `npm run test:e2e`  | E2E smoke (Playwright) — builds and boots the app itself; see below |
 
 ## Layout
 
@@ -132,10 +134,28 @@ data is stable enough to cache.
 **Substrate colors** live in `globals.css` as `--color-bhet-*`. Do not redefine
 them per component: BHET12.5 `#2E86AB`, BHET25 `#A23B72`, BHET50 `#F18F01`.
 
+## Testing
+
+Vitest (unit + component) and Playwright (E2E) — layered per the Homepage Test
+Plan. `npm run test:e2e` boots its own throwaway backend
+(`e2e/mock-api-server.mjs`, port 3011) and Next build/server; it does not need
+`cd backend && npm run dev` running.
+
+One local gotcha: `npm run test:e2e` reuses an already-running server on
+`:3000` instead of starting its own (Playwright's `reuseExistingServer`,
+on to speed up repeated local runs). If you have `npm run dev` open in another
+terminal, the E2E counts assertions will fail against your dev server's real
+data instead of the test fixture — stop `npm run dev` first, or ignore that
+one assertion locally and trust CI, which always runs on a clean runner.
+
+`e2e/home.spec.ts` runs a second time in CI (`web-deploy-check.yml`) against
+the real Vercel preview/production URL once it deploys, with nothing mocked —
+the only way to catch a Vercel project env var that's missing or wrong.
+
 ## Not done yet
 
-- Test framework — Vitest + Playwright assumed in the CI plan, not chosen
 - Typed client generated from OpenAPI. `backend/docs/openapi.yaml` documents 4 of
   ~25 mounted routes, so types are hand-written until the spec is completed.
-- Any actual page. Phase 1 must settle the enzyme key, the substrate schema and
-  the `/sequence/*` namespace split before routes are committed to.
+- Any actual page besides `/`, `/atlas` and `/activity`. Phase 1 must settle the
+  enzyme key, the substrate schema and the `/sequence/*` namespace split before
+  routes are committed to.

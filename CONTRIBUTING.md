@@ -177,7 +177,27 @@ Before pushing: `cd web && npm run check` (typecheck + lint + format).
 7. **Add `loading.tsx` / `error.tsx`** beside the page where the defaults
    (`src/app/error.tsx`, `not-found.tsx`) aren't specific enough.
 
-8. **Finish:** `npm run check`, then flip the ledger row to `shipped`.
+8. **Write tests for the page**, layered per the Homepage Test Plan pattern
+   (`web/src/app/page.tsx` + `web/e2e/home.spec.ts` is the reference
+   implementation):
+   - **Vitest, colocated `*.test.ts(x)`** — every fetcher added in step 3
+     (2xx parses, non-2xx and network failures throw and are not swallowed —
+     this is the load-bearing one, see rule 1 above), and any client
+     component with real branching logic (formatting, empty/error states).
+     Server components and page-level `async function` bodies aren't
+     RTL-tested directly; cover them through E2E instead.
+   - **Playwright, `web/e2e/<page>.spec.ts`** — 200 + the page's real
+     content renders (not a skeleton/placeholder/`NaN`/`undefined`), every
+     same-origin link on the page resolves, an `@axe-core/playwright` pass,
+     no uncaught console errors. If the page fetches something server-side
+     during render, `next build` needs a live target for it — see
+     `web/e2e/mock-api-server.mjs`'s own comment for why Playwright's
+     `page.route()` can't intercept that and has to be answered by a real
+     mock server instead.
+   - Add the fixture used by both layers under `web/e2e/fixtures/`.
+
+9. **Finish:** `npm run check && npm run test && npm run test:e2e`, then flip
+   the ledger row to `shipped`.
 
 ## Adding a backend endpoint (`backend/`)
 
@@ -279,16 +299,20 @@ file.
 Vercel owns builds and previews; GitHub Actions owns checks — so a failing
 check reads as "code is broken," not "the site didn't ship."
 
-| Workflow                 | Trigger                              | Runs                                    |
-| ------------------------ | ------------------------------------ | --------------------------------------- |
-| `web-ci.yml`             | PR/push touching `web/**`            | typecheck, lint, format check, build    |
-| `backend-ci-deploy.yml`  | push to `main` touching `backend/**` | `npm ci`, `npm test`, serverless deploy |
-| `frontend-ci-deploy.yml` | push to `main`                       | Gatsby build → GitHub Pages             |
-| Vercel                   | push to `rebuild/next-web`, PRs      | Next build + preview deploy             |
+| Workflow                    | Trigger                              | Runs                                              |
+| --------------------------- | ------------------------------------ | -------------------------------------------------- |
+| `web-ci.yml`                | PR/push touching `web/**`            | typecheck, lint, format check, Vitest, build, then a Playwright E2E job against a local build |
+| `web-deploy-check.yml`      | `deployment_status` (Vercel deploys) | the same E2E spec again, unmocked, against the live preview/production URL |
+| `backend-ci-deploy.yml`     | push to `main` touching `backend/**` | `npm ci`, `npm test`, serverless deploy             |
+| `frontend-ci-deploy.yml`    | push to `main`                       | Gatsby build → GitHub Pages                        |
+| Vercel                      | push to `rebuild/next-web`, PRs      | Next build + preview deploy                        |
 
-**No test framework is chosen yet** (Vitest + Playwright assumed, not
-decided), so no test is required today — attach a `curl` transcript or
-screenshot instead. This section gets updated once that lands.
+**Test framework: Vitest (unit/component) + Playwright (E2E)**, colocated
+`*.test.ts(x)` beside the source they cover, E2E specs under `web/e2e/`. A PR
+touching `web/` is expected to include tests for the surface it changes —
+see `web/README.md`'s Testing section and the Homepage Test Plan for the
+layering (static checks → component tests → data-layer tests → E2E smoke →
+accessibility).
 
 ## Decided vs. open
 

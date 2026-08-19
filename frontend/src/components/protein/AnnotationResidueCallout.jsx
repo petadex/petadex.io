@@ -3,6 +3,9 @@ import React from "react"
 /**
  * Callout box offset from the residue with an arrow pointing at the highlight.
  *
+ * `annotation.seqPos` is the internal Mol* label_seq_id, not a publication residue number -
+ * `annotation.label` (e.g. "S160") is shown instead when set.
+ *
  * @param {{
  *   mode: 'hover' | 'pinned',
  *   annotation: { seqPos: number, aa?: string, label?: string, note?: string },
@@ -87,9 +90,9 @@ export default function AnnotationResidueCallout({
           />
           <div className="min-w-0 flex-1">
             <p className="m-0 text-sm font-mono font-semibold text-foreground">
-              {annotation.seqPos}
-              {annotation.aa ? ` ${annotation.aa}` : ""}
-              {annotation.label ? ` · ${annotation.label}` : ""}
+              {annotation.label
+                ? annotation.label
+                : `${annotation.seqPos}${annotation.aa ? ` ${annotation.aa}` : ""}`}
             </p>
             {group?.label ? (
               <p className="m-0 mt-0.5 text-[11px] text-muted-foreground">

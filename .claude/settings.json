@@ -6,7 +6,11 @@
       "Bash(aws s3 ls*)",
       "Bash(aws ec2 describe-*)",
       "Bash(aws stepfunctions list-*)",
-      "Bash(aws logs get-log-events*)"
+      "Bash(aws logs get-log-events*)",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:rest.uniprot.org)",
+      "Bash(curl -sf http://localhost:3001/api/enzymes/stats/overview)",
+      "Bash(curl -s \"http://localhost:3001/api/atlas/components\")"
     ]
   }
 }

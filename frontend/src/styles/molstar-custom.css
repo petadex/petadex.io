@@ -27,6 +27,19 @@
   display: none !important;
 }
 
+/* The layout rules above only hide the docked side/top/bottom panels - Mol* also floats a
+   separate set of buttons directly on the 3D canvas (reset/screenshot/settings top-right,
+   state-snapshot/selection-mode top-left) that live outside those panels entirely. */
+.molstar-compact .msp-viewport-controls,
+.molstar-compact .msp-viewport-top-left-controls,
+.molstar-compact .msp-selection-viewport-controls,
+.molstar-compact .msp-animation-viewport-controls,
+.molstar-compact .msp-state-snapshot-viewport-controls,
+.molstar-compact .msp-viewport-controls-panel,
+.molstar-compact .msp-logo {
+  display: none !important;
+}
+
 /* Ensure compact viewers don't create overlays outside their container */
 .molstar-compact {
   contain: layout style paint;

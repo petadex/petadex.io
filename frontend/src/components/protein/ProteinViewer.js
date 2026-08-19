@@ -153,26 +153,41 @@ const ProteinViewer = ({
 
         pluginRef.current = plugin;
 
-        const pdbUrl = `${config.apiUrl}/pdb/accession/${accession}`;
-        const response = await fetch(pdbUrl);
-
-        if (!response.ok) {
-          throw new Error('No structure available');
+        // The axes gizmo is drawn directly into the WebGL scene (not a DOM overlay), so no CSS
+        // rule can hide it - it has to go through canvas3d props instead.
+        if (!showControls) {
+          plugin.canvas3d?.setProps({ camera: { helper: { axes: { name: 'off', params: {} } } } });
         }
 
-        const pdbInfo = await response.json();
+        // --------------------------------------------------------------
+        // Fetch PDB data: either direct URL (starts with http) or via API
+        // --------------------------------------------------------------
+        let pdbData;
+        if (accession.startsWith('http')) {
+          // Direct S3 (or any) URL – fetch the PDB file contents directly
+          const response = await fetch(accession);
+          if (!response.ok) {
+            throw new Error(`Failed to load PDB from URL: ${response.status}`);
+          }
+          pdbData = await response.text();
+        } else {
+          // Original API flow for protein accessions
+          const apiUrl = `${config.apiUrl}/pdb/accession/${accession}`;
+          const response = await fetch(apiUrl);
+          if (!response.ok) {
+            throw new Error('No structure available');
+          }
+          const pdbInfo = await response.json();
+          const pdbResponse = await fetch(pdbInfo.pdb_url);
+          if (!pdbResponse.ok) {
+            throw new Error(`Failed to load PDB file: ${pdbResponse.status}`);
+          }
+          pdbData = await pdbResponse.text();
+        }
 
         if (!isMounted) return;
 
-        const pdbResponse = await fetch(pdbInfo.pdb_url);
-        if (!pdbResponse.ok) {
-          throw new Error(`Failed to load PDB file: ${pdbResponse.status}`);
-        }
-
-        const pdbData = await pdbResponse.text();
-
-        if (!isMounted) return;
-
+        // Build Mol* structure from the fetched PDB data
         const data = await plugin.builders.data.rawData({
           data: pdbData,
           label: `${accession} Structure`

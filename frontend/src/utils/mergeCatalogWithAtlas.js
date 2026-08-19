@@ -22,7 +22,7 @@ export function normalizeFigureList(raw) {
 /**
  * Build the unified domain model for `/cath-domains` from curated catalog + optional atlas row.
  *
- * @param {import("../data/cathDomainCatalog.js").CathDomainCatalogEntry} catalogEntry
+ * @param {import("../data/pfamProfileCatalog.js").PfamProfileCatalogEntry} catalogEntry
  * @param {{ component: number, cath_domain?: string|null, domain_name?: string|null, family_count: number }|null} atlasRow
  */
 export function buildDomainModelFromCatalog(catalogEntry, atlasRow) {
@@ -38,8 +38,13 @@ export function buildDomainModelFromCatalog(catalogEntry, atlasRow) {
   const familyCount =
     atlasRow != null && atlasRow.family_count != null ? atlasRow.family_count : null
 
+  // atlasRow.domain_name is a generic CATH-fold-level label (e.g. every component under
+  // 3.40.50.1820 comes back as "Alpha/Beta Hydrolase") — the curated, Pfam-specific name from
+  // the literature-review catalog is always more precise, so it takes priority.
   const displayName =
-    (atlasRow?.domain_name && String(atlasRow.domain_name).trim()) || catalogEntry.displayName
+    (catalogEntry.displayName && String(catalogEntry.displayName).trim()) ||
+    (atlasRow?.domain_name && String(atlasRow.domain_name).trim()) ||
+    catalogEntry.pfamAccession
 
   const profileHmmLabel = `${catalogEntry.profileHmm} · ${catalogEntry.pfamAccession}`
 
@@ -92,7 +97,7 @@ export function buildDomainModelFromCatalog(catalogEntry, atlasRow) {
 
 /**
  * Merge full catalog with atlas `/components` array.
- * @param {import("../data/cathDomainCatalog.js").CathDomainCatalogEntry[]} catalog
+ * @param {import("../data/pfamProfileCatalog.js").PfamProfileCatalogEntry[]} catalog
  * @param {{ component: number, cath_domain?: string|null, domain_name?: string|null, family_count: number }[]} atlasComponents
  */
 export function mergeCatalogWithAtlasComponents(catalog, atlasComponents) {

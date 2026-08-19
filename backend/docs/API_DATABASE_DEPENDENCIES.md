@@ -1,6 +1,6 @@
 # PETadex API - Database Dependencies
 
-**Auto-generated**: 2026-07-06
+**Auto-generated**: 2026-07-28
 **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
 
 ---
@@ -40,6 +40,8 @@
 | `/api/gene-metadata/` | GET | gene_metadata |
 | `/api/gene-metadata/:gene` | GET | gene_metadata |
 | `/api/gene-metadata/by-accession/:accession` | GET | gene_metadata |
+| `/api/kinetics/published` | GET | None |
+| `/api/kinetics/published/raw` | GET | public |
 | `/api/orf/:orfId/provenance` | GET | None |
 | `/api/orf/:orfId/domains` | GET | petadex_catalytic_domains, pazy_hmms |
 | `/api/orf/:orfId` | GET | None |
@@ -862,6 +864,41 @@ SELECT
       FROM gene_metadata 
       WHERE accession = $1
       ORDER BY gene ASC
+```
+</details>
+
+---
+
+## Kinetics Routes
+
+Base: `/api/kinetics`
+
+### GET `/api/kinetics/published`
+
+**Tables**: None
+
+<details>
+<summary>SQL Query</summary>
+
+```sql
+SELECT
+```
+</details>
+
+---
+
+### GET `/api/kinetics/published/raw`
+
+**Tables**: public
+
+**Columns**:
+- `public`: plastic_kinetics_published
+
+<details>
+<summary>SQL Query</summary>
+
+```sql
+SELECT * FROM public.plastic_kinetics_published ORDER BY
 ```
 </details>
 

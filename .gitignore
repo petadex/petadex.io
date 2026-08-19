@@ -32,6 +32,9 @@ TMP*
 *tmp
 *TMP
 
+# Atlas poster exports (generated SVGs + cached atlas data)
+atlas-poster/
+
 # ignore dependencies
 node_modules/
 tree_output.txt
@@ -41,3 +44,4 @@ generated-schema 2.md
 docs/.cursor/
 docs/metadata-map.md
 docs/*
+.DS_Store

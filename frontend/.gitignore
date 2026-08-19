@@ -71,6 +71,9 @@ public
 # Mac files
 .DS_Store
 
+# vercel
+.vercel
+
 # Yarn
 yarn-error.log
 .pnp/

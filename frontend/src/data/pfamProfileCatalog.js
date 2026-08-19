@@ -8,7 +8,6 @@
  *
  * In-text [N] citations: paste source URLs into narrative fields. Numbers follow page reading order
  * (overview → sections → inline figure captions). Duplicate PDB/DOI/PMC URLs share one number.
- * Warnings print on `npm run develop`; set VALIDATE_CATH_REFS=strict to fail builds on violations.
  *
  * @typedef {{ label: string, url?: string|null }} PfamProfileReference
  * @typedef {{ label: string, cathId: string }} PfamProfileLegendSegment

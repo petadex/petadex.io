@@ -30,19 +30,31 @@ import { pool } from './db.js';
 
 const app = express();
 
+const staticOrigins = [
+  'https://petadex.net',
+  'https://www.petadex.net',
+  'https://petadex.org',
+  'https://www.petadex.org',
+  'https://api.petadex.org',
+  'http://localhost:8000',
+  'http://localhost:9000',
+  'http://localhost:3000',
+  'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001'
+];
+// Every Vercel deploy (temp `vercel deploy --temporary` links, PR previews) gets its own
+// random *.vercel.app subdomain, so ad hoc frontend previews need a pattern match here
+// instead of a one-off entry that goes stale the moment a new preview URL is minted.
+const vercelPreviewOrigin = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+
 app.use(compression());
 app.use(cors({
-  origin: [
-    'https://petadex.net',
-    'https://www.petadex.net',
-    'https://petadex.org',
-    'https://www.petadex.org',
-    'https://api.petadex.org',
-    'http://localhost:8000',
-    'http://localhost:9000',
-    'http://localhost:3000',
-    'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001'
-  ],
+  origin: (origin, callback) => {
+    // No Origin header = not a browser CORS request (curl, server-to-server); let it through.
+    if (!origin || staticOrigins.includes(origin) || vercelPreviewOrigin.test(origin)) {
+      return callback(null, true);
+    }
+    callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

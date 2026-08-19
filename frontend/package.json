@@ -50,7 +50,6 @@
   "license": "0BSD",
   "scripts": {
     "build": "gatsby build",
-    "build:validate-cath": "cross-env VALIDATE_CATH_REFS=strict gatsby build",
     "develop": "cross-env NODE_OPTIONS='--no-deprecation' gatsby develop",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,css}\"",
     "start": "cross-env NODE_OPTIONS='--no-deprecation' gatsby develop",

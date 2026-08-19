@@ -23,6 +23,9 @@ _site/
 # Details at https://github.com/github/pages-gem/issues/768
 Gemfile.lock
 
+# macOS
+.DS_Store
+
 # Project specific
 local/*
 local*
@@ -31,6 +34,8 @@ tmp*
 TMP*
 *tmp
 *TMP
+.claude/*
+.cursor/*
 
 # Atlas poster exports (generated SVGs + cached atlas data)
 atlas-poster/
@@ -40,8 +45,8 @@ node_modules/
 tree_output.txt
 generated-schema.md
 CLAUDE.md
+AGENTS.md
 generated-schema 2.md
 docs/.cursor/
 docs/metadata-map.md
 docs/*
-.DS_Store

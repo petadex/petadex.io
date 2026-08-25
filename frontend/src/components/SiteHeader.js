@@ -15,8 +15,9 @@ const NAV_ITEMS = [
   },
   { label: "Enzymes", path: "/enzymes", key: "enzymes" },
   { label: "Search", path: "/search", key: "search" },
-  // CATH domains hidden from nav — page still exists at /cath-domains
+  // CATH domains hidden from nav; page still exists at /cath-domains
   { label: "Atlas", path: "/atlas", key: "atlas" },
+  { label: "Organisms", path: "/organisms", key: "organisms" },
 ]
 
 const ChevronDownIcon = ({ open }) => (
@@ -31,7 +32,7 @@ const ChevronDownIcon = ({ open }) => (
   </svg>
 )
 
-// Desktop nav dropdown — opens on hover or click, closes on outside click / Escape.
+// Desktop nav dropdown opens on hover or click, closes on outside click / Escape.
 const NavDropdown = ({ item }) => {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef(null)
@@ -277,7 +278,7 @@ const SiteHeader = () => {
               {dark ? <MoonIcon /> : <SunIcon />}
             </button>
 
-            {/* Hamburger — md and below only, matches desktop nav breakpoint */}
+            {/* Hamburger, md and below only, matches desktop nav breakpoint */}
             <button
               onClick={() => setMobileMenuOpen(true)}
               className={`${iconButtonClass} md:hidden`}

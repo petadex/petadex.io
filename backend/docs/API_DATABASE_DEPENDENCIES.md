@@ -47,6 +47,8 @@
 | `/api/orf/:orfId` | GET | None |
 | `/api/pdb/accession/:accession` | GET | pdb_accessions |
 | `/api/pdb/:pdb_id` | GET | pdb_accessions |
+| `/api/structure/orf/:orfId` | GET | orf_origins, pdb_accessions, block_90pid, pazy/nr catalytic_orfs |
+| `/api/structure/accession/:accession` | GET | pdb_accessions, block_90pid, pazy/nr catalytic_orfs |
 | `/api/petadex-domains/by-accession/:accession` | GET | None |
 | `/api/petadex-domains/:orfId` | GET | None |
 | `/api/plate-data/comparison` | GET | accession_activity_view, gene_metadata |
@@ -988,6 +990,28 @@ SELECT pdb_id, accession, technique, relaxed, date_created, date_entered, alignm
        WHERE pdb_id = $1
 ```
 </details>
+
+---
+
+## Structure Routes
+
+Base: `/api/structure`
+
+Resolves experimental PDB (`pdb_accessions` → `petadex/pdb_structs/`) or predicted
+ESMFold2 mmCIF URLs under `petadex-protein-structures` (see
+`frontend/docs/protein-structures.md`). Does not list ~18M centroids.
+
+### GET `/api/structure/orf/:orfId`
+
+**Parameters**: `orfId`
+
+**Tables**: orf_origins, pdb_accessions, block_90pid, pazy_catalytic_orfs, nr_catalytic_orfs
+
+### GET `/api/structure/accession/:accession`
+
+**Parameters**: `accession`
+
+**Tables**: pdb_accessions, block_90pid, pazy_catalytic_orfs, nr_catalytic_orfs
 
 ---
 

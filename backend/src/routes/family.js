@@ -194,9 +194,13 @@ router.get('/:familyId/tree-members', async (req, res, next) => {
          e.enzyme_id,
          e.genbank_accession_id,
          t.family_pid,
-         t.component
+         t.component,
+         b.organism,
+         b.country
        FROM enzyme_fastaa e
        INNER JOIN enzyme_taxonomy t ON e.enzyme_id = t.enzyme_id
+       LEFT JOIN blast_nr_metadata b
+         ON b.genbank_accession_id = e.genbank_accession_id
        WHERE t.family = $1
        ORDER BY t.family_pid DESC NULLS FIRST, e.enzyme_id`,
       [familyId]

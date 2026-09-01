@@ -1,10 +1,18 @@
-import React, { useMemo } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "gatsby"
 import { CATH_BASE_CSS } from "../../utils/cathColors"
 import { buildCathDomainPetadexLinks } from "../../utils/cathStructureLinks"
-import { pfamEntryUrl, stripRedundantPfamFromDisplayName } from "../../utils/cathDomainSectionConfig"
+import { stripRedundantPfamFromDisplayName } from "../../utils/cathDomainSectionConfig"
 import { renderCaptionWithReferenceAnchors } from "../../utils/cathCaptionLinks"
 import { buildCathReferencePlan } from "../../utils/cathReferencePlan"
+import ProteinViewer from "../protein/ProteinViewer"
+import CathDomainHmmPanel from "./CathDomainHmmPanel"
+import CathDomainArchitecture from "./CathDomainArchitecture"
+
+/** @param {string} pdbId */
+function rcsbDownloadUrl(pdbId) {
+  return `https://files.rcsb.org/download/${pdbId}.pdb`
+}
 
 const overviewRefLinkOptions = {
   numbered: true,
@@ -84,14 +92,26 @@ const CathDomainVisualizationPanel = ({ domain }) => {
   )
 
   const petadexLinks = buildCathDomainPetadexLinks(domain)
+  const pdbIds = useMemo(
+    () =>
+      Array.isArray(domain.pdbIds)
+        ? domain.pdbIds
+            .map(p => String(p || "").toUpperCase())
+            .filter(p => /^[0-9][A-Z0-9]{3}$/.test(p))
+        : [],
+    [domain.pdbIds],
+  )
   const hasPetadexLinks =
-    petadexLinks.atlas || petadexLinks.enzymes || petadexLinks.extras.length > 0
-  const embedPdbId =
-    Array.isArray(domain.pdbIds) && domain.pdbIds.length ? String(domain.pdbIds[0]).toUpperCase() : null
-  const embedUrl =
-    embedPdbId && /^[0-9][A-Z0-9]{3}$/.test(embedPdbId)
-      ? `https://molstar.org/viewer/?pdb=${embedPdbId}`
-      : null
+    petadexLinks.atlas || petadexLinks.enzymes || petadexLinks.extras.length > 0 || pdbIds.length > 0
+
+  const [selectedPdb, setSelectedPdb] = useState(() => pdbIds[0] || "")
+
+  useEffect(() => {
+    setSelectedPdb(pdbIds[0] || "")
+  }, [domain.cathId, domain.profileHmm, pdbIds])
+
+  const activePdb =
+    selectedPdb && pdbIds.includes(selectedPdb) ? selectedPdb : pdbIds[0] || ""
 
   return (
     <div
@@ -105,19 +125,6 @@ const CathDomainVisualizationPanel = ({ domain }) => {
               {domain.profileHmm}
               <span className="text-muted-foreground/70"> · </span>
               {domain.cathId}
-              {domain.pfamAccession ? (
-                <>
-                  <span className="text-muted-foreground/70"> · </span>
-                  <a
-                    href={pfamEntryUrl(domain.pfamAccession)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:text-accent-hover underline underline-offset-2"
-                  >
-                    {domain.pfamAccession}
-                  </a>
-                </>
-              ) : null}
             </p>
             <h2 className="text-xl md:text-2xl font-semibold text-primary m-0">
               {stripRedundantPfamFromDisplayName(domain.displayName, domain.pfamAccession)}
@@ -160,6 +167,8 @@ const CathDomainVisualizationPanel = ({ domain }) => {
             )}
           </div>
         )}
+        <CathDomainHmmPanel domain={domain} />
+        <CathDomainArchitecture pfamAccession={domain.pfamAccession} />
       </div>
 
       <div className="p-5 md:p-6">
@@ -169,7 +178,7 @@ const CathDomainVisualizationPanel = ({ domain }) => {
               Related in PETadex
             </p>
             <p className="text-xs text-muted-foreground mb-3 m-0 leading-relaxed">
-              Atlas links open a filtered UMAP view in a new tab. External sources are in References below.
+              Atlas and structure links open in a new tab. External sources are in References below.
             </p>
             <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
               {petadexLinks.atlas && (
@@ -226,22 +235,68 @@ const CathDomainVisualizationPanel = ({ domain }) => {
                   </li>
                 ),
               )}
+              {pdbIds.map(pdb => (
+                <li key={`pdb-${pdb}`}>
+                  <a
+                    href={`https://www.rcsb.org/structure/${pdb}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-lg border border-input bg-background px-3 py-1.5 text-sm font-medium text-accent hover:bg-muted/50 hover:text-accent-hover transition-colors"
+                  >
+                    Structure {pdb} (RCSB)
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         )}
 
-        {embedUrl ? (
+        {activePdb ? (
           <div className="rounded-xl border border-border bg-muted/10 overflow-hidden">
-            <div className="px-4 py-2 border-b border-border bg-muted/20">
-              <p className="text-sm font-medium text-foreground m-0">In-page 3D embed (Mol*): {embedPdbId}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 border-b border-border bg-muted/20">
+              <p className="text-sm font-medium text-foreground m-0">Structure</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {pdbIds.length > 1 ? (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground m-0">
+                    <span className="sr-only">Select PDB</span>
+                    <select
+                      className="rounded-md border border-input bg-background px-2 py-1 text-sm font-mono text-foreground"
+                      value={activePdb}
+                      onChange={e => setSelectedPdb(e.target.value)}
+                      aria-label="Select structure PDB ID"
+                    >
+                      {pdbIds.map(pdb => (
+                        <option key={pdb} value={pdb}>
+                          {pdb}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <span className="text-sm font-mono text-muted-foreground">{activePdb}</span>
+                )}
+                <a
+                  href={rcsbDownloadUrl(activePdb)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-lg border border-input bg-background px-3 py-1.5 text-xs font-medium text-accent hover:bg-muted/50 hover:text-accent-hover transition-colors"
+                >
+                  Download PDB
+                </a>
+              </div>
             </div>
-            <iframe
-              title={`Molstar viewer ${embedPdbId}`}
-              src={embedUrl}
-              className="w-full h-[420px] border-0"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
+            <div className="bg-neutral-950" style={{ height: 450 }}>
+              <ProteinViewer
+                key={activePdb}
+                accession={rcsbDownloadUrl(activePdb)}
+                initialStyle="cartoon"
+                showControls={false}
+                height="100%"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground px-4 py-2 m-0 border-t border-border bg-muted/10">
+              Use mouse to rotate (left-click), zoom (scroll), or pan (right-click).
+            </p>
           </div>
         ) : (
           <div

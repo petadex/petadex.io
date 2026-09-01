@@ -35,6 +35,10 @@ TMP*
 *tmp
 *TMP
 .claude/*
+.cursor/*
+
+# Vercel local project linkage (.vercel/project.json etc.)
+.vercel/
 
 # Atlas poster exports (generated SVGs + cached atlas data)
 atlas-poster/

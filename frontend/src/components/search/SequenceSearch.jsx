@@ -3,6 +3,11 @@
  *
  * Input form only. On submit navigates to /results?job={sessionId}
  * All polling and result rendering lives in pages/results.js.
+ *
+ * Note there is deliberately no "max results" control here. Result count is a
+ * *view* concern, not a search parameter — every search runs to the fixed
+ * SEARCH_RESULT_DEPTH and ResultsView subsets it. See components/search/
+ * constants.js for why (a depth change used to force a full ~46 s re-search).
  */
 import React, { useState, useEffect } from "react"
 import { navigate } from "gatsby"
@@ -10,6 +15,7 @@ import config from "../../config"
 import ExampleCards from "./ExampleCards"
 import SearchHistory from "./SearchHistory"
 import { cleanSequence } from "../../utils/lib"
+import { SEARCH_RESULT_DEPTH } from "./constants"
 
 const EXAMPLE_SEQUENCES = {
   isPETase: `>IsPETase (WP_054022242.1)
@@ -18,7 +24,6 @@ MNFPRASRLMQAAVLGGLMAVSAAATAQTNPYARGPNPTAASLEASAGPFTVRSFTVSRPSGYGAGTVYYPTNAGGTVGA
 
 const SequenceSearch = () => {
   const [sequence, setSequence] = useState("")
-  const [maxResults, setMaxResults] = useState(50)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -52,7 +57,9 @@ const SequenceSearch = () => {
       const response = await fetch(`${searchApiUrl}/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequence, max_results: maxResults }),
+        // Constant depth, never a user choice: the caller's count no longer
+        // selects how deep DIAMOND searches, only how deep the stored result is.
+        body: JSON.stringify({ sequence, max_results: SEARCH_RESULT_DEPTH }),
       })
 
       const data = await response.json()
@@ -129,25 +136,6 @@ const SequenceSearch = () => {
             IsPETase
           </button>
         </p>
-      </div>
-
-      {/* Options row */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          Max results:
-          <select
-            value={maxResults}
-            onChange={e => setMaxResults(parseInt(e.target.value, 10))}
-            disabled={submitting}
-            className="bg-background border border-input text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring disabled:opacity-60 transition-colors"
-          >
-            {[10, 25, 50, 100, 250].map(n => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       {/* Submit */}

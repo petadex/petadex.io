@@ -8,6 +8,7 @@ import config from "../config"
 import { addJobId } from "../utils/session"
 import SearchHistory from "../components/search/SearchHistory"
 import ResultsView from "../components/search/ResultsView"
+import { DEFAULT_RESULT_VIEW } from "../components/search/constants"
 import Container from "../components/common/Container"
 import { LOADING_PROMPTS } from "../components/common/TerminalLoader"
 import {
@@ -79,6 +80,9 @@ function transformResults(rawResults, queryLength) {
       query_end: hit.query_end,
       target_start: hit.target_start,
       target_end: hit.target_end,
+      // Full subject protein (DIAMOND full_sseq). Null on hits merged from a
+      // part written by a pre-1.3.0 worker.
+      target_sequence: hit.target_sequence ?? null,
       enzyme_id: hit.enzyme_id ?? null,
       family: hit.family ?? null,
       component: hit.component ?? null,
@@ -261,6 +265,10 @@ const ResultsPage = () => {
   const [error, setError] = useState(null)
   const [elapsed, setElapsed] = useState(0)
   const [newSearchCount, setNewSearchCount] = useState(0)
+  // How many rows to ask Express for. The server slices the stored result before
+  // enriching it, so this bounds a Postgres round trip — it is not just cosmetic.
+  const [viewCount, setViewCount] = useState(DEFAULT_RESULT_VIEW)
+  const [viewPending, setViewPending] = useState(false)
 
   const pollRef = useRef(null)
   const timerRef = useRef(null)
@@ -282,37 +290,68 @@ const ResultsPage = () => {
     [stopAll]
   )
 
+  const applyResults = useCallback(data => {
+    setResults(
+      transformResults(
+        data.results,
+        data.query_length || data.metadata?.query_length
+      )
+    )
+    setMetadata(
+      data.metadata || {
+        query_header: data.query_header,
+        query_sequence: data.query_sequence,
+        query_length: data.query_length,
+        num_results: data.num_results,
+        database_size: data.database_size,
+        search_time_ms: data.search_time_ms,
+        timestamp: data.timestamp,
+      }
+    )
+  }, [])
+
   const handleResults = useCallback(
     (data, sid) => {
       stopAll()
       addJobId(data.job_id || sid)
-      setResults(
-        transformResults(
-          data.results,
-          data.query_length || data.metadata?.query_length
-        )
-      )
-      setMetadata(
-        data.metadata || {
-          query_header: data.query_header,
-          query_sequence: data.query_sequence,
-          query_length: data.query_length,
-          num_results: data.num_results,
-          database_size: data.database_size,
-          search_time_ms: data.search_time_ms,
-          timestamp: data.timestamp,
-        }
-      )
+      applyResults(data)
       setStatus("completed")
       setNewSearchCount(n => n + 1)
     },
-    [stopAll]
+    [stopAll, applyResults]
+  )
+
+  // Changing the row count re-fetches a deeper slice of the SAME stored result.
+  // The sessionId is unchanged, so this is a cache hit by construction — it can
+  // never re-run the search. Safe to fire only after completion, which is the
+  // only time ResultsView (and therefore the selector) is on screen.
+  const handleViewCountChange = useCallback(
+    async next => {
+      setViewCount(next)
+      setViewPending(true)
+      try {
+        const resp = await fetch(
+          `${searchApiUrl}/search/results/${sessionId}?max_results=${next}`
+        )
+        const data = await resp.json()
+        if (resp.ok && data.status === "completed") applyResults(data)
+      } catch {
+        // Keep the rows already on screen; the selector reverts on next change.
+      } finally {
+        setViewPending(false)
+      }
+    },
+    [searchApiUrl, sessionId, applyResults]
   )
 
   const poll = useCallback(
     async sid => {
       try {
-        const resp = await fetch(`${searchApiUrl}/search/results/${sid}`)
+        // viewCount is the initial default here: polling stops the moment the
+        // result lands, so it can't be stale by the time the user can change it.
+        const resp = await fetch(
+          `${searchApiUrl}/search/results/${sid}?max_results=${viewCount}`
+        )
         const data = await resp.json()
         if (!resp.ok) {
           failWithError(data.error || `Server error ${resp.status}`, sid)
@@ -325,7 +364,7 @@ const ResultsPage = () => {
         failWithError("Failed to fetch results. Please try again.", sid)
       }
     },
-    [searchApiUrl, failWithError, handleResults]
+    [searchApiUrl, failWithError, handleResults, viewCount]
   )
 
   useEffect(() => {
@@ -381,6 +420,9 @@ const ResultsPage = () => {
               metadata={metadata}
               sessionId={sessionId}
               onNewSearch={handleNewSearch}
+              viewCount={viewCount}
+              onViewCountChange={handleViewCountChange}
+              viewPending={viewPending}
             />
           )}
           {status === "error" && error && (

@@ -9,6 +9,7 @@ import { TaxonomyScatterChart } from "../charts/TaxonomyScatterChart"
 import AlignmentCoverageMap from "../charts/AlignmentCoverageMap"
 import { FunctionalAnnotationChart } from "../charts/FunctionalAnnotationChart"
 import SequenceViewer from "../sequence/SequenceViewer"
+import { SEARCH_RESULT_DEPTH, resultViewOptions } from "./constants"
 
 // Deterministic per-family color — must match enzymes.js
 function familyColor(familyId) {
@@ -23,7 +24,15 @@ const TABS = [
   { id: "atlas", label: "Atlas" },
 ]
 
-const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
+const ResultsView = ({
+  results: allResults,
+  metadata,
+  sessionId,
+  onNewSearch,
+  viewCount,
+  onViewCountChange,
+  viewPending = false,
+}) => {
   const [activeTab, setActiveTab] = useState("descriptions")
   const [familySummaryOpen, setFamilySummaryOpen] = useState(true)
   const [queryOpen, setQueryOpen] = useState(false)
@@ -31,6 +40,29 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
   const [copied, setCopied] = useState(false)
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState("asc")
+
+  // `allResults` is only what Express sent for the current view count — the
+  // stored result is `num_results` deep, and that total is what the selector
+  // has to offer. `result_depth` is stamped by the aggregator; until that
+  // ships, fall back to the depth the client asks for.
+  const totalHits = metadata?.num_results ?? allResults.length
+  const resultDepth = metadata?.result_depth ?? SEARCH_RESULT_DEPTH
+  const viewOptions = resultViewOptions(totalHits, resultDepth)
+  const maxView = viewOptions[viewOptions.length - 1] ?? 0
+  const shownCount = Math.min(viewCount, maxView)
+
+  // Defensive re-slice. Express already trimmed to the requested count before
+  // enriching, so this is normally a no-op; it only bites if a response carries
+  // more rows than the current selection (e.g. a stale in-flight fetch).
+  const results = useMemo(
+    () => allResults.slice(0, shownCount),
+    [allResults, shownCount]
+  )
+
+  // num_results < result_depth means DIAMOND's e-value floor ran out of hits
+  // before the depth cap did — the search was exhaustive, so every hit above the
+  // significance threshold is reachable and no count can ever re-run the search.
+  const isExhaustive = totalHits < resultDepth
 
   const hitFamilyIds = useMemo(
     () => new Set(results.map(h => h.family).filter(f => f != null)),
@@ -145,6 +177,10 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
       "Identity (%)",
       "E-value",
       "Coverage (%)",
+      // Last, like DIAMOND's own full_sseq column: it is by far the widest
+      // field (~314 aa median) and would push everything else off-screen in a
+      // spreadsheet anywhere else in the row.
+      "Target sequence",
     ]
     const rows = results.map(h => [
       h.rank,
@@ -155,6 +191,9 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
       h.identity?.toFixed(1) ?? "",
       h.evalue ?? "",
       h.query_coverage ?? "",
+      // The full subject protein, not the aligned segment. Empty for a hit
+      // merged from a part written by a pre-1.3.0 worker, which stores null.
+      h.target_sequence || "",
     ])
     downloadCSV(
       generateCSV(headers, rows),
@@ -179,9 +218,9 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
       <div className="flex justify-between items-start mb-4 gap-2 py-4">
         <div>
           <h2 className="text-lg">
-            {results.length === 0
+            {allResults.length === 0
               ? "No results found"
-              : `${results.length} sequences found`}
+              : `${totalHits} sequences found`}
           </h2>
           {metadata && (
             <p className="text-xs text-muted-foreground">
@@ -195,6 +234,43 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
                 .filter(Boolean)
                 .join("  ·  ")}
             </p>
+          )}
+          {viewOptions.length > 1 && (
+            <div className="flex items-center gap-2 mt-2 text-sm text-foreground">
+              <label className="flex items-center gap-2">
+                Show
+                <select
+                  value={shownCount}
+                  onChange={e =>
+                    onViewCountChange(parseInt(e.target.value, 10))
+                  }
+                  disabled={viewPending}
+                  className="bg-background border border-input text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring disabled:opacity-60 transition-colors"
+                >
+                  {viewOptions.map(n => (
+                    <option key={n} value={n}>
+                      {n === maxView ? `All (${n})` : n}
+                    </option>
+                  ))}
+                </select>
+                of {totalHits} hits
+              </label>
+              {viewPending && (
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-border border-t-accent animate-spin" />
+              )}
+              <span
+                className="text-xs text-muted-foreground"
+                title={
+                  isExhaustive
+                    ? "Every hit above DIAMOND's significance cutoff was stored — showing more re-reads the cached result, it never re-runs the search."
+                    : `The search stored the top ${resultDepth} hits; more may exist below this depth.`
+                }
+              >
+                {isExhaustive
+                  ? "· complete result set"
+                  : `· capped at search depth ${resultDepth}`}
+              </span>
+            </div>
           )}
         </div>
         <div className="flex gap-1">
@@ -246,7 +322,7 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
           )}
         </div>
       )}
-      {results.length === 0 ? (
+      {allResults.length === 0 ? (
         <div className="p-3 text-center text-muted-foreground">
           <p>No similar sequences were found in the PETadex database.</p>
           <p>
@@ -391,10 +467,15 @@ const ResultsView = ({ results, metadata, sessionId, onNewSearch }) => {
                   <button
                     className="btn btn-outline"
                     onClick={handleDownloadJSON}
+                    title={`Downloads the ${results.length} hits currently shown`}
                   >
                     ⬇ Download JSON
                   </button>
-                  <button className="btn btn-outline" onClick={handleDownload}>
+                  <button
+                    className="btn btn-outline"
+                    onClick={handleDownload}
+                    title={`Downloads the ${results.length} hits currently shown`}
+                  >
                     ⬇ Download CSV
                   </button>
                 </div>

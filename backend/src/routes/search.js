@@ -56,6 +56,29 @@ const RESULTS_BUCKET = process.env.RESULTS_BUCKET || 'petadex';
 const RESULTS_PREFIX = process.env.RESULTS_PREFIX || 'results';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'ababaian/petadex.io';
 
+// ─── Result depth ────────────────────────────────────────────────────────────
+// Search depth is a SERVER constant, never caller-controlled. A request's
+// `max_results` is purely presentational: it selects rows for display, never
+// reaches DIAMOND, and is not in the cache key. See "12 Variable Result Count".
+//
+// Why Express substitutes it rather than just forwarding the caller's value:
+// dropping `max_results` from the cache key is only safe if it has ALSO stopped
+// parameterising the search — otherwise a 20-row result cached under the
+// version-only key is silently served to someone who asked for 200. The
+// orchestrator's own RESULT_DEPTH (Part A) closes that, but it is not deployed
+// yet, so Express injects the constant one layer up and the trap is shut either
+// way. Post-deploy the orchestrator ignores what we send and this becomes a
+// harmless no-op.
+//
+// Held at 250 — the deepest count the search UI ever offered — because the §9
+// benchmark that would authorise the orchestrator's 500 has not been run.
+// Overridable for ops without a redeploy of intent.
+const RESULT_DEPTH = Number.parseInt(process.env.SEARCH_RESULT_DEPTH, 10) || 250;
+
+// Rows returned when a caller doesn't ask for a count. Matches the old
+// `max_results` default, so an un-parameterised poll looks exactly as it did.
+const DEFAULT_VIEW_RESULTS = 50;
+
 function getLambdaClient() {
   if (!lambdaClient) {
     lambdaClient = new LambdaClient({
@@ -85,9 +108,18 @@ async function streamToString(stream) {
 // Defaults are a visible sentinel, not '': an accidentally version-omitted call
 // then produces a distinct, identifiable key instead of silently colliding with
 // a real search's key.
-function makeSessionId(cleanSequence, maxResults, databaseVersion = 'unset', searchVersion = 'unset') {
+//
+// `maxResults` is deliberately NOT a key input. Keying on it meant that asking
+// for 100 hits instead of 50 was a cache miss, re-running the entire 32-shard
+// fan-out (~46 s, 32 Lambdas) to surface rows the previous job had already
+// ranked and discarded. Depth is now a server constant, so all view counts for
+// one query share a single stored result. Note this re-keys the whole cache
+// once — the legacy md5(seq:maxResults:...) keyspace is orphaned in one shot
+// (see the note's "Re-keying cost"), which is also what guarantees any entry
+// this code can now resolve was written by this code, at RESULT_DEPTH.
+function makeSessionId(cleanSequence, databaseVersion = 'unset', searchVersion = 'unset') {
   return createHash('md5')
-    .update(`${cleanSequence}:${maxResults}:${databaseVersion}:${searchVersion}`)
+    .update(`${cleanSequence}:${databaseVersion}:${searchVersion}`)
     .digest('hex');
 }
 
@@ -133,6 +165,11 @@ async function getSearchVersions() {
     const value = {
       databaseVersion: parsed.database_version,
       searchVersion: parsed.search_version,
+      // How deep a FRESH search will store, straight from the orchestrator.
+      // Deliberately OPTIONAL, unlike the two versions above: it only appears
+      // once Part A ships, and requiring it would throw → null → nonce → every
+      // single request forced to re-search. Null means "ask RESULT_DEPTH".
+      resultDepth: Number.isInteger(parsed.result_depth) ? parsed.result_depth : null,
     };
     _versionCache = { value, expires: Date.now() + VERSION_TTL_MS };
     return value;
@@ -191,8 +228,14 @@ function sendError(res, statusCode, message, jobId = null) {
   return res.status(statusCode).json(payload);
 }
 
-function transformResults(rawResults, queryLength) {
-  return (rawResults || []).map((hit, index) => ({
+// `maxResults` trims the RAW array before the map, and that ordering is the
+// whole point: on the poll path every transformed hit's accession is fed to
+// enrichWithFamilyData(), a three-way CTE round trip to Postgres. Slicing after
+// the map would run that query over the full stored depth on every request, to
+// enrich rows the caller will never see — invisible in testing, just slower
+// forever. Ranks stay 1..N naturally because the stored list is already sorted.
+function transformResults(rawResults, queryLength, maxResults = Infinity) {
+  return (rawResults || []).slice(0, maxResults).map((hit, index) => ({
     rank: index + 1,
     accession: hit.target_id,
     target_id: hit.target_id,
@@ -211,6 +254,11 @@ function transformResults(rawResults, queryLength) {
     query_end: hit.query_end,
     target_start: hit.target_start,
     target_end: hit.target_end,
+    // DIAMOND `full_sseq` — the complete subject protein, not the aligned
+    // segment. Shipped by the Lambda since search_version 1.3.0 but dropped
+    // here by this whitelist, so it never reached the browser. `null` for a hit
+    // merged from a part written by a pre-1.3.0 worker.
+    target_sequence: hit.target_sequence ?? null,
   }));
 }
 
@@ -226,6 +274,12 @@ const searchSchema = Joi.object({
     .messages({ 'string.pattern.base': 'Sequence contains unrecognized characters. Use standard amino acid codes (single-letter).' }),
   max_results: Joi.number().integer().min(1).max(500).default(50),
 });
+
+// Display count on the poll path. Purely presentational: it slices an already
+// stored result and can never trigger a search, so unlike the POST path there is
+// no miss rule and no clamp — asking deeper than the stored result simply
+// returns all of it.
+const viewCountSchema = Joi.number().integer().min(1).max(500).default(DEFAULT_VIEW_RESULTS);
 
 const jobIdSchema = Joi.alternatives().try(
   Joi.string().pattern(/^[a-f0-9]{32}$/),                    // MD5 sessionId
@@ -400,8 +454,9 @@ async function resolveErrorSignal(s3, sessionId) {
  * POST /api/search
  *
  * 1. Validate body
- * 2. MD5(sequence + max_results + databaseVersion + searchVersion) = sessionId
- *    (versions fetched live so a corpus/pipeline change busts the cache)
+ * 2. MD5(sequence + databaseVersion + searchVersion) = sessionId
+ *    (versions fetched live so a corpus/pipeline change busts the cache;
+ *     max_results is NOT a key input — it selects rows for display only)
  * 3. Check index file — return cached results immediately if found
  * 4. Fire Lambda async (Event) — returns 202 immediately
  * 5. Client polls GET /api/search/results/{sessionId}
@@ -421,11 +476,19 @@ router.post('/', async (req, res, next) => {
     // result from a prior corpus/pipeline under an unchanged key.
     const versions = await getSearchVersions();
     const sessionId = versions
-      ? makeSessionId(cleanSequence, max_results, versions.databaseVersion, versions.searchVersion)
+      ? makeSessionId(cleanSequence, versions.databaseVersion, versions.searchVersion)
       // Version lookup failed: force a miss with a per-request nonce so we recompute
       // rather than risk serving a stale entry. ('unknown' marks it; the nonce
       // guarantees uniqueness so two failed requests can't collide on each other.)
-      : makeSessionId(cleanSequence, max_results, 'unknown', randomUUID());
+      : makeSessionId(cleanSequence, 'unknown', randomUUID());
+
+    // What a fresh search will actually store: the orchestrator's own depth once
+    // Part A is deployed, otherwise the depth we're about to ask it for.
+    const searchDepth = versions?.resultDepth ?? RESULT_DEPTH;
+    // Clamp the display count to what the system can produce. Without this a
+    // caller could ask for more than any search stores and miss forever: miss →
+    // re-run at searchDepth → still short → miss again.
+    const requested = Math.min(max_results, searchDepth);
     const s3 = getS3Client();
 
     // ── Cache lookup via index file ───────────────────────────────────────────
@@ -438,6 +501,21 @@ router.post('/', async (req, res, next) => {
     } catch (cacheErr) {
       console.warn(`Cache lookup failed for sessionId=${sessionId}, treating as miss:`, cacheErr.message);
     }
+    // A stored result is reusable for ANY count up to the depth it was stored
+    // at, so only a request deeper than the stored depth is a genuine miss.
+    // `result_depth` is stamped by the aggregator (Part A); an unstamped entry
+    // must have been written by this code — the re-key orphaned every older
+    // entry — so it holds searchDepth rows. Caveat: raising RESULT_DEPTH while
+    // unstamped entries are still live needs a deliberate SEARCH_VERSION bump,
+    // since nothing in an unstamped doc records the shallower depth.
+    if (cached) {
+      const storedDepth = cached.data.result_depth ?? searchDepth;
+      if (requested > storedDepth) {
+        console.log(`Cache too shallow – sessionId=${sessionId} requested=${requested} stored_depth=${storedDepth}; re-running`);
+        cached = null;
+      }
+    }
+
     if (cached) {
       console.log(`Cache hit – sessionId=${sessionId} job=${cached.jobId}`);
       return res.json({
@@ -445,12 +523,15 @@ router.post('/', async (req, res, next) => {
         session_id: sessionId,
         status: 'completed',
         cached: true,
-        results: transformResults(cached.data.results, cached.data.query_length),
+        results: transformResults(cached.data.results, cached.data.query_length, requested),
         metadata: {
           query_header: cached.data.query_header,
           query_sequence: cached.data.query_sequence,
           query_length: cached.data.query_length,
+          // Total stored, NOT the number returned above — the client needs it to
+          // know how many more rows it could ask for without a re-search.
           num_results: cached.data.num_results,
+          result_depth: cached.data.result_depth ?? searchDepth,
           database_size: cached.data.database_size,
           search_time_ms: cached.data.search_time_ms,
           timestamp: cached.data.timestamp,
@@ -468,7 +549,11 @@ router.post('/', async (req, res, next) => {
         Payload: JSON.stringify({
           sessionId: sessionId,
           sequence: sequence,
-          max_results: max_results,
+          // The server constant, never the caller's value. This is what makes
+          // dropping max_results from the cache key safe while Part A is still
+          // undeployed: every entry under a given key holds the same depth, so
+          // no request can be served a result shallower than it asked for.
+          max_results: RESULT_DEPTH,
         }),
       }));
       console.log(`Lambda invoked async – sessionId=${sessionId}`);
@@ -538,6 +623,9 @@ router.get('/results/:job_id', async (req, res, next) => {
     const { error, value: jobId } = jobIdSchema.validate(req.params.job_id);
     if (error) return sendError(res, 400, 'Invalid job_id format.');
 
+    const { error: viewErr, value: viewCount } = viewCountSchema.validate(req.query.max_results);
+    if (viewErr) return sendError(res, 400, `Invalid max_results: ${viewErr.details[0].message}`);
+
     const s3 = getS3Client();
 
     // MD5 sessionId or regen_example_* — check index file
@@ -580,7 +668,9 @@ router.get('/results/:job_id', async (req, res, next) => {
         return res.json({ status: 'processing', session_id: jobId });
       }
 
-      const transformedResults = transformResults(result.data.results, result.data.query_length)
+      // Sliced here, before enrichWithFamilyData below — the DB round trip must
+      // scale with what the caller renders, not with the full stored depth.
+      const transformedResults = transformResults(result.data.results, result.data.query_length, viewCount)
 
       // Enrich with family/component data from DB, then check S3 for tree files
       try {
@@ -615,7 +705,9 @@ router.get('/results/:job_id', async (req, res, next) => {
           query_header: result.data.query_header,
           query_sequence: result.data.query_sequence,
           query_length: result.data.query_length,
+          // Total stored, NOT the length of `results` above.
           num_results: result.data.num_results,
+          result_depth: result.data.result_depth ?? null,
           database_size: result.data.database_size,
           search_time_ms: result.data.search_time_ms,
           timestamp: result.data.timestamp,

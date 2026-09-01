@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { getCathSectionNavItems } from "../../utils/cathDomainSectionConfig"
+import { getCatSectionNavItems } from "../../utils/catDomainSectionConfig"
 
 const linkBase =
   "block rounded-md px-2.5 py-1.5 no-underline transition-colors text-sm leading-snug"
@@ -14,11 +14,12 @@ function navLinkClass(active) {
 }
 
 /**
- * In-page section nav — vertical sidebar on large screens, compact row on small screens.
- * @param {{ domain: Record<string, unknown>, className?: string }} props
+ * In-page section nav for a CATH-domain view. vertical sidebar on large screens, compact row on
+ * small screens.
+ * @param {{ catDomain: Record<string, unknown>, className?: string }} props
  */
-const CathDomainSectionNav = ({ domain, className = "" }) => {
-  const items = useMemo(() => getCathSectionNavItems(domain), [domain])
+const CatDomainSectionNav = ({ catDomain, className = "" }) => {
+  const items = useMemo(() => getCatSectionNavItems(catDomain), [catDomain])
   const [activeId, setActiveId] = useState(items[0]?.id ?? "")
   const scrollLockRef = useRef(false)
 
@@ -47,7 +48,7 @@ const CathDomainSectionNav = ({ domain, className = "" }) => {
     }
 
     return () => observer.disconnect()
-  }, [domain.id, items])
+  }, [catDomain.cathId, items])
 
   const handleNavClick = (event, id) => {
     event.preventDefault()
@@ -74,11 +75,7 @@ const CathDomainSectionNav = ({ domain, className = "" }) => {
 
   return (
     <>
-      {/* Small screens: compact inline nav (not sticky) */}
-      <nav
-        aria-label="On this page"
-        className={`lg:hidden mb-6 md:mb-8 ${className}`}
-      >
+      <nav aria-label="On this page" className={`lg:hidden mb-6 md:mb-8 ${className}`}>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 m-0">
           On this page
         </p>
@@ -97,11 +94,7 @@ const CathDomainSectionNav = ({ domain, className = "" }) => {
         </ul>
       </nav>
 
-      {/* Large screens: sticky sidebar in left margin */}
-      <nav
-        aria-label="On this page"
-        className={`hidden lg:block sticky top-20 self-start pt-1 ${className}`}
-      >
+      <nav aria-label="On this page" className={`hidden lg:block sticky top-20 self-start pt-1 ${className}`}>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 m-0">
           On this page
         </p>
@@ -131,5 +124,4 @@ const CathDomainSectionNav = ({ domain, className = "" }) => {
   )
 }
 
-export default CathDomainSectionNav
-
+export default CatDomainSectionNav

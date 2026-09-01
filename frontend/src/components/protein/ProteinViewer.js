@@ -22,6 +22,8 @@ const EMPTY_ANNOTATIONS = Object.freeze([]);
 
 const ProteinViewer = ({
   accession,
+  /** Optional direct PDB file URL (e.g. RCSB download). Skips /api/pdb lookup. */
+  structureUrl = null,
   width = "100%",
   height = "100%",
   showControls = true,
@@ -101,7 +103,7 @@ const ProteinViewer = ({
   }, [hoverTip, pinnedAnnotation, bumpLayout, loading]);
 
   useEffect(() => {
-    if (!accession || typeof window === 'undefined') return;
+    if ((!accession && !structureUrl) || typeof window === 'undefined') return;
 
     let plugin = null;
     let isMounted = true;
@@ -153,30 +155,38 @@ const ProteinViewer = ({
 
         pluginRef.current = plugin;
 
-        // --------------------------------------------------------------
-        // Fetch PDB data: either direct URL (starts with http) or via API
-        // --------------------------------------------------------------
+        // Fetch PDB: structureUrl prop, accession as direct URL, or /api/pdb lookup.
         let pdbData;
-        if (accession.startsWith('http')) {
-          // Direct S3 (or any) URL – fetch the PDB file contents directly
-          const response = await fetch(accession);
+        let label = accession ? `${accession} Structure` : "Structure";
+        const directUrl =
+          structureUrl ||
+          (accession && String(accession).startsWith("http") ? accession : null);
+
+        if (directUrl) {
+          const response = await fetch(directUrl);
           if (!response.ok) {
             throw new Error(`Failed to load PDB from URL: ${response.status}`);
           }
           pdbData = await response.text();
+          if (structureUrl && accession) {
+            label = `${accession} Structure`;
+          } else if (structureUrl) {
+            label = "Structure";
+          }
         } else {
-          // Original API flow for protein accessions
           const apiUrl = `${config.apiUrl}/pdb/accession/${accession}`;
           const response = await fetch(apiUrl);
           if (!response.ok) {
-            throw new Error('No structure available');
+            throw new Error("No structure available");
           }
           const pdbInfo = await response.json();
+          if (!isMounted) return;
           const pdbResponse = await fetch(pdbInfo.pdb_url);
           if (!pdbResponse.ok) {
             throw new Error(`Failed to load PDB file: ${pdbResponse.status}`);
           }
           pdbData = await pdbResponse.text();
+          label = `${accession} Structure`;
         }
 
         if (!isMounted) return;
@@ -184,7 +194,7 @@ const ProteinViewer = ({
         // Build Mol* structure from the fetched PDB data
         const data = await plugin.builders.data.rawData({
           data: pdbData,
-          label: `${accession} Structure`
+          label,
         });
 
         const trajectory = await plugin.builders.structure.parseTrajectory(data, 'pdb');
@@ -307,6 +317,7 @@ const ProteinViewer = ({
     };
   }, [
     accession,
+    structureUrl,
     showControls,
     initialStyle,
     enableMeasurement,

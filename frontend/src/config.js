@@ -35,6 +35,16 @@ const config = {
   atlasDataUrl:
     process.env.GATSBY_ATLAS_DATA_URL ||
     'https://petadex.s3.amazonaws.com/atlas/umap.json.gz',
+
+  // Long CATH-domain narrative JSON on S3 (not in the JS bundle).
+  cathDomainContentBaseUrl:
+    process.env.GATSBY_CATH_DOMAIN_CONTENT_BASE_URL ||
+    'https://petadex.s3.amazonaws.com/cath-domains',
+
+  // Methodology article JSON on S3.
+  methodologyContentUrl:
+    process.env.GATSBY_METHODOLOGY_CONTENT_URL ||
+    'https://petadex.s3.amazonaws.com/docs/methodology.json',
 };
 
 export default config;

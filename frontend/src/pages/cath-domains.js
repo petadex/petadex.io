@@ -5,57 +5,51 @@ import { useScrollHeader } from "../hooks/useScrollHeader"
 import Container from "../components/common/Container"
 import config from "../config"
 import CathDomainHero from "../components/cath/CathDomainHero"
-import CathDomainProfileSelector from "../components/cath/CathDomainProfileSelector"
-import CathDomainVisualizationPanel from "../components/cath/CathDomainVisualizationPanel"
-import CathDomainSectionNav from "../components/cath/CathDomainSectionNav"
-import CathDomainNarrativeSections from "../components/cath/CathDomainNarrativeSections"
-import CathDomainFiguresAndRefs from "../components/cath/CathDomainFiguresAndRefs"
+import CatDomainDashboard from "../components/cath/CatDomainDashboard"
+import CathClassificationPopup from "../components/cath/CathClassificationPopup"
+import CatDomainOverviewPanel from "../components/cath/CatDomainOverviewPanel"
+import CatDomainSectionNav from "../components/cath/CatDomainSectionNav"
+import CatDomainMechanismPanel from "../components/cath/CatDomainMechanismPanel"
+import CatDomainProseSections, {
+  CatDomainStructuralArchitecture,
+  CatDomainStructureEmbed,
+} from "../components/cath/CatDomainProseSections"
+import CatDomainStructuresTable from "../components/cath/CatDomainStructuresTable"
+import CatDomainMemberHmms from "../components/cath/CatDomainMemberHmms"
+import CatDomainLogoGallery from "../components/cath/CatDomainLogoGallery"
+import CatDomainReferences from "../components/cath/CatDomainReferences"
 import { CATH_DOMAIN_CATALOG } from "../data/cathDomainCatalog"
 import { mergeCatalogWithAtlasComponents } from "../utils/mergeCatalogWithAtlas"
-import { stripRedundantPfamFromDisplayName } from "../utils/cathDomainSectionConfig"
+import { buildCatDomainModels } from "../utils/buildCatDomainModels"
+import { fetchCathDomainNarrative } from "../utils/cathRemoteContent"
 
 function parseCathQuery(search) {
   const params = new URLSearchParams(search || "")
-  const component = params.get("component")
   const cath = params.get("cath")
-  const pfam = params.get("pfam")
-  const id = params.get("id")
+  const legacy = ["id", "pfam", "component", "view"].some(k => {
+    const v = params.get(k)
+    return v != null && v !== ""
+  })
   return {
-    componentNum: component != null && component !== "" ? parseInt(component, 10) : null,
     cathRaw: cath != null && cath !== "" ? decodeURIComponent(cath.trim()) : null,
-    pfamRaw: pfam != null && pfam !== "" ? pfam.trim().toUpperCase() : null,
-    idRaw: id != null && id !== "" ? id.trim() : null,
-    hasComponentParam: component != null && component !== "",
+    hasLegacyParams: legacy,
   }
 }
 
-function pickIdFromQuery(domainModels, { componentNum, cathRaw, pfamRaw, idRaw }) {
-  if (!domainModels.length) return null
-  if (idRaw) {
-    const byId = domainModels.find(d => d.id === idRaw)
-    if (byId) return byId.id
+function mergeNarrative(baseDomain, narrative) {
+  if (!narrative || typeof narrative !== "object") return baseDomain
+  const mechanism = {
+    ...(baseDomain.mechanism || {}),
+    ...(narrative.mechanism || {}),
   }
-  if (pfamRaw) {
-    const acc = pfamRaw.startsWith("PF") ? pfamRaw : `PF${pfamRaw}`
-    const byPf = domainModels.find(
-      d => d.pfamAccession === acc || d.id === `pf-${acc}` || d.id === acc.toLowerCase(),
-    )
-    if (byPf) return byPf.id
+  return {
+    ...baseDomain,
+    ...narrative,
+    mechanism,
+    representativeStructures:
+      narrative.representativeStructures || baseDomain.representativeStructures,
+    hmmMethod: { ...(baseDomain.hmmMethod || {}), ...(narrative.hmmMethod || {}) },
   }
-  if (Number.isFinite(componentNum)) {
-    const matches = domainModels.filter(d => d.component === componentNum)
-    if (matches.length >= 1) return matches[0].id
-  }
-  if (cathRaw) {
-    const byCath = domainModels.find(d => d.cathId === cathRaw)
-    if (byCath) return byCath.id
-  }
-  return null
-}
-
-function domainsForComponent(domainModels, componentNum) {
-  if (!Number.isFinite(componentNum)) return []
-  return domainModels.filter(d => d.component === componentNum)
 }
 
 const CathDomainsPage = ({ location }) => {
@@ -64,7 +58,9 @@ const CathDomainsPage = ({ location }) => {
   const [domainModels, setDomainModels] = useState([])
   const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedCathId, setSelectedCathId] = useState(null)
+  const [showDetails, setShowDetails] = useState(false)
+  const [narrativeById, setNarrativeById] = useState({})
 
   const search = location?.search ?? (typeof window !== "undefined" ? window.location.search : "")
 
@@ -84,7 +80,7 @@ const CathDomainsPage = ({ location }) => {
         if (!rows.length) {
           setDomainModels(mergeCatalogWithAtlasComponents(CATH_DOMAIN_CATALOG, []))
           setLoadError(
-            "Atlas component counts unavailable; Pfam profiles still listed—family counts will appear when the API is reachable and Pfam↔atlas mapping is set.",
+            "Atlas component counts unavailable. CATH domains are still listed; family counts will appear when the API is reachable and Pfam↔atlas mapping is set.",
           )
           return
         }
@@ -94,7 +90,7 @@ const CathDomainsPage = ({ location }) => {
         if (cancelled) return
         setDomainModels(mergeCatalogWithAtlasComponents(CATH_DOMAIN_CATALOG, []))
         setLoadError(
-          "Could not load atlas components; showing Pfam catalog without live family counts.",
+          "Could not load atlas components; showing CATH domains without live family counts.",
         )
       })
       .finally(() => {
@@ -106,35 +102,48 @@ const CathDomainsPage = ({ location }) => {
     }
   }, [])
 
+  const catDomainModels = useMemo(() => buildCatDomainModels(domainModels), [domainModels])
+
   useEffect(() => {
-    if (!domainModels.length) return
+    if (!catDomainModels.length) return
     const q = parseCathQuery(search)
-    const fromQuery = pickIdFromQuery(domainModels, q)
-    setSelectedId(prev => {
-      if (fromQuery) return fromQuery
-      if (prev && domainModels.some(d => d.id === prev)) return prev
-      return domainModels[0].id
+    if (q.cathRaw && catDomainModels.some(d => d.cathId === q.cathRaw)) {
+      setSelectedCathId(q.cathRaw)
+      setShowDetails(false)
+      return
+    }
+    setSelectedCathId(null)
+    setShowDetails(false)
+    if (q.hasLegacyParams && typeof window !== "undefined") {
+      navigate("/cath-domains", { replace: true })
+    }
+  }, [catDomainModels, search])
+
+  useEffect(() => {
+    if (!selectedCathId) return
+    if (narrativeById[selectedCathId] !== undefined) return
+    let cancelled = false
+    fetchCathDomainNarrative(selectedCathId).then(payload => {
+      if (cancelled) return
+      setNarrativeById(prev => ({ ...prev, [selectedCathId]: payload }))
     })
-  }, [domainModels, search])
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCathId, narrativeById])
 
-  const selected = useMemo(
-    () => domainModels.find(d => d.id === selectedId) ?? domainModels[0] ?? null,
-    [domainModels, selectedId],
-  )
+  const selectedCatDomain = useMemo(() => {
+    if (!selectedCathId) return null
+    const base = catDomainModels.find(d => d.cathId === selectedCathId) ?? null
+    if (!base) return null
+    return mergeNarrative(base, narrativeById[selectedCathId])
+  }, [catDomainModels, selectedCathId, narrativeById])
 
-  const queryInfo = useMemo(() => parseCathQuery(search), [search])
-
-  const componentAmbiguous = useMemo(() => {
-    if (!queryInfo.hasComponentParam || !Number.isFinite(queryInfo.componentNum)) return null
-    const matches = domainsForComponent(domainModels, queryInfo.componentNum)
-    if (matches.length <= 1) return null
-    return { component: queryInfo.componentNum, matches }
-  }, [domainModels, queryInfo.componentNum, queryInfo.hasComponentParam])
-
-  const handleSelectId = useCallback(id => {
-    setSelectedId(id)
+  const handleSelectCathId = useCallback(cathId => {
+    setSelectedCathId(cathId)
+    setShowDetails(false)
     if (typeof window !== "undefined") {
-      navigate(`/cath-domains?id=${encodeURIComponent(id)}`, { replace: true })
+      navigate(`/cath-domains?cath=${encodeURIComponent(cathId)}`, { replace: true })
     }
   }, [])
 
@@ -142,17 +151,7 @@ const CathDomainsPage = ({ location }) => {
     return (
       <section className="py-16 md:py-20">
         <Container>
-          <p className="text-muted-foreground">Loading CATH / Pfam domain reference…</p>
-        </Container>
-      </section>
-    )
-  }
-
-  if (!selected) {
-    return (
-      <section className="py-16 md:py-20">
-        <Container>
-          <p className="text-muted-foreground">No domain entries available.</p>
+          <p className="text-muted-foreground">Loading CATH domain reference…</p>
         </Container>
       </section>
     )
@@ -165,55 +164,85 @@ const CathDomainsPage = ({ location }) => {
 
         {loadError && (
           <p
-            className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300/90 max-w-3xl"
+            className="mb-6 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground max-w-3xl"
             role="status"
           >
             {loadError}
           </p>
         )}
 
-        {componentAmbiguous && (
-          <div
-            className="mb-6 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground max-w-3xl"
-            role="status"
-          >
-            <p className="m-0 mb-2 text-foreground font-medium">
-              Component {componentAmbiguous.component} maps to more than one Pfam profile
-            </p>
-            <p className="m-0 mb-2 leading-relaxed">
-              Use a profile-specific link so the page opens to the right entry:
-            </p>
-            <ul className="m-0 pl-5 space-y-1 list-disc">
-              {componentAmbiguous.matches.map(d => (
-                <li key={d.id}>
-                  <Link
-                    to={`/cath-domains?id=${encodeURIComponent(d.id)}`}
-                    className="text-accent hover:text-accent-hover underline underline-offset-2"
-                  >
-                    {stripRedundantPfamFromDisplayName(d.displayName, d.pfamAccession)}
-                  </Link>
-                  <span className="text-muted-foreground"> ({d.pfamAccession})</span>
-                </li>
-              ))}
-            </ul>
+        {!catDomainModels.length ? (
+          <p className="text-muted-foreground">No CATH domains available.</p>
+        ) : !selectedCathId ? (
+          <div className="relative">
+            <CathClassificationPopup />
+            <CatDomainDashboard catDomains={catDomainModels} onSelect={handleSelectCathId} />
           </div>
+        ) : !selectedCatDomain ? (
+          <p className="text-muted-foreground">That CATH domain wasn&rsquo;t found.</p>
+        ) : (
+          <>
+            <Link
+              to="/cath-domains"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
+            >
+              ← Back to CATH domains overview
+            </Link>
+            <CatDomainOverviewPanel catDomain={selectedCatDomain} compact />
+
+            {!showDetails ? (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowDetails(true)}
+                  className="text-sm font-medium px-5 py-2.5 rounded-lg bg-accent text-accent-foreground hover:opacity-90"
+                >
+                  Read full domain details
+                </button>
+                <p className="text-xs text-muted-foreground mt-2 m-0 max-w-xl">
+                  Architecture, mechanism, structures, member HMMs, and literature.
+                </p>
+              </div>
+            ) : (
+              <>
+                <CatDomainStructureEmbed
+                  structureEmbedPdbId={selectedCatDomain.structureEmbedPdbId}
+                />
+                <div className="lg:flex lg:items-start lg:gap-8 xl:gap-12 mt-6 md:mt-8">
+                  <CatDomainSectionNav
+                    catDomain={selectedCatDomain}
+                    className="lg:w-44 xl:w-52 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1 lg:max-w-3xl space-y-8">
+                    <CatDomainStructuralArchitecture
+                      structuralArchitecture={selectedCatDomain.structuralArchitecture}
+                    />
+                    <CatDomainMechanismPanel mechanism={selectedCatDomain.mechanism} />
+                    <CatDomainProseSections
+                      functionalDiversity={selectedCatDomain.functionalDiversity}
+                      interactingDomains={selectedCatDomain.interactingDomains}
+                    />
+                    <CatDomainStructuresTable
+                      representativeStructures={selectedCatDomain.representativeStructures}
+                      representativeStructuresNote={
+                        selectedCatDomain.representativeStructuresNote
+                      }
+                    />
+                    <CatDomainMemberHmms
+                      memberHmms={selectedCatDomain.memberHmms}
+                      hmmMethod={selectedCatDomain.hmmMethod}
+                    />
+                    <CatDomainLogoGallery
+                      hmmLogos={selectedCatDomain.hmmLogos}
+                      sequenceLogos={selectedCatDomain.sequenceLogos}
+                    />
+                    <CatDomainReferences references={selectedCatDomain.references} />
+                  </div>
+                </div>
+              </>
+            )}
+          </>
         )}
-
-        <CathDomainProfileSelector
-          domains={domainModels}
-          selectedId={selected.id}
-          onSelectId={handleSelectId}
-        />
-
-        <CathDomainVisualizationPanel domain={selected} />
-
-        <div className="lg:flex lg:items-start lg:gap-8 xl:gap-12 mt-6 md:mt-8">
-          <CathDomainSectionNav domain={selected} className="lg:w-44 xl:w-52 shrink-0" />
-          <div className="min-w-0 flex-1 lg:max-w-3xl">
-            <CathDomainNarrativeSections domain={selected} />
-            <CathDomainFiguresAndRefs domain={selected} />
-          </div>
-        </div>
       </Container>
     </section>
   )
@@ -224,6 +253,6 @@ export default CathDomainsPage
 export const Head = () => (
   <Seo
     title="CATH domains"
-    description="PETadex: Pfam / CATH domain reference pages with literature-backed notes, linked to the family atlas when mapped."
+    description="PETadex CATH domain reference pages linked to the family atlas when mapped."
   />
 )

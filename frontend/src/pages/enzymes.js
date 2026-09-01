@@ -7,7 +7,6 @@ import ScrollableArea from "../components/common/ScrollableArea"
 import IdentifierResolver from "../components/search/IdentifierResolver"
 import config from "../config"
 import { useScrollHeader } from "../hooks/useScrollHeader"
-import { cathDomainPathForComponent } from "../utils/cathDomainCatalogLookup"
 
 // Deterministic per-family color from family_id using golden-ratio hue spread
 function familyColor(familyId) {
@@ -291,12 +290,6 @@ const EnzymesPage = ({ location }) => {
                 Enzymes in atlas component {componentFilterId}
               </h2>
               <div className="flex flex-wrap gap-3 text-sm">
-                <Link
-                  to={cathDomainPathForComponent(componentFilterId)}
-                  className="text-accent hover:text-accent-hover underline underline-offset-2"
-                >
-                  CATH domain reference
-                </Link>
                 <Link
                   to={`/atlas?component=${componentFilterId}`}
                   className="text-accent hover:text-accent-hover underline underline-offset-2"

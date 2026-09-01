@@ -2,25 +2,9 @@ import { resolveCathDomain } from "./cathDomainResolve"
 import { resolveAtlasComponentForPfam } from "../data/pfamAtlasMap"
 
 /**
- * Normalize catalog figures: strings become { caption }.
- * @param {(string|{ caption: string, imageSrc?: string|null, alt?: string })[]|undefined} raw
- * @returns {{ caption: string, imageSrc?: string|null, alt?: string }[]}
- */
-export function normalizeFigureList(raw) {
-  if (!raw?.length) return []
-  return raw.map(f =>
-    typeof f === "string"
-      ? { caption: f, imageSrc: null, alt: "" }
-      : {
-          caption: f.caption || "",
-          imageSrc: f.imageSrc ?? null,
-          alt: f.alt ?? "",
-        },
-  )
-}
-
-/**
- * Build the unified domain model for `/cath-domains` from curated catalog + optional atlas row.
+ * Build the Pfam-profile model consumed by `buildCatDomainModels` from the catalog entry plus an
+ * optional atlas row. These models are never rendered on their own — the CATH-domain view groups
+ * them by `cathId` into its "HMMs used" table and aggregate family count.
  *
  * @param {import("../data/cathDomainCatalog.js").CathDomainCatalogEntry} catalogEntry
  * @param {{ component: number, cath_domain?: string|null, domain_name?: string|null, family_count: number }|null} atlasRow
@@ -41,52 +25,14 @@ export function buildDomainModelFromCatalog(catalogEntry, atlasRow) {
   const displayName =
     (atlasRow?.domain_name && String(atlasRow.domain_name).trim()) || catalogEntry.displayName
 
-  const profileHmmLabel = `${catalogEntry.profileHmm} · ${catalogEntry.pfamAccession}`
-
-  let sourceLabel = "Pfam literature review (PETadex)"
-  if (familyCount != null && Number.isFinite(Number(familyCount))) {
-    sourceLabel = `PETadex family atlas (${Number(familyCount).toLocaleString()} families)`
-  }
-
-  const figures = normalizeFigureList(catalogEntry.figures)
-
   return {
     id: catalogEntry.id,
     component: component != null && Number.isFinite(Number(component)) ? Number(component) : null,
     familyCount,
     cathId,
     displayName,
-    profileHmm: profileHmmLabel,
+    profileHmm: `${catalogEntry.profileHmm} · ${catalogEntry.pfamAccession}`,
     pfamAccession: catalogEntry.pfamAccession,
-    sourceLabel,
-    lastUpdated: catalogEntry.lastUpdated,
-    summary: catalogEntry.summary,
-    moreInformation: catalogEntry.moreInformation,
-    moreInformationFigure: catalogEntry.moreInformationFigure,
-    postLocalizationTable: catalogEntry.postLocalizationTable,
-    preLocalizationTable: catalogEntry.preLocalizationTable,
-    prePtmsTable: catalogEntry.prePtmsTable,
-    postCatalyticResiduesTable: catalogEntry.postCatalyticResiduesTable,
-    postStructureTable: catalogEntry.postStructureTable,
-    localization: catalogEntry.localization,
-    ptms: catalogEntry.ptms,
-    catalyticResidues: catalogEntry.catalyticResidues,
-    mechanisms: catalogEntry.mechanisms,
-    interactingDomains: catalogEntry.interactingDomains,
-    function: catalogEntry.function,
-    regulation: catalogEntry.regulation,
-    variability: catalogEntry.variability,
-    structure: catalogEntry.structure,
-    labNotes: catalogEntry.labNotes,
-    figures,
-    figureCaptions: figures.map(f => f.caption),
-    references: catalogEntry.references?.length ? catalogEntry.references : [],
-    legendSegments:
-      catalogEntry.legendSegments?.length > 0
-        ? catalogEntry.legendSegments
-        : [{ label: "Representative CATH", cathId }],
-    pdbIds: Array.isArray(catalogEntry.pdbIds) ? catalogEntry.pdbIds : [],
-    resourceLinks: Array.isArray(catalogEntry.resourceLinks) ? catalogEntry.resourceLinks : [],
   }
 }
 

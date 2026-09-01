@@ -1,11 +1,8 @@
 // frontend/src/components/corpus/ComparisonRegion.jsx
 //
 // User-initiated COMPARISON action (search this sequence against the corpus),
-// kept in a visually separate region from the factual panels per the framing
-// discipline in "03 - Frontend Wiring": comparisons are "results of searching
-// this sequence", NOT first-paint facts. This does NOT run the search — it
-// pre-fills the /search form (FASTA block, with this ORF's identity as header)
-// and lets the user submit it themselves.
+// kept distinct from factual panels per "03 - Frontend Wiring". Does not run
+// the search — pre-fills /search with a FASTA block for this ORF.
 import React, { useState } from "react"
 import { navigate } from "gatsby"
 import { cleanSequence } from "../../utils/lib"
@@ -15,24 +12,25 @@ import { cleanSequence } from "../../utils/lib"
  *   sequence: string | null,
  *   orfId?: number | string | null,
  *   accession?: string | null,
+ *   variant?: "block" | "inline",
  * }} props
  */
-export default function ComparisonRegion({ sequence, orfId, accession }) {
+export default function ComparisonRegion({
+  sequence,
+  orfId,
+  accession,
+  variant = "block",
+}) {
   const [error, setError] = useState(null)
 
   const clean = cleanSequence(sequence || "")
   const canSearch = Boolean(clean && clean.length >= 10)
 
-  // The search form expects a FASTA block (`>header\nSEQ`). Build a header that
-  // identifies this ORF so it lands pre-filled and labelled: prefer the GenBank
-  // accession, always carry the ORF id (the corpus native key).
   const queryHeader =
     [accession, orfId != null ? `ORF ${orfId}` : null]
       .filter(Boolean)
       .join(" ") || "query"
 
-  // Don't run the search here — just pre-fill the /search form so the user
-  // submits it themselves (and can tweak it first).
   const goToSearch = () => {
     if (!canSearch) {
       setError("This sequence is too short to search.")
@@ -40,6 +38,39 @@ export default function ComparisonRegion({ sequence, orfId, accession }) {
     }
     const fasta = `>${queryHeader}\n${clean}`
     navigate(`/search?prefill=${encodeURIComponent(fasta)}`)
+  }
+
+  if (variant === "inline") {
+    return (
+      <div className="mt-3 max-w-2xl">
+        <p className="text-xs text-muted-foreground m-0 mb-2 leading-relaxed">
+          Compare against the corpus: open search pre-filled with this sequence
+          for a DIAMOND similarity search (~307M Logan sequences).
+        </p>
+        <button
+          type="button"
+          onClick={goToSearch}
+          disabled={!canSearch}
+          className={[
+            "text-xs font-medium px-3 py-1.5 rounded border border-border",
+            "bg-surface-raised text-foreground hover:border-info hover:text-info",
+            "disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+          ].join(" ")}
+        >
+          Search this sequence
+        </button>
+        {!canSearch && (
+          <p className="text-xs text-muted-foreground mt-1.5 mb-0">
+            Needs at least 10 amino acids to search.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-xs text-destructive mt-1.5 mb-0">
+            {error}
+          </p>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -61,6 +92,7 @@ export default function ComparisonRegion({ sequence, orfId, accession }) {
       </p>
 
       <button
+        type="button"
         onClick={goToSearch}
         disabled={!canSearch}
         className={[

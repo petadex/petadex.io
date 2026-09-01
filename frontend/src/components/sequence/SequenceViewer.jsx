@@ -18,6 +18,9 @@ export default function SequenceViewer({
   // is selected in the corpus page's domain track), the viewer selects that
   // region and scrolls into view. `null` clears an externally-driven selection.
   highlightRange = null,
+  // When false, apply highlight without scrolling the page (e.g. SignalP
+  // auto-highlight on first paint should not yank the viewport down).
+  autoScrollOnHighlight = true,
 }) {
   const [seqType, setSeqType] = useState("amino-acid")
   const [containerWidth, setWidth] = useState(0)
@@ -153,15 +156,18 @@ export default function SequenceViewer({
       setSelStart(start)
       setSelEnd(end)
       setIsExternalHighlight(true)
-      // The domain track sits below the viewer — bring the highlight into view.
-      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      // Domain track sits below the viewer — scroll only when requested (user
+      // clicked a domain). Skip for auto highlights like SignalP on load.
+      if (autoScrollOnHighlight) {
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
     } else if (highlightRange === null) {
       // External deselection clears the externally-driven selection.
       setSelStart(null)
       setSelEnd(null)
       setIsExternalHighlight(false)
     }
-  }, [highlightRange])
+  }, [highlightRange, autoScrollOnHighlight])
 
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (!currentSeq) {

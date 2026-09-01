@@ -15,6 +15,25 @@ provider:
     SEARCH_LAMBDA_NAME: ${env:SEARCH_LAMBDA_NAME, 'petadex-diamond-orchestrator'}
     RESULTS_BUCKET: ${env:RESULTS_BUCKET, 'petadex'}
     RESULTS_PREFIX: ${env:RESULTS_PREFIX, 'results'}
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://petadex.net
+        - https://www.petadex.net
+        - https://petadex.io
+        - https://www.petadex.io
+        - https://petadex.org
+        - https://www.petadex.org
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowCredentials: true
   iam:
     role:
       statements:
@@ -50,4 +69,3 @@ functions:
       - httpApi:
           path: /
           method: '*'
-

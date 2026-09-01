@@ -19,6 +19,7 @@ import pdbRoutes from './routes/pdb.js';
 import enzymesRoutes from './routes/enzymes.js';
 import searchRoutes from './routes/search.js';
 import atlasRoutes from './routes/atlas.js';
+import organismsRoutes from './routes/organisms.js';
 import familyRoutes from './routes/family.js';
 import saraViewerRoutes from './routes/saraViewer.js';
 import petadexDomainsRoutes from './routes/petadexDomains.js';
@@ -35,6 +36,8 @@ app.use(cors({
   origin: [
     'https://petadex.net',
     'https://www.petadex.net',
+    'https://petadex.io',
+    'https://www.petadex.io',
     'https://petadex.org',
     'https://www.petadex.org',
     'https://api.petadex.org',
@@ -58,6 +61,7 @@ app.use('/api/pdb', pdbRoutes);
 app.use('/api/enzymes', enzymesRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/atlas', atlasRoutes);
+app.use('/api/organisms', organismsRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/sara-viewer', saraViewerRoutes);
 app.use('/api/petadex-domains', petadexDomainsRoutes);
@@ -66,7 +70,7 @@ app.use('/api/cluster', clusterRoutes);
 app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
 
-// Root: no HTML UI — API lives under /api/*. Browsers hitting :3001/ alone see this instead of "Cannot GET /".
+// Root: no HTML UI. API lives under /api/*. Browsers hitting :3001/ alone see this instead of "Cannot GET /".
 app.get('/', (req, res) => {
   res.type('json').json({
     service: 'PETadex API',

@@ -1,7 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Petadex Pilot API
-  version: 1.0.0
+  title: PETadex API
+  version: 1.1.0
+  description: API endpoints for PETadex data, including the Organism Atlas.
 paths:
   /api/fastaa:
     get:
@@ -22,9 +23,7 @@ paths:
         - name: accession
           in: path
           required: true
-          schema:
-            type: string
-            maxLength: 64
+          schema: { type: string, maxLength: 64 }
       responses:
         '200':
           description: A single sequence
@@ -36,48 +35,191 @@ paths:
           description: Not found
   /api/atlas/umap:
     get:
-      summary: Family atlas UMAP points (family_atlas)
+      summary: Family atlas UMAP points
       responses:
         '200':
-          description: Points with component, cath_domain, domain_name
+          description: Points with component, cath_domain, and domain_name
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  points:
-                    type: array
-                    items:
-                      type: object
+              schema: { type: object }
   /api/atlas/components:
     get:
-      summary: Distinct atlas components for CATH domain page selector
+      summary: Distinct atlas components for the CATH domain selector
       responses:
         '200':
           description: One representative row per component with family counts
           content:
             application/json:
+              schema: { type: object }
+  /api/organisms/stats:
+    get:
+      summary: Atlas-wide organism statistics
+      responses:
+        '200':
+          description: Aggregated atlas counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganismStats'
+  /api/organisms:
+    get:
+      summary: Browse and filter organisms
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 50, minimum: 1, maximum: 200 }
+        - name: pageSize
+          in: query
+          description: Legacy alias for per_page, retained for existing programmatic clients (maximum 500).
+          schema: { type: integer, minimum: 1, maximum: 500 }
+        - name: q
+          in: query
+          description: Case-insensitive substring search across organism name, genus, phylum, and plastic names.
+          schema: { type: string }
+        - name: phylum
+          in: query
+          description: Exact phylum name for existing programmatic API clients.
+          schema: { type: string }
+        - name: filter
+          in: query
+          schema: { type: string, enum: [bioplastic, conventional, genome, bacdive, sra, thermo, rt] }
+        - name: tier
+          in: query
+          schema: { type: string, enum: [confirmed, predicted, listed] }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [name, taxid, tier, novelty, sra, pubmed, entries, year], default: name }
+      responses:
+        '200':
+          description: One page of matching organisms
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganismPage'
+  /api/organisms/phylum:
+    get:
+      summary: Confirmed organism counts grouped by phylum
+      responses:
+        '200':
+          description: Phylum aggregation
+          content:
+            application/json:
               schema:
                 type: object
+                required: [phyla]
                 properties:
-                  components:
+                  phyla:
                     type: array
                     items:
                       type: object
+                      required: [phylum, count]
+                      properties:
+                        phylum: { type: string }
+                        count: { type: integer }
+  /api/organisms/by-name/{name}:
+    get:
+      summary: Fetch an organism and all of its PlasticDB entries
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Full organism profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganismDetail'
+        '404':
+          description: Organism not found
+  /api/organisms/{taxid}:
+    get:
+      summary: Fetch an organism by NCBI TaxID
+      parameters:
+        - name: taxid
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Full organism profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganismDetail'
+        '400':
+          description: Invalid TaxID
+        '404':
+          description: Organism not found
 components:
+  parameters:
+    page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1, minimum: 1 }
   schemas:
     Fastaa:
       type: object
       properties:
-        accession:
-          type: string
-        sequence:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-      required:
-        - accession
-        - sequence
-        - created_at
-
+        accession: { type: string }
+        sequence: { type: string }
+        created_at: { type: string, format: date-time }
+      required: [accession, sequence, created_at]
+    OrganismStats:
+      type: object
+      required: [total_organisms, total_entries, unique_plastics, unique_genera, confirmed_count, predicted_count, listed_count]
+      properties:
+        total_organisms: { type: integer }
+        bioplastic_active: { type: integer }
+        genome_count: { type: integer }
+        bacdive_count: { type: integer }
+        total_entries: { type: integer }
+        unique_plastics: { type: integer }
+        unique_genera: { type: integer }
+        sra_count: { type: integer }
+        confirmed_count: { type: integer }
+        predicted_count: { type: integer }
+        listed_count: { type: integer }
+    OrganismSummary:
+      type: object
+      required: [name, confidence_tier, plastics]
+      properties:
+        name: { type: string }
+        genus: { type: string, nullable: true }
+        phylum: { type: string, nullable: true }
+        confidence_tier: { type: string, enum: [Confirmed, Predicted, Listed] }
+        plastics: { type: array, items: { type: string } }
+        plastics_cls: { type: array, items: { type: string } }
+        n_entries: { type: integer }
+        nov: { type: number }
+        sra_rc: { type: integer }
+        genome_acc: { type: string, nullable: true }
+        bd_found: { type: boolean }
+    OrganismPage:
+      type: object
+      required: [total, page, per_page, pages, organisms]
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+        pages: { type: integer }
+        organisms:
+          type: array
+          items: { $ref: '#/components/schemas/OrganismSummary' }
+    OrganismDetail:
+      allOf:
+        - $ref: '#/components/schemas/OrganismSummary'
+        - type: object
+          properties:
+            tax_id: { type: string, nullable: true }
+            entries:
+              type: array
+              items:
+                type: object
+                properties:
+                  pl: { type: string, nullable: true }
+                  yr: { type: integer, nullable: true }
+                  enz: { type: string, nullable: true }
+                  doi: { type: string, nullable: true }

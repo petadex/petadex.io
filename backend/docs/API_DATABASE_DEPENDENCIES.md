@@ -37,8 +37,8 @@
 | `/api/family/:familyId/umap` | GET | None |
 | `/api/family/:familyId/tree-members` | GET | enzyme_fastaa, enzyme_taxonomy |
 | `/api/family/:familyId/tree` | GET | None |
-| `/api/fastaa/` | GET | fastaa, with_sra_and_biosample_loc_metadata |
-| `/api/fastaa/:accession` | GET | with_sra_and_biosample_loc_metadata, fastaa |
+| `/api/fastaa/` | GET | gene_metadata, fastaa, with_sra_and_biosample_loc_metadata |
+| `/api/fastaa/:accession` | GET | gene_metadata, with_sra_and_biosample_loc_metadata, fastaa |
 | `/api/gene-details/locations` | GET | None |
 | `/api/gene-details/:accession/header` | GET | with_sra_and_biosample_loc_metadata |
 | `/api/gene-details/:accession/origin` | GET | with_sra_and_biosample_loc_metadata |
@@ -586,10 +586,13 @@ Base: `/api/fastaa`
 
 ### GET `/api/fastaa/`
 
-**Tables**: fastaa, with_sra_and_biosample_loc_metadata
+**Tables**: gene_metadata, fastaa, with_sra_and_biosample_loc_metadata
 
 **Columns**:
-- `f`: accession, aa_sequence, source, synonyms, date_entered, genotype, genotype_description, synthetic, parent_accessions, parent_genes, in_gene_metadata
+- `f`: accession, aa_sequence, source, synonyms, date_entered, genotype, genotype_description, synthetic, parent_accessions, parent_genes
+- `fastaa`: in_gene_metadata
+- `fix_in_gene_metadata`: py
+- `gm`: accession
 - `m`: accession
 
 <details>
@@ -607,7 +610,12 @@ SELECT
         f.synthetic,
         f.parent_accessions,
         f.parent_genes,
-        f.in_gene_metadata,
+        -- Derived, not the stored fastaa.in_gene_metadata column, which nothing
+        -- keeps in sync (it drifted to 199 false positives; fixed 2026-09-24 by
+        -- petadex-access/scripts/fix_in_gene_metadata.py).
+        EXISTS(
+          SELECT 1 FROM gene_metadata gm WHERE gm.accession = f.accession
+        ) AS in_gene_metadata,
         (m.accession IS NOT NULL) AS in_sra_metadata
       FROM fastaa f
       LEFT JOIN (
@@ -624,10 +632,11 @@ SELECT
 
 **Parameters**: `accession`
 
-**Tables**: with_sra_and_biosample_loc_metadata, fastaa
+**Tables**: gene_metadata, with_sra_and_biosample_loc_metadata, fastaa
 
 **Columns**:
-- `f`: accession, aa_sequence, source, synonyms, date_entered, genotype, genotype_description, synthetic, parent_accessions, parent_genes, in_gene_metadata
+- `f`: accession, aa_sequence, source, synonyms, date_entered, genotype, genotype_description, synthetic, parent_accessions, parent_genes
+- `gm`: accession
 - `m`: accession
 
 <details>
@@ -645,7 +654,9 @@ SELECT
         f.synthetic,
         f.parent_accessions,
         f.parent_genes,
-        f.in_gene_metadata,
+        EXISTS(
+          SELECT 1 FROM gene_metadata gm WHERE gm.accession = f.accession
+        ) as in_gene_metadata,
         EXISTS(
           SELECT 1
           FROM with_sra_and_biosample_loc_metadata m

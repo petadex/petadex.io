@@ -101,34 +101,10 @@ exports.createPages = async ({ actions }) => {
     console.error("❌ Error creating sequence pages:", error.message);
   }
 
-  // Create enzyme pages
-  try {
-    const response = await fetch(`${apiUrl}/enzymes?limit=10000`, {
-      signal: AbortSignal.timeout(60000) // 60 second timeout for large dataset
-    });
-
-    if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`);
-    }
-
-    const result = await response.json();
-    const enzymes = result.data || [];
-
-    enzymes.forEach(enzyme => {
-      const accessionId = enzyme.genbank_accession_id || enzyme.enzyme_id;
-      createPage({
-        path: `/sequence/${accessionId}`,
-        component: require.resolve("./src/templates/enzyme.js"),
-        context: {
-          enzymeId: enzyme.enzyme_id,
-          accessionId: accessionId,
-        },
-      });
-    });
-
-  } catch (error) {
-    console.error("❌ Error creating enzyme pages:", error.message);
-  }
+  // No enzyme pages are prebuilt here. Enzymes live at /enzyme/:enzymeId, served
+  // client-side by src/pages/enzyme/[enzymeId].js. Prebuilding them under
+  // /sequence/:genbankAccession collided with curated accessions and replaced
+  // their pages (and plate data) with the enzyme template.
 
   // Create family pages
   try {

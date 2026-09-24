@@ -1,6 +1,6 @@
 # PETadex API - Database Dependencies
 
-**Auto-generated**: 2026-09-01
+**Auto-generated**: 2026-09-24
 **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
 
 ---
@@ -11,6 +11,14 @@
 |----------|--------|--------|
 | `/api/aa-seq-features/` | GET | aa_seq_features |
 | `/api/aa-seq-features/:accession` | GET | aa_seq_features |
+| `/api/annotation/sequences/:orfId/provenance` | GET | None |
+| `/api/annotation/annotations/batch` | POST | None |
+| `/api/annotation/biosamples/:id` | GET | None |
+| `/api/annotation/biosamples/:id/sequences` | GET | None |
+| `/api/annotation/clusters/:pid90/profiles` | GET | None |
+| `/api/annotation/profiles` | GET | None |
+| `/api/annotation/profiles/:slug` | GET | None |
+| `/api/annotation/profiles/:slug/biosamples` | GET | None |
 | `/api/atlas/umap` | GET | None |
 | `/api/atlas/components` | GET | None |
 | `/api/cluster/:level/:clusterId` | GET | None |
@@ -103,6 +111,70 @@ SELECT * FROM aa_seq_features ORDER BY accession ASC
 SELECT * FROM aa_seq_features WHERE accession = $1
 ```
 </details>
+
+---
+
+## Annotation Routes
+
+Base: `/api/annotation`
+
+### GET `/api/annotation/sequences/:orfId/provenance`
+
+**Parameters**: `orfId`
+
+**Tables**: None
+
+---
+
+### POST `/api/annotation/annotations/batch`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/biosamples/:id`
+
+**Parameters**: `id`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/biosamples/:id/sequences`
+
+**Parameters**: `id`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/clusters/:pid90/profiles`
+
+**Parameters**: `pid90`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/profiles`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/profiles/:slug`
+
+**Parameters**: `slug`
+
+**Tables**: None
+
+---
+
+### GET `/api/annotation/profiles/:slug/biosamples`
+
+**Parameters**: `slug`
+
+**Tables**: None
 
 ---
 

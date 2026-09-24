@@ -223,7 +223,7 @@ function FamilyThumb() {
 const TOOL_CARDS = [
   { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the family atlas", sub: "Explore 64,730 families in 2D UMAP space. Color by domain, phylum, or CATH component.", kbd: "A", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
   { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans ~307M sequences in the Logan corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
-  { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 / 50 mM BHET. Click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/substrate", Thumb: SubstrateThumb },
+  { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
   { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for every family, with member tables and centroid sequences.", kbd: "F", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
 ]
 
@@ -311,7 +311,7 @@ function WhatsInside() {
             <p className="label mb-2">What's in PETadex</p>
             <h2 className="text-3xl font-semibold tracking-tight">Six layers of data, one schema</h2>
           </div>
-          <a href="/fastaa" target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:opacity-80 font-mono">
+          <a href="https://github.com/petadex/petadex.io/wiki/Database-Schema" target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:opacity-80 font-mono">
             View the full schema →
           </a>
         </div>

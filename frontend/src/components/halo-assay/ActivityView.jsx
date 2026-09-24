@@ -1,5 +1,10 @@
 // Substrate activity comparison view (halo assay results).
-// Extracted from pages/substrate.js so it can be embedded in /halo-assay.
+//
+// The sole home of this tool. It began as an extraction of the standalone
+// /substrate page so it could be embedded as the Activity tab of /halo-assay;
+// the two then diverged (drag-to-zoom, compact axis ticks, benchmark-label
+// dedup, responsive sizing all landed here only) and /substrate was deleted.
+// BHET50 went with it — this view offers 12.5 and 25 mM only.
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { Link } from "gatsby"
 import config from "../../config"

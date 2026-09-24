@@ -14,7 +14,7 @@ const Footer = () => {
           {/* MENU */}
           <nav role="navigation" className="flex flex-wrap items-center gap-4 text-primary">
             <Link
-              to="/fastaa"
+              to="/enzymes"
               aria-label="Database"
               className="text-primary hover:text-accent-hover transition-colors duration-150"
             >

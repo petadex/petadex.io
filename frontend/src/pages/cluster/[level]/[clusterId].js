@@ -14,6 +14,7 @@ import Seo from "../../../components/seo"
 import Container from "../../../components/common/Container"
 import config from "../../../config"
 import { useScrollHeader } from "../../../hooks/useScrollHeader"
+import ClusterProfilesPanel from "../../../components/annotation/ClusterProfilesPanel"
 
 const VALID_LEVELS = new Set(["90", "60", "30"])
 
@@ -146,6 +147,14 @@ export default function ClusterPage({ params }) {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Environment-profile distribution — annotation layer is keyed on
+              the 90% cluster id (pid90 = block_90pid.cluster_id). */}
+          {status === "ready" && String(level) === "90" && (
+            <div className="mt-6">
+              <ClusterProfilesPanel pid90={clusterId} />
             </div>
           )}
         </div>

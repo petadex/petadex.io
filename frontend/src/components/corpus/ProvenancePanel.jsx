@@ -7,8 +7,16 @@
 // populated (`sra` / `nr` / `pazy`). See "01 - Per-Sequence Annotation Plan"
 // (fact vs. comparison) and "02 - Backend Routing Plan" (the orf_origin dispatch).
 import React from "react"
+import CoordinateLinks from "../annotation/CoordinateLinks"
+import { Link } from "gatsby"
+import { OriginRow as Row, ExtLink } from "../annotation/SourceSample"
+import {
+  biosamplePath,
+  ncbiBioprojectUrl,
+  ncbiSraUrl,
+} from "../../utils/annotation"
 
-const ORIGIN_META = {
+export const ORIGIN_META = {
   0: {
     label: "PAZy",
     key: "pazy",
@@ -37,25 +45,13 @@ const FIELD_LABELS = {
   biosample: "BioSample",
   geo_loc_country: "Geo. country",
   geo_loc_continent: "Geo. continent",
-  biome: "Biome",
   collection_date: "Collection date",
   study: "SRA study",
   assay: "Assay",
   platform: "Platform",
-  lat: "Latitude",
-  lon: "Longitude",
 }
 
 const ITALIC_FIELDS = new Set(["organism", "taxonomy"])
-
-function Row({ label, children }) {
-  return (
-    <div className="grid grid-cols-[180px_1fr] gap-4 py-2 border-b border-border/60 last:border-b-0">
-      <div className="text-sm font-medium text-muted-foreground">{label}</div>
-      <div className="text-sm text-foreground break-words">{children}</div>
-    </div>
-  )
-}
 
 /**
  * @param {{
@@ -63,19 +59,50 @@ function Row({ label, children }) {
  *   provenance: Record<string, any> | null,
  * }} props
  */
-export default function ProvenancePanel({ orfOrigin, provenance }) {
+// Identifier fields rendered as links: internal pages where PETadex has one,
+// otherwise the NCBI record.
+function linkedValue(k, v) {
+  if (k === "biosample")
+    return (
+      <Link
+        to={biosamplePath(v)}
+        className="font-mono text-info hover:underline"
+      >
+        {v}
+      </Link>
+    )
+  if (k === "bioproject")
+    return (
+      <>
+        <span className="font-mono mr-3">{v}</span>
+        <ExtLink href={ncbiBioprojectUrl(v)}>NCBI BioProject</ExtLink>
+      </>
+    )
+  if (k === "study")
+    return (
+      <>
+        <span className="font-mono mr-3">{v}</span>
+        <ExtLink href={ncbiSraUrl(v)}>NCBI SRA</ExtLink>
+      </>
+    )
+  return null
+}
+
+/**
+ * @param {{ orfOrigin: number | null, provenance: object | null, hideCoordinates?: boolean }} props
+ */
+export function ProvenanceDetails({
+  orfOrigin,
+  provenance,
+  hideCoordinates = false,
+}) {
   const meta = ORIGIN_META[orfOrigin]
 
   if (!meta || !provenance) {
     return (
-      <section className="card p-6">
-        <h2 className="text-lg font-semibold text-foreground m-0">
-          Provenance
-        </h2>
-        <p className="text-sm text-muted-foreground mt-2 mb-0">
-          Origin metadata is unavailable for this sequence.
-        </p>
-      </section>
+      <p className="text-sm text-muted-foreground m-0">
+        Origin metadata is unavailable for this sequence.
+      </p>
     )
   }
 
@@ -106,16 +133,8 @@ export default function ProvenancePanel({ orfOrigin, provenance }) {
     .map(k => [k, sub[k]])
 
   return (
-    <section className="card p-6">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <h2 className="text-lg font-semibold text-foreground m-0">
-          Provenance
-        </h2>
-        <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
-          Source tier: {meta.label}
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground mt-0 mb-4">{meta.blurb}</p>
+    <div data-testid="provenance-details">
+      <p className="text-sm text-muted-foreground mt-0 mb-4">{meta.blurb}</p>
 
       <div className="divide-y divide-border/60">
         {accession && (
@@ -141,11 +160,19 @@ export default function ProvenancePanel({ orfOrigin, provenance }) {
 
         {knownEntries.map(([k, v]) => (
           <Row key={k} label={FIELD_LABELS[k]}>
-            <span className={ITALIC_FIELDS.has(k) ? "italic" : undefined}>
-              {String(v)}
-            </span>
+            {linkedValue(k, String(v)) ?? (
+              <span className={ITALIC_FIELDS.has(k) ? "italic" : undefined}>
+                {String(v)}
+              </span>
+            )}
           </Row>
         ))}
+
+        {sub.lat != null && sub.lon != null && !hideCoordinates && (
+          <Row label="Coordinates (stated)">
+            <CoordinateLinks latitude={sub.lat} longitude={sub.lon} />
+          </Row>
+        )}
       </div>
 
       {knownEntries.length === 0 && locusBits.length === 0 && !accession && (
@@ -153,6 +180,27 @@ export default function ProvenancePanel({ orfOrigin, provenance }) {
           No additional origin metadata is recorded for this sequence.
         </p>
       )}
+    </div>
+  )
+}
+
+/** Standalone card form. The corpus sequence page shows ProvenanceDetails as a
+ *  tab of OriginPanel instead. */
+export default function ProvenancePanel({ orfOrigin, provenance }) {
+  const meta = ORIGIN_META[orfOrigin]
+  return (
+    <section className="card p-6">
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <h2 className="text-lg font-semibold text-foreground m-0">
+          Provenance
+        </h2>
+        {meta && (
+          <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+            Source tier: {meta.label}
+          </span>
+        )}
+      </div>
+      <ProvenanceDetails orfOrigin={orfOrigin} provenance={provenance} />
     </section>
   )
 }

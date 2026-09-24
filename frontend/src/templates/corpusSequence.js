@@ -21,11 +21,11 @@ import Container from "../components/common/Container"
 import config from "../config"
 import { useScrollHeader } from "../hooks/useScrollHeader"
 import SequenceViewer from "../components/sequence/SequenceViewer"
-import ProvenancePanel from "../components/corpus/ProvenancePanel.jsx"
 import ClusterContextPanel from "../components/corpus/ClusterContextPanel.jsx"
 import CatalyticDomainsPanel from "../components/corpus/CatalyticDomainsPanel.jsx"
 import ComputedStatsPanel from "../components/corpus/ComputedStatsPanel.jsx"
 import ComparisonRegion from "../components/corpus/ComparisonRegion.jsx"
+import OriginPanel from "../components/annotation/OriginPanel.jsx"
 import StructurePanel from "../components/StructurePanel"
 
 const ORIGIN_LABEL = { 0: "PAZy", 1: "NR", 2: "Logan" }
@@ -202,8 +202,13 @@ export default function CorpusSequenceTemplate({ pageContext }) {
         </p>
       </header>
 
-      {/* ── Provenance (first-paint fact) ── */}
-      <ProvenancePanel orfOrigin={orf.orfOrigin} provenance={orf.provenance} />
+      {/* ── Sequence origin: Source sample (BioSample annotation layer) and
+            Provenance (first-paint fact) as tabs of one panel ── */}
+      <OriginPanel
+        orfId={orf.id}
+        orfOrigin={orf.orfOrigin}
+        provenance={orf.provenance}
+      />
 
       {/* ── Computed properties (computed from sequence) ── */}
       <ComputedStatsPanel computed={orf.computed} length={orf.length} />

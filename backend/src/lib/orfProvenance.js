@@ -38,9 +38,13 @@ export async function fetchProvenance(orfId, orfOrigin) {
       `SELECT l.library_id, l.contig, l.orf_start, l.orf_end, l.orf_type,
               s.organism, s.bioproject, s.biosample, s.platform, s.assay_type,
               s.sra_study, s.geo_loc_name_country_calc, s.geo_loc_name_country_continent_calc,
-              s.biome, s.collection_date_sam, s.latitude, s.longitude
+              s.collection_date_sam, b.latitude, b.longitude
        FROM logan_catalytic_orfs l
        LEFT JOIN sra_metadata s ON s.acc = l.library_id
+       -- Coordinates are the stated BioSample lat_lon. sra_metadata.latitude/
+       -- longitude/biome are geocoded from free text (every US run lands on one
+       -- point in West Virginia) and must never be served.
+       LEFT JOIN biosample_annotation b ON b.biosample = s.biosample
        WHERE l.orf_id = $1`,
       [orfId],
     )
@@ -61,7 +65,6 @@ export async function fetchProvenance(orfId, orfOrigin) {
         study: r.sra_study,
         geo_loc_country: r.geo_loc_name_country_calc,
         geo_loc_continent: r.geo_loc_name_country_continent_calc,
-        biome: r.biome,
         collection_date: r.collection_date_sam,
         lat: r.latitude,
         lon: r.longitude,

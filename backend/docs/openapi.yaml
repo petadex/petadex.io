@@ -64,8 +64,119 @@ paths:
                     type: array
                     items:
                       type: object
+  /api/sequences/{orfId}/provenance:
+    get:
+      summary: Source-sample provenance + environment profile for one ORF
+      description: Always one row, even when nothing resolves. Coordinates are the stated BioSample lat_lon only.
+      parameters:
+        - { name: orfId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Provenance row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Provenance' }
+        '400': { description: Invalid orf_id }
+  /api/annotations/batch:
+    post:
+      summary: Provenance rows for many ORFs (search-result enrichment)
+      description: Response has the same length and order as orf_ids, unknown ids included. Capped at 1000.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orf_ids]
+              properties:
+                orf_ids: { type: array, maxItems: 1000, items: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: One row per requested orf_id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results: { type: array, items: { $ref: '#/components/schemas/Provenance' } }
+        '400': { description: Invalid body or over the cap }
+  /api/biosamples/{id}:
+    get:
+      summary: BioSample annotation (null when outside the snapshot) and its SRA runs
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, maxLength: 64 } }
+      responses:
+        '200': { description: "{ biosample, annotation, runs }" }
+        '404': { description: Neither the annotation nor any run knows this accession }
+  /api/biosamples/{id}/sequences:
+    get:
+      summary: Keyset-paged ORFs from a BioSample
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, maxLength: 64 } }
+        - { name: after, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: last orf_id of the previous page }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ biosample, sequences: [{ orf_id, run }], next_after }" }
+  /api/clusters/{pid90}/profiles:
+    get:
+      summary: Environment-profile distribution for a 90% cluster
+      description: n_orfs NULL means no linked ORF and is never coerced to 0.
+      parameters:
+        - { name: pid90, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: "cluster_annotation row + distribution: [{ profile, n_orfs, n_biosamples, n_bioprojects }]" }
+        '404': { description: Cluster not in cluster_annotation }
+  /api/profiles:
+    get:
+      summary: The 22 environment profiles with BioSample counts by evidence
+      responses:
+        '200': { description: Array of profile_summary rows }
+  /api/profiles/{slug}:
+    get:
+      summary: One environment profile
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: profile_summary row }
+        '404': { description: Unknown profile }
+  /api/profiles/{slug}/biosamples:
+    get:
+      summary: In-universe BioSamples carrying a profile (keyset-paged by accession)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: after, in: query, schema: { type: string, default: '' }, description: last biosample of the previous page }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: evidence, in: query, schema: { type: string, enum: [stated, inferred, form_template, none] } }
+      responses:
+        '200': { description: "{ profile, biosamples: [{ biosample, profile_evidence, isolation_source, env_broad_scale, country, collection_year, has_coordinates }], next_after }" }
 components:
   schemas:
+    Provenance:
+      type: object
+      properties:
+        orf_id: { type: integer }
+        run: { type: string, nullable: true }
+        biosample: { type: string, nullable: true }
+        organism: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        collection_date: { type: string, nullable: true, description: raw text as submitted }
+        bioproject: { type: string, nullable: true }
+        isolation_source: { type: string, nullable: true }
+        env_broad_scale: { type: string, nullable: true, description: stated broad-scale environment (ENVO biome) }
+        env_medium: { type: string, nullable: true }
+        profile: { type: string, nullable: true }
+        profile_evidence: { type: string, enum: [stated, inferred, form_template, none], nullable: true }
+        profile_tier: { type: integer, nullable: true, description: rule precedence, NOT ordinal }
+        in_universe: { type: boolean, nullable: true }
+        stated_temperature_c: { type: number, nullable: true }
+        stated_ph: { type: number, nullable: true }
+        pid90: { type: integer, nullable: true }
+        cluster_dominant_profile: { type: string, nullable: true }
+        cluster_dominant_frac: { type: number, nullable: true }
+        cluster_n_orfs_profiled: { type: integer, nullable: true }
+        snapshot_id: { type: string, nullable: true }
     Fastaa:
       type: object
       properties:

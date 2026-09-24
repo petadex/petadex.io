@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { Link } from "gatsby"
 import { formatSeq, cleanSequence } from "../../utils/lib"
 import { generateCSV, downloadCSV } from "../../utils/csvDownload"
@@ -10,6 +10,32 @@ import AlignmentCoverageMap from "../charts/AlignmentCoverageMap"
 import { FunctionalAnnotationChart } from "../charts/FunctionalAnnotationChart"
 import SequenceViewer from "../sequence/SequenceViewer"
 import { SEARCH_RESULT_DEPTH, resultViewOptions } from "./constants"
+import ProfileBadge from "../annotation/ProfileBadge"
+import {
+  fetchAnnotations,
+  resolveProfile,
+  profileFacetValue,
+  profileLabel,
+  NO_PROFILE_FACET,
+  biosamplePath,
+} from "../../utils/annotation"
+
+// The profile facet lives in the URL (?profile=<slug>) so it survives bookmarking
+// and back-navigation. replaceState keeps the job id and adds no history entry.
+const PROFILE_PARAM = "profile"
+
+function readProfileFacet() {
+  if (typeof window === "undefined") return null
+  return new URLSearchParams(window.location.search).get(PROFILE_PARAM)
+}
+
+function writeProfileFacet(value) {
+  if (typeof window === "undefined") return
+  const url = new URL(window.location.href)
+  if (value) url.searchParams.set(PROFILE_PARAM, value)
+  else url.searchParams.delete(PROFILE_PARAM)
+  window.history.replaceState(window.history.state, "", url)
+}
 
 // Deterministic per-family color — must match enzymes.js
 function familyColor(familyId) {
@@ -23,6 +49,25 @@ const TABS = [
   { id: "taxonomy", label: "Taxonomy" },
   { id: "atlas", label: "Atlas" },
 ]
+
+// Empty enrichment cell: a pending marker while the batch is in flight, a dash
+// once it is known there is nothing to show. Neither is an error state.
+function AnnotationPlaceholder({ status, hit }) {
+  if (status === "loading" && hit.orf_id != null)
+    return <span className="text-muted-foreground/60">…</span>
+  const title = hit.ann
+    ? hit.ann.run == null
+      ? "Not from a metagenome run"
+      : hit.ann.biosample == null
+      ? "No linked SRA sample"
+      : undefined
+    : undefined
+  return (
+    <span className="text-muted-foreground" title={title}>
+      -
+    </span>
+  )
+}
 
 const ResultsView = ({
   results: allResults,
@@ -40,6 +85,15 @@ const ResultsView = ({
   const [copied, setCopied] = useState(false)
   const [sortKey, setSortKey] = useState(null)
   const [sortDir, setSortDir] = useState("asc")
+  // BioSample annotation enrichment: orf_id(string) → provenance row. Filled by
+  // POST /api/annotations/batch AFTER the hits render — the table never waits.
+  const [annotations, setAnnotations] = useState(() => new Map())
+  const [annotationStatus, setAnnotationStatus] = useState("idle") // idle | loading | ready | error
+  const [profileFacet, setProfileFacetState] = useState(readProfileFacet)
+  const setProfileFacet = value => {
+    setProfileFacetState(value || null)
+    writeProfileFacet(value || null)
+  }
 
   // `allResults` is only what Express sent for the current view count — the
   // stored result is `num_results` deep, and that total is what the selector
@@ -63,6 +117,79 @@ const ResultsView = ({
   // before the depth cap did — the search was exhaustive, so every hit above the
   // significance threshold is reachable and no count can ever re-run the search.
   const isExhaustive = totalHits < resultDepth
+
+  // One batch call for the whole page of hits (≤ 500 rows; the cap is 1,000).
+  // Keyed on the id list so re-sorting doesn't refetch, but a deeper view does.
+  const orfIdKey = useMemo(
+    () =>
+      results
+        .map(h => h.orf_id)
+        .filter(id => id != null)
+        .join(","),
+    [results]
+  )
+  useEffect(() => {
+    if (!orfIdKey) {
+      setAnnotationStatus("idle")
+      return
+    }
+    const controller = new AbortController()
+    setAnnotationStatus("loading")
+    fetchAnnotations(orfIdKey.split(","), controller.signal)
+      .then(map => {
+        setAnnotations(map)
+        setAnnotationStatus("ready")
+      })
+      .catch(err => {
+        if (err.name === "AbortError") return
+        console.error("Annotation enrichment failed:", err)
+        setAnnotationStatus("error")
+      })
+    return () => controller.abort()
+  }, [orfIdKey])
+
+  // Hits joined with their provenance row. Sortable keys are flattened onto the
+  // row so the existing column sort works on the new columns too.
+  const enrichedResults = useMemo(
+    () =>
+      results.map(hit => {
+        const ann =
+          hit.orf_id != null ? annotations.get(String(hit.orf_id)) : null
+        if (!ann) return { ...hit, ann: null, resolved: null }
+        const resolved = resolveProfile(ann)
+        return {
+          ...hit,
+          ann,
+          resolved,
+          biosample: ann.biosample,
+          country: ann.country,
+          profile_sort: profileLabel(resolved.profile),
+          profile_facet: profileFacetValue(ann),
+        }
+      }),
+    [results, annotations]
+  )
+
+  // Facet counts use the same own-or-cluster value the column shows.
+  const profileFacetOptions = useMemo(() => {
+    const counts = new Map()
+    for (const h of enrichedResults) {
+      if (!h.ann) continue
+      counts.set(h.profile_facet, (counts.get(h.profile_facet) || 0) + 1)
+    }
+    if (profileFacet && !counts.has(profileFacet)) counts.set(profileFacet, 0)
+    return [...counts.entries()]
+      .map(([value, count]) => ({
+        value,
+        count,
+        label: value === NO_PROFILE_FACET ? "No profile" : profileLabel(value),
+      }))
+      .sort(
+        (a, b) =>
+          (a.value === NO_PROFILE_FACET) - (b.value === NO_PROFILE_FACET) ||
+          b.count - a.count
+      )
+  }, [enrichedResults, profileFacet])
 
   const hitFamilyIds = useMemo(
     () => new Set(results.map(h => h.family).filter(f => f != null)),
@@ -152,8 +279,14 @@ const ResultsView = ({
   }
 
   const sortedResults = useMemo(() => {
-    if (!sortKey) return results
-    return [...results].sort((a, b) => {
+    // The facet only applies once enrichment has landed; until then every hit
+    // shows, rather than an empty table that looks like "no matches".
+    const rows =
+      profileFacet && annotationStatus === "ready"
+        ? enrichedResults.filter(h => h.profile_facet === profileFacet)
+        : enrichedResults
+    if (!sortKey) return rows
+    return [...rows].sort((a, b) => {
       let av = a[sortKey],
         bv = b[sortKey]
       if (av == null) return 1
@@ -165,7 +298,7 @@ const ResultsView = ({
       const cmp = av < bv ? -1 : av > bv ? 1 : 0
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [results, sortKey, sortDir])
+  }, [enrichedResults, sortKey, sortDir, profileFacet, annotationStatus])
 
   const handleDownload = () => {
     const headers = [
@@ -177,12 +310,17 @@ const ResultsView = ({
       "Identity (%)",
       "E-value",
       "Coverage (%)",
+      "BioSample",
+      "Country",
+      "Environment profile",
+      "Profile source",
+      "Profile evidence",
       // Last, like DIAMOND's own full_sseq column: it is by far the widest
       // field (~314 aa median) and would push everything else off-screen in a
       // spreadsheet anywhere else in the row.
       "Target sequence",
     ]
-    const rows = results.map(h => [
+    const rows = enrichedResults.map(h => [
       h.rank,
       h.accession,
       h.name || "",
@@ -191,6 +329,11 @@ const ResultsView = ({
       h.identity?.toFixed(1) ?? "",
       h.evalue ?? "",
       h.query_coverage ?? "",
+      h.ann?.biosample || "",
+      h.ann?.country || "",
+      h.resolved?.profile || "",
+      h.resolved?.source || "",
+      h.resolved?.source === "own" ? h.resolved.evidence || "" : "",
       // The full subject protein, not the aligned segment. Empty for a hit
       // merged from a part written by a pre-1.3.0 worker, which stores null.
       h.target_sequence || "",
@@ -463,7 +606,51 @@ const ResultsView = ({
             {/* Descriptions table */}
             {activeTab === "descriptions" && (
               <div className="overflow-x-auto">
-                <div className="flex justify-end mb-2 gap-2">
+                <div className="flex flex-wrap items-center justify-end mb-2 gap-2">
+                  <div className="mr-auto flex items-center gap-2 text-sm">
+                    <label
+                      htmlFor="profile-facet"
+                      className="text-muted-foreground"
+                    >
+                      Environment profile
+                    </label>
+                    <select
+                      id="profile-facet"
+                      value={profileFacet || ""}
+                      onChange={e => setProfileFacet(e.target.value)}
+                      disabled={annotationStatus !== "ready"}
+                      className="bg-background border border-input text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring disabled:opacity-60"
+                    >
+                      <option value="">All ({results.length})</option>
+                      {profileFacetOptions.map(o => (
+                        <option key={o.value} value={o.value}>
+                          {o.label} ({o.count})
+                        </option>
+                      ))}
+                    </select>
+                    {annotationStatus === "loading" && (
+                      <span className="text-xs text-muted-foreground">
+                        Loading sample metadata…
+                      </span>
+                    )}
+                    {annotationStatus === "error" && (
+                      <span className="text-xs text-destructive">
+                        Sample metadata unavailable
+                      </span>
+                    )}
+                    {profileFacet && annotationStatus === "ready" && (
+                      <span className="text-xs text-muted-foreground">
+                        Showing {sortedResults.length} of {results.length}
+                        {" · "}
+                        <button
+                          className="text-accent hover:underline"
+                          onClick={() => setProfileFacet(null)}
+                        >
+                          clear
+                        </button>
+                      </span>
+                    )}
+                  </div>
                   <button
                     className="btn btn-outline"
                     onClick={handleDownloadJSON}
@@ -491,6 +678,13 @@ const ResultsView = ({
                         { label: "Identity", key: "identity" },
                         { label: "E-value", key: "evalue", minWidth: "8rem" },
                         { label: "Coverage", key: "query_coverage" },
+                        { label: "BioSample", key: "biosample" },
+                        {
+                          label: "Environment profile",
+                          key: "profile_sort",
+                          minWidth: "12rem",
+                        },
+                        { label: "Country", key: "country" },
                       ].map(({ label, key, minWidth }) => (
                         <th
                           key={key}
@@ -586,6 +780,39 @@ const ResultsView = ({
                         </td>
                         <td className="py-2 px-2.5">
                           {hit.query_coverage ?? "-"}%
+                        </td>
+                        <td className="py-2 px-2.5 whitespace-nowrap">
+                          {hit.ann?.biosample ? (
+                            <Link
+                              to={biosamplePath(hit.ann.biosample)}
+                              className="font-mono text-xs text-info hover:underline"
+                            >
+                              {hit.ann.biosample}
+                            </Link>
+                          ) : (
+                            <AnnotationPlaceholder
+                              status={annotationStatus}
+                              hit={hit}
+                            />
+                          )}
+                        </td>
+                        <td className="py-2 px-2.5">
+                          {hit.resolved?.profile ? (
+                            <ProfileBadge {...hit.resolved} />
+                          ) : (
+                            <AnnotationPlaceholder
+                              status={annotationStatus}
+                              hit={hit}
+                            />
+                          )}
+                        </td>
+                        <td className="py-2 px-2.5">
+                          {hit.ann?.country || (
+                            <AnnotationPlaceholder
+                              status={annotationStatus}
+                              hit={hit}
+                            />
+                          )}
                         </td>
                       </tr>
                     ))}

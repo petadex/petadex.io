@@ -6,6 +6,7 @@
 // dedup, responsive sizing all landed here only) and /substrate was deleted.
 // BHET50 went with it — this view offers 12.5 and 25 mM only.
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Link } from "gatsby"
 import config from "../../config"
 import { generateCSV, downloadCSV } from "../../utils/csvDownload"
@@ -256,6 +257,17 @@ const SubstrateScatter = ({
   const axisLabel = isActivityMode ? "Activity" : "Avg Intensity"
   const substrates = [...activeSubstrates]
 
+  // Focus mode lifts the card into a full-viewport overlay (portalled to
+  // <body> so no transformed/blurred ancestor can trap `position: fixed`).
+  // Wheel and keyboard zoom are only live here, so they never hijack page scroll.
+  const [isFocused, setIsFocused] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const placeholderHeightRef = useRef(0)
+  // Focus-mode search and name labels. Both only apply while focused.
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchFocusGene, setSearchFocusGene] = useState(null)
+  const [showNames, setShowNames] = useState(false)
+
   const containerRef = useRef(null)
   const [containerWidth, setContainerWidth] = useState(0)
   useEffect(() => {
@@ -263,13 +275,15 @@ const SubstrateScatter = ({
     const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width))
     ro.observe(containerRef.current)
     return () => ro.disconnect()
-  }, [])
+  }, [isFocused])
 
   const isMobile = containerWidth > 0 && containerWidth < 600
   const chartMargin = isMobile
     ? { top: 16, right: 12, left: 48, bottom: 64 }
     : { top: 24, right: 48, left: 88, bottom: 88 }
-  const chartHeight = isMobile ? 340 : 460
+  const chartHeight = isFocused
+    ? Math.max(320, viewportHeight - (isMobile ? 260 : 230))
+    : isMobile ? 340 : 460
   const xLabelOffset = isMobile ? 22 : 48
   const yLabelDx = isMobile ? -28 : -64
   const yAxisWidth = isMobile ? 44 : 72
@@ -342,7 +356,7 @@ const SubstrateScatter = ({
       }
     }, 50)
     return () => clearTimeout(t)
-  }, [containerWidth, chartHeight, isMobile, scatterData.length])
+  }, [containerWidth, chartHeight, isMobile, scatterData.length, isFocused])
 
   // Convert a client-space mouse position to chart data coordinates.
   const clientToData = (clientX, clientY) => {
@@ -362,6 +376,120 @@ const SubstrateScatter = ({
       y: yMax - yFrac * (yMax - yMin),
     }
   }
+
+  // Scale the current view by `factor` (<1 zooms in, >1 out) about `center`
+  // (data coords; defaults to the view's midpoint). Each axis is clamped to the
+  // data extent, and a view that covers the full extent on both axes collapses
+  // back to the unzoomed state.
+  const zoomBy = useCallback((factor, center) => {
+    const full = {
+      x: [resolvedDomain.xMin, resolvedDomain.xMax],
+      y: [resolvedDomain.yMin, resolvedDomain.yMax],
+    }
+    const scaleAxis = ([lo, hi], c, [fLo, fHi]) => {
+      const fullW = fHi - fLo
+      const w = Math.max((hi - lo) * factor, fullW * 0.002)
+      if (w >= fullW) return [fLo, fHi]
+      let a = c - (c - lo) * (w / (hi - lo))
+      a = Math.min(Math.max(a, fLo), fHi - w)
+      return [a, a + w]
+    }
+    setZoom(prev => {
+      const cur = prev ?? full
+      const cx = center?.x ?? (cur.x[0] + cur.x[1]) / 2
+      const cy = center?.y ?? (cur.y[0] + cur.y[1]) / 2
+      const x = scaleAxis(cur.x, cx, full.x)
+      const y = scaleAxis(cur.y, cy, full.y)
+      const isFull =
+        x[0] === full.x[0] && x[1] === full.x[1] &&
+        y[0] === full.y[0] && y[1] === full.y[1]
+      return isFull ? null : { x, y }
+    })
+  }, [resolvedDomain])
+
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!isFocused || !q) return null
+    return scatterData.filter(d =>
+      [d.gene, d.nickname, d.accession, benchmarkEnzymes[d.accession]]
+        .some(v => v && String(v).toLowerCase().includes(q))
+    )
+  }, [searchQuery, scatterData, isFocused])
+  const searchMatchGenes = useMemo(
+    () => (searchMatches ? new Set(searchMatches.map(d => d.gene)) : null),
+    [searchMatches]
+  )
+
+  // Zoom to a window ~15% of the data extent centred on one gene, and pulse it.
+  const focusOnGene = d => {
+    const span = (lo, hi) => (hi - lo) * 0.15
+    const around = (c, lo, hi) => {
+      const w = span(lo, hi)
+      const a = Math.min(Math.max(c - w / 2, lo), hi - w)
+      return [a, a + w]
+    }
+    setZoom({
+      x: around(d.x, resolvedDomain.xMin, resolvedDomain.xMax),
+      y: around(d.y, resolvedDomain.yMin, resolvedDomain.yMax),
+    })
+    setSearchFocusGene(d.gene)
+  }
+
+  // Leaving focus clears its search so the inline chart never renders dimmed.
+  useEffect(() => {
+    if (isFocused) return
+    setSearchQuery("")
+    setSearchFocusGene(null)
+  }, [isFocused])
+
+  const enterFocus = () => {
+    placeholderHeightRef.current = containerRef.current?.offsetHeight || 0
+    setViewportHeight(window.innerHeight)
+    setIsFocused(true)
+  }
+
+  // While focused: lock page scroll, track viewport height, keyboard shortcuts.
+  useEffect(() => {
+    if (!isFocused) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const onResize = () => setViewportHeight(window.innerHeight)
+    const onKey = e => {
+      if (e.target.closest?.("input, select, textarea")) return
+      if (e.key === "Escape") setIsFocused(false)
+      else if (e.key === "+" || e.key === "=") zoomBy(1 / 1.5)
+      else if (e.key === "-" || e.key === "_") zoomBy(1.5)
+      else if (e.key === "0") setZoom(null)
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener("resize", onResize)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener("resize", onResize)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [isFocused, zoomBy])
+
+  // Wheel / trackpad-pinch zoom about the cursor, focus mode only. Bound natively
+  // because React's onWheel is passive and can't preventDefault the page scroll.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!isFocused || !el) return
+    const onWheel = e => {
+      if (!e.target.closest?.(".recharts-surface")) return
+      const pt = clientToData(e.clientX, e.clientY)
+      if (!pt) return
+      e.preventDefault()
+      const factor = Math.min(Math.max(Math.exp(e.deltaY * 0.002), 0.5), 2)
+      zoomBy(factor, pt)
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+    // clientToData reads `zoom`; rebinding on zoom keeps it current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, zoom, zoomBy])
 
   const diagonalData = useMemo(() => {
     if (scatterData.length === 0) return []
@@ -419,8 +547,19 @@ const SubstrateScatter = ({
   const yDomain = zoom?.y || ["dataMin", "dataMax"]
   const isZoomed = zoom !== null
 
-  return (
-    <div id="substrate-scatter" className="card mb-8 relative" ref={containerRef}>
+  const card = (
+    <div
+      id="substrate-scatter"
+      ref={containerRef}
+      className={
+        isFocused
+          ? "card fixed inset-0 z-[100] m-0 rounded-none border-0 overflow-y-auto"
+          : "card mb-8 relative"
+      }
+      role={isFocused ? "dialog" : undefined}
+      aria-modal={isFocused || undefined}
+      aria-label={isFocused ? "Substrate preference plot, focus mode" : undefined}
+    >
       <div className="flex justify-between items-start mb-4 flex-wrap gap-4 px-6 pt-6">
         <div>
           <h2 className="text-xl font-bold text-primary">
@@ -450,6 +589,42 @@ const SubstrateScatter = ({
         </div>
 
         <div className="flex gap-3 items-center flex-wrap">
+          {isFocused && (
+            <button
+              onClick={() => setShowNames(v => !v)}
+              aria-pressed={showNames}
+              className={`btn text-xs gap-1.5 ${showNames ? "btn-primary" : "btn-secondary"}`}
+              title="Label every dot with its gene name"
+            >
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+              </svg>
+              Names
+            </button>
+          )}
+
+          {isFocused && (
+            <div className="flex items-center" role="group" aria-label="Zoom">
+              <button
+                onClick={() => zoomBy(1.5)}
+                disabled={!isZoomed}
+                className="btn btn-secondary text-sm px-3 rounded-r-none disabled:opacity-40 disabled:cursor-default"
+                title="Zoom out (−)"
+                aria-label="Zoom out"
+              >
+                −
+              </button>
+              <button
+                onClick={() => zoomBy(1 / 1.5)}
+                className="btn btn-secondary text-sm px-3 rounded-l-none border-l-0"
+                title="Zoom in (+)"
+                aria-label="Zoom in"
+              >
+                +
+              </button>
+            </div>
+          )}
+
           {isZoomed && (
             <button
               onClick={() => setZoom(null)}
@@ -463,6 +638,21 @@ const SubstrateScatter = ({
               Reset zoom
             </button>
           )}
+
+          <button
+            onClick={isFocused ? () => setIsFocused(false) : enterFocus}
+            className="btn btn-secondary text-xs gap-1.5"
+            title={isFocused ? "Exit focus mode (Esc)" : "Open the plot full screen, with scroll-to-zoom"}
+          >
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              {isFocused ? (
+                <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+              ) : (
+                <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+              )}
+            </svg>
+            {isFocused ? "Exit focus" : "Focus"}
+          </button>
 
           {substrates.length > 2 && (
             <div className="flex gap-4 items-center">
@@ -492,8 +682,66 @@ const SubstrateScatter = ({
         </div>
       </div>
 
+      {isFocused && (
+        <div className="px-6 mb-3 relative max-w-md">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={e => {
+              setSearchQuery(e.target.value)
+              setSearchFocusGene(null)
+            }}
+            onKeyDown={e => {
+              if (e.key === "Enter" && searchMatches?.length) {
+                e.preventDefault()
+                focusOnGene(searchMatches[0])
+              } else if (e.key === "Escape") {
+                e.preventDefault()
+                if (searchQuery) setSearchQuery("")
+                else e.currentTarget.blur()
+                setSearchFocusGene(null)
+              }
+            }}
+            placeholder="Search gene, nickname or accession…"
+            aria-label="Search genes on the plot"
+            className="input w-full text-sm"
+          />
+          {searchMatches && (
+            <div className="mt-1 text-xs text-muted-foreground" aria-live="polite">
+              {searchMatches.length === 0
+                ? "No genes on this plot match"
+                : `${searchMatches.length} match${searchMatches.length === 1 ? "" : "es"} highlighted · Enter or pick one to zoom to it`}
+            </div>
+          )}
+          {searchMatches?.length > 0 && !searchFocusGene && (
+            <ul className="absolute left-6 right-0 top-full mt-1 z-20 max-h-64 overflow-y-auto list-none p-1 m-0 bg-card border border-border rounded-lg shadow-lg">
+              {searchMatches.slice(0, 50).map(d => (
+                <li key={d.gene}>
+                  <button
+                    type="button"
+                    onClick={() => focusOnGene(d)}
+                    className="w-full text-left px-3 py-1.5 rounded-md text-sm hover:bg-muted flex items-baseline gap-2 bg-transparent border-none cursor-pointer"
+                  >
+                    <span className="font-mono font-semibold text-foreground">{d.gene}</span>
+                    {d.nickname && <span className="text-muted-foreground text-xs">{d.nickname}</span>}
+                    {d.accession && <span className="ml-auto text-muted-foreground text-xs font-mono">{d.accession}</span>}
+                  </button>
+                </li>
+              ))}
+              {searchMatches.length > 50 && (
+                <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                  {searchMatches.length - 50} more — keep typing to narrow
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground italic mb-3 px-6">
-        Drag a box on the chart to zoom in · click a dot to jump to its gene card
+        {isFocused
+          ? "Scroll or press +/− to zoom · drag a box to zoom to it · 0 resets · Esc exits"
+          : "Drag a box on the chart to zoom in · click a dot to jump to its gene card"}
       </p>
 
       <ResponsiveContainer width="100%" height={chartHeight}>
@@ -558,16 +806,40 @@ const SubstrateScatter = ({
             data={scatterData}
             isAnimationActive
             animationDuration={800}
-            onClick={data => { if (data?.gene) onDotClick(data.gene) }}
+            onClick={data => {
+              if (!data?.gene) return
+              // The gene card lives behind the overlay; leave focus to show it.
+              setIsFocused(false)
+              onDotClick(data.gene)
+            }}
             cursor="pointer"
             shape={props => {
               const { cx, cy, payload } = props
               const prefersX = payload.x > payload.y
               const color = prefersX ? mediaColors[scatterXAxis] : mediaColors[scatterYAxis]
-              const isHighlighted = highlightedGene && payload.gene === highlightedGene
+              const isHighlighted =
+                (highlightedGene && payload.gene === highlightedGene) ||
+                (isFocused && payload.gene === searchFocusGene)
               const benchmarkLabel = benchmarkEnzymes[payload.accession]
               const showBenchmarkLabel =
                 benchmarkLabel && labeledBenchmarkGenes.has(payload.gene)
+              const isMatch = searchMatchGenes?.has(payload.gene)
+              const isDimmed = searchMatchGenes && !isMatch
+              // Benchmarks keep their common-name label; everything else gets
+              // its gene name when Names is on or it matches the search.
+              const nameLabel =
+                isFocused && !showBenchmarkLabel && (showNames || isMatch) ? (
+                  <text
+                    x={cx + 8}
+                    y={cy - 7}
+                    fontSize="10"
+                    fontWeight={isMatch ? "700" : "400"}
+                    fill={isMatch ? "var(--foreground)" : "var(--muted-foreground)"}
+                    style={{ pointerEvents: "none" }}
+                  >
+                    {payload.gene}
+                  </text>
+                ) : null
 
               const pulseRing = (
                 <circle cx={cx} cy={cy} r={14} fill="none" stroke={color} strokeWidth={2}>
@@ -582,16 +854,23 @@ const SubstrateScatter = ({
                 </text>
               ) : null
 
+              const opacity = isDimmed ? 0.15 : 1
+
               if (benchmarkLabel && isHighlighted) {
-                return <g>{pulseRing}<polygon points={diamondPoints(cx, cy, 9)} fill={color} stroke="#fff" strokeWidth={2.5} />{label}</g>
+                return <g>{pulseRing}<polygon points={diamondPoints(cx, cy, 9)} fill={color} stroke="#fff" strokeWidth={2.5} />{label}{nameLabel}</g>
               }
               if (benchmarkLabel) {
-                return <g><polygon points={diamondPoints(cx, cy, 8)} fill={color} stroke="var(--foreground)" strokeWidth={2} />{label}</g>
+                return <g opacity={opacity}><polygon points={diamondPoints(cx, cy, 8)} fill={color} stroke="var(--foreground)" strokeWidth={2} />{label}{nameLabel}</g>
               }
               if (isHighlighted) {
-                return <g>{pulseRing}<circle cx={cx} cy={cy} r={7} fill={color} stroke="#fff" strokeWidth={2.5} /></g>
+                return <g>{pulseRing}<circle cx={cx} cy={cy} r={7} fill={color} stroke="#fff" strokeWidth={2.5} />{nameLabel}</g>
               }
-              return <circle cx={cx} cy={cy} r={5} fill={color} fillOpacity={0.65} stroke={color} strokeWidth={1.5} strokeOpacity={0.9} />
+              return (
+                <g opacity={opacity}>
+                  <circle cx={cx} cy={cy} r={isMatch ? 6 : 5} fill={color} fillOpacity={0.65} stroke={isMatch ? "var(--foreground)" : color} strokeWidth={1.5} strokeOpacity={0.9} />
+                  {nameLabel}
+                </g>
+              )
             }}
           />
           {dragStart && dragEnd && (
@@ -651,6 +930,15 @@ const SubstrateScatter = ({
         </span>
       </div>
     </div>
+  )
+
+  if (!isFocused) return card
+  return (
+    <>
+      {/* Hold the card's place so the page doesn't reflow behind the overlay. */}
+      <div className="mb-8" style={{ height: placeholderHeightRef.current }} aria-hidden="true" />
+      {createPortal(card, document.body)}
+    </>
   )
 }
 

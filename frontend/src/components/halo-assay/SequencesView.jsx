@@ -2,12 +2,63 @@ import React, { useEffect, useMemo, useState } from "react"
 import config from "../../config"
 import SequenceList from "../sequence/SequenceList"
 import TopPerformersLeaderboard from "./TopPerformersLeaderboard"
+import { generateCSV, downloadCSV } from "../../utils/csvDownload"
+
+const SUBSTRATES = ["BHET12.5", "BHET25", "BHET50"]
+
+const ACTIVITY_CSV_HEADERS = [
+  "accession",
+  "source",
+  "gene",
+  "nickname",
+  "media",
+  "timepoint_hours",
+  "average_readout",
+  "stddev_readout",
+  "sample_count",
+  "activity",
+  "peak_value",
+  "peak_timepoint_hours",
+  "min_value_after_peak",
+  "min_timepoint_hours",
+  "activity_flag",
+  "sequence",
+]
+
+// One row per gene × media × timepoint. The per-gene/media activity summary
+// (peak − subsequent minimum) is repeated on each of that pair's timepoint rows.
+function buildActivityRows({ timeseries, activity }, sequenceByAccession) {
+  const summary = new Map(activity.map(a => [`${a.gene}|${a.media}`, a]))
+  return timeseries.map(t => {
+    const a = summary.get(`${t.gene}|${t.media}`) || {}
+    return [
+      t.accession,
+      t.source,
+      t.gene,
+      t.nickname,
+      t.media,
+      t.timepoint_hours,
+      t.average_readout,
+      t.stddev_readout,
+      t.sample_count,
+      a.activity,
+      a.peak_value,
+      a.peak_timepoint,
+      a.min_value,
+      a.min_timepoint,
+      a.flag,
+      sequenceByAccession.get(t.accession),
+    ]
+  })
+}
 
 const SequencesView = () => {
   const [sequences, setSequences] = useState([])
   const [searchInput, setSearchInput] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -29,6 +80,32 @@ const SequencesView = () => {
     const q = searchInput.toLowerCase()
     return sequences.filter(seq => seq.accession.toLowerCase().includes(q))
   }, [sequences, searchInput])
+
+  async function handleDownloadActivity() {
+    setDownloading(true)
+    setDownloadError(null)
+    try {
+      const res = await fetch(
+        `${config.apiUrl}/plate-data/comparison?media=${SUBSTRATES.join(",")}`
+      )
+      if (!res.ok) throw new Error(`Status ${res.status}`)
+      const data = await res.json()
+      const sequenceByAccession = new Map(
+        sequences.map(s => [s.accession, s.sequence])
+      )
+      downloadCSV(
+        generateCSV(
+          ACTIVITY_CSV_HEADERS,
+          buildActivityRows(data, sequenceByAccession)
+        ),
+        `petadex_halo_assay_activity_${new Date().toISOString().slice(0, 10)}`
+      )
+    } catch (err) {
+      setDownloadError(err.toString())
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const withMetadata = filtered.filter(s => s.in_gene_metadata === true)
   const withoutMetadata = filtered.filter(s => s.in_gene_metadata !== true)
@@ -104,12 +181,28 @@ const SequencesView = () => {
         <p className="text-destructive py-4">Error loading sequences: {error}</p>
       ) : (
         <div>
+          <div className="flex flex-wrap items-center justify-end gap-3 mb-4">
+            {downloadError && (
+              <span className="text-sm text-destructive">
+                Download failed: {downloadError}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleDownloadActivity}
+              disabled={downloading}
+              className="btn btn-secondary text-sm disabled:opacity-40 disabled:cursor-default"
+              title="Every sequence with halo-assay data, with its averaged readout per substrate and timepoint"
+            >
+              {downloading ? "Preparing CSV…" : "Download activity data (CSV)"}
+            </button>
+          </div>
           <SequenceList
             title="Sequences with Experimental Data"
             sequenceList={withMetadata}
           />
           <SequenceList
-            title="Sequences without Experimental Data"
+            title="Controls"
             sequenceList={withoutMetadata}
           />
         </div>

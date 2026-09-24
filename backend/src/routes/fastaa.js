@@ -21,7 +21,12 @@ router.get('/', async (req, res, next) => {
         f.synthetic,
         f.parent_accessions,
         f.parent_genes,
-        f.in_gene_metadata,
+        -- Derived, not the stored fastaa.in_gene_metadata column, which nothing
+        -- keeps in sync (it drifted to 199 false positives; fixed 2026-09-24 by
+        -- petadex-access/scripts/fix_in_gene_metadata.py).
+        EXISTS(
+          SELECT 1 FROM gene_metadata gm WHERE gm.accession = f.accession
+        ) AS in_gene_metadata,
         (m.accession IS NOT NULL) AS in_sra_metadata
       FROM fastaa f
       LEFT JOIN (
@@ -58,7 +63,9 @@ router.get('/:accession', async (req, res, next) => {
         f.synthetic,
         f.parent_accessions,
         f.parent_genes,
-        f.in_gene_metadata,
+        EXISTS(
+          SELECT 1 FROM gene_metadata gm WHERE gm.accession = f.accession
+        ) as in_gene_metadata,
         EXISTS(
           SELECT 1
           FROM with_sra_and_biosample_loc_metadata m

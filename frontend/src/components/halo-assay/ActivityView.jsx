@@ -1122,6 +1122,12 @@ const ActivityView = ({ showTitle = false }) => {
   }
 
   const geneEntries = Object.entries(geneGroups)
+  // Plate controls (EV, empty_well) have no accession. Counting them apart lets
+  // this line reconcile with the Sequences tab, which counts accessions.
+  const controlCount = geneEntries.filter(([, g]) => !g.accession).length
+  const sequenceCount = new Set(
+    geneEntries.map(([, g]) => g.accession).filter(Boolean)
+  ).size
 
   return (
     <div>
@@ -1186,8 +1192,12 @@ const ActivityView = ({ showTitle = false }) => {
 
           <div className="flex justify-between items-center mb-4">
             <p className="text-sm text-secondary-foreground">
-              Showing {geneEntries.length}{" "}
-              {geneEntries.length === 1 ? "gene" : "genes"} with substrate data
+              Showing {geneEntries.length - controlCount}{" "}
+              {geneEntries.length - controlCount === 1 ? "gene" : "genes"} from{" "}
+              {sequenceCount} {sequenceCount === 1 ? "sequence" : "sequences"}
+              {controlCount > 0 &&
+                ` + ${controlCount} plate ${controlCount === 1 ? "control" : "controls"}`}{" "}
+              with substrate data
             </p>
             {scatterData.length > 0 && (
               <p className="text-xs text-muted-foreground">

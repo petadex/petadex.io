@@ -42,7 +42,12 @@ app.use(cors({
     'http://localhost:8000',
     'http://localhost:9000',
     'http://localhost:3000',
-    'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001'
+    'http://ec2-44-222-238-66.compute-1.amazonaws.com:3001',
+    // Vercel deployments of the Gatsby frontend (project: petadex-gatsby).
+    // Scoped to this project's prefix rather than a blanket *.vercel.app, which
+    // would let any app on Vercel call this API. Matches the production alias,
+    // per-deployment URLs, and git-branch previews.
+    /^https:\/\/petadex-gatsby(-[a-z0-9-]+)?\.vercel\.app$/
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

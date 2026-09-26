@@ -19,7 +19,6 @@ import React, { useState, useEffect } from "react"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
 import config from "../config"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import SequenceViewer from "../components/sequence/SequenceViewer"
 import ClusterContextPanel from "../components/corpus/ClusterContextPanel.jsx"
 import CatalyticDomainsPanel from "../components/corpus/CatalyticDomainsPanel.jsx"
@@ -62,8 +61,6 @@ function normalizeOrf(raw, fallbackId) {
 }
 
 export default function CorpusSequenceTemplate({ pageContext }) {
-  useScrollHeader()
-
   const orfId = pageContext?.orfId ?? null
   const [orf, setOrf] = useState(null)
   const [status, setStatus] = useState("loading") // loading | ready | notfound | error

@@ -19,6 +19,7 @@ import {
   NO_PROFILE_FACET,
   biosamplePath,
 } from "../../utils/annotation"
+import { familyColor } from "../../utils/familyColor"
 
 // The profile facet lives in the URL (?profile=<slug>) so it survives bookmarking
 // and back-navigation. replaceState keeps the job id and adds no history entry.
@@ -35,12 +36,6 @@ function writeProfileFacet(value) {
   if (value) url.searchParams.set(PROFILE_PARAM, value)
   else url.searchParams.delete(PROFILE_PARAM)
   window.history.replaceState(window.history.state, "", url)
-}
-
-// Deterministic per-family color — must match enzymes.js
-function familyColor(familyId) {
-  const hue = (familyId * 137.508) % 360
-  return `hsl(${hue}, 60%, 45%)`
 }
 
 const TABS = [

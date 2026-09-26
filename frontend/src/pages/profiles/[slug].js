@@ -16,13 +16,13 @@ import { Link } from "gatsby"
 import Seo from "../../components/seo"
 import Container from "../../components/common/Container"
 import config from "../../config"
-import { useScrollHeader } from "../../hooks/useScrollHeader"
 import {
   profileLabel,
   biosamplePath,
   EVIDENCE_META,
   PROFILE_DESCRIPTIONS,
 } from "../../utils/annotation"
+import { formatCount } from "../../utils/format"
 
 const PAGE_SIZE = 50
 
@@ -39,8 +39,6 @@ const EVIDENCE_FILTERS = [
     count: p => Math.max(0, p.n_in_universe - p.n_stated - p.n_inferred),
   },
 ]
-
-const fmt = n => (n == null ? "—" : Number(n).toLocaleString())
 
 function readEvidenceParam() {
   if (typeof window === "undefined") return ""
@@ -199,7 +197,6 @@ function BiosampleTable({ slug, evidence }) {
 }
 
 export default function ProfilePage({ params }) {
-  useScrollHeader()
   const slug = params.slug
   const [profile, setProfile] = useState(null)
   const [status, setStatus] = useState("loading") // loading | ready | notfound | error
@@ -276,13 +273,13 @@ export default function ProfilePage({ params }) {
         <>
           <section className="card p-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Stat label="BioSamples" value={fmt(profile.n_biosamples)} />
-              <Stat label="In universe" value={fmt(profile.n_in_universe)} />
+              <Stat label="BioSamples" value={formatCount(profile.n_biosamples)} />
+              <Stat label="In universe" value={formatCount(profile.n_in_universe)} />
               <Stat
                 label={isUnprofilable ? "No description" : "Stated"}
-                value={fmt(isUnprofilable ? profile.n_none : profile.n_stated)}
+                value={formatCount(isUnprofilable ? profile.n_none : profile.n_stated)}
               />
-              <Stat label="BioProjects" value={fmt(profile.n_bioprojects)} />
+              <Stat label="BioProjects" value={formatCount(profile.n_bioprojects)} />
             </div>
           </section>
 
@@ -310,7 +307,7 @@ export default function ProfilePage({ params }) {
                       aria-pressed={evidence === f.value}
                       onClick={() => setEvidence(f.value)}
                     >
-                      {f.label} · {fmt(f.count(profile))}
+                      {f.label} · {formatCount(f.count(profile))}
                     </button>
                   ))}
                 </div>

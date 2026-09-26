@@ -18,6 +18,7 @@ import React, { useEffect, useState } from "react"
 import config from "../../config"
 import { Link } from "gatsby"
 import { profileLabel, profilePath } from "../../utils/annotation"
+import { formatCount } from "../../utils/format"
 
 // TODO(decision, §9): set the n_orfs_profiled floor for the specialist badge.
 export const SPECIALIST_BADGE_FLOOR = null
@@ -29,8 +30,6 @@ export function showSpecialistBadge(summary, floor = SPECIALIST_BADGE_FLOOR) {
     summary.n_orfs_profiled >= floor
   )
 }
-
-const fmt = n => (n == null ? "—" : Number(n).toLocaleString())
 
 function Stat({ label, value }) {
   return (
@@ -114,7 +113,7 @@ export default function ClusterProfilesPanel({ pid90 }) {
             className="badge badge-info"
             title={`Shannon entropy ${data.shannon_entropy?.toFixed(
               2
-            )} over ${fmt(data.n_orfs_profiled)} profiled ORFs`}
+            )} over ${formatCount(data.n_orfs_profiled)} profiled ORFs`}
             data-testid="specialist-badge"
           >
             {data.n_profiles === 1 ? "Single-profile" : "Multi-profile"}
@@ -127,9 +126,9 @@ export default function ClusterProfilesPanel({ pid90 }) {
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <Stat label="ORFs" value={fmt(data.n_orfs)} />
-        <Stat label="Profiled ORFs" value={fmt(data.n_orfs_profiled)} />
-        <Stat label="Profiles" value={fmt(data.n_profiles)} />
+        <Stat label="ORFs" value={formatCount(data.n_orfs)} />
+        <Stat label="Profiled ORFs" value={formatCount(data.n_orfs_profiled)} />
+        <Stat label="Profiles" value={formatCount(data.n_profiles)} />
         <Stat
           label="Dominant"
           value={
@@ -150,9 +149,9 @@ export default function ClusterProfilesPanel({ pid90 }) {
             <li
               key={d.profile}
               className="grid grid-cols-[10rem_1fr_6rem] items-center gap-3 text-sm"
-              title={`${profileLabel(d.profile)}: ${fmt(
+              title={`${profileLabel(d.profile)}: ${formatCount(
                 d.n_orfs
-              )} ORFs from ${fmt(d.n_biosamples)} BioSamples in ${fmt(
+              )} ORFs from ${formatCount(d.n_biosamples)} BioSamples in ${formatCount(
                 d.n_bioprojects
               )} BioProjects`}
             >
@@ -171,7 +170,7 @@ export default function ClusterProfilesPanel({ pid90 }) {
                 />
               </span>
               <span className="text-right text-muted-foreground tabular-nums">
-                {fmt(d.n_orfs)}
+                {formatCount(d.n_orfs)}
               </span>
             </li>
           ))}
@@ -184,7 +183,7 @@ export default function ClusterProfilesPanel({ pid90 }) {
 
       {unprofilable?.n_orfs > 0 && (
         <p className="text-xs text-muted-foreground mt-4 mb-0">
-          Plus {fmt(unprofilable.n_orfs)} ORFs from samples with no environment
+          Plus {formatCount(unprofilable.n_orfs)} ORFs from samples with no environment
           description.
         </p>
       )}

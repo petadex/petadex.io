@@ -13,14 +13,11 @@ import { Link } from "gatsby"
 import Seo from "../../../components/seo"
 import Container from "../../../components/common/Container"
 import config from "../../../config"
-import { useScrollHeader } from "../../../hooks/useScrollHeader"
 import ClusterProfilesPanel from "../../../components/annotation/ClusterProfilesPanel"
 
 const VALID_LEVELS = new Set(["90", "60", "30"])
 
 export default function ClusterPage({ params }) {
-  useScrollHeader()
-
   const { level, clusterId } = params
   const [block, setBlock] = useState(null)
   const [status, setStatus] = useState("loading") // loading | ready | notfound | error

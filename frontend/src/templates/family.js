@@ -11,7 +11,6 @@ import LazyPetadexCatalyticDomainsPanel from "../components/petadexDomains/LazyP
 import AtlasMap from "../components/charts/AtlasMap"
 import PhyloTreePanel from "../components/phyloTree/PhyloTreePanel"
 import config from "../config"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import {
   COMPONENT_TO_CATH,
   COMPONENT_SHADE_CSS,
@@ -358,7 +357,6 @@ function Section({ title, children }) {
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function FamilyTemplate({ pageContext }) {
-  useScrollHeader()
   const familyId =
     pageContext?.familyId ||
     (typeof window !== "undefined"

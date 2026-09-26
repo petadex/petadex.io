@@ -3,8 +3,8 @@ import config from "../../config"
 import SequenceList from "../sequence/SequenceList"
 import TopPerformersLeaderboard from "./TopPerformersLeaderboard"
 import { generateCSV, downloadCSV } from "../../utils/csvDownload"
-
-const SUBSTRATES = ["BHET12.5", "BHET25", "BHET50"]
+import { COMPARISON_SUBSTRATES } from "./constants"
+import { fetchComparison } from "./comparison"
 
 const ACTIVITY_CSV_HEADERS = [
   "accession",
@@ -85,11 +85,7 @@ const SequencesView = () => {
     setDownloading(true)
     setDownloadError(null)
     try {
-      const res = await fetch(
-        `${config.apiUrl}/plate-data/comparison?media=${SUBSTRATES.join(",")}`
-      )
-      if (!res.ok) throw new Error(`Status ${res.status}`)
-      const data = await res.json()
+      const data = await fetchComparison(COMPARISON_SUBSTRATES)
       const sequenceByAccession = new Map(
         sequences.map(s => [s.accession, s.sequence])
       )

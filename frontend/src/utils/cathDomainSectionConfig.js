@@ -120,8 +120,3 @@ export function getCathSectionNavItems(_domain) {
   items.push({ id: "cath-refs-heading", label: "References" })
   return items
 }
-
-/** @deprecated Use getAllCathSections — all sections are always shown. */
-export function getVisibleCathSections(domain) {
-  return getAllCathSections().filter(({ key }) => hasCathSectionContent(domain, key))
-}

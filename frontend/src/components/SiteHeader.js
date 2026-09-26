@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import { Link } from "gatsby"
 import { useTheme } from "../context/ThemeContext"
+import { ACTIVITY_LINKS } from "../data/activityLinks"
 
 const NAV_ITEMS = [
   {
     label: "Activity",
     path: "/activity",
     key: "activity",
-    children: [
-      { label: "Kinetics", path: "/kinetics", key: "kinetics" },
-      { label: "Substrates", path: "/substrates", key: "substrates" },
-      { label: "Halo Assay", path: "/halo-assay", key: "halo-assay" },
-    ],
+    children: ACTIVITY_LINKS,
   },
   { label: "Enzymes", path: "/enzymes", key: "enzymes" },
   { label: "Search", path: "/search", key: "search" },

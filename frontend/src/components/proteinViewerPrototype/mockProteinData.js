@@ -16,9 +16,6 @@ export const DEMO_SEQUENCE = RAW_SEQUENCE.slice(0, TEMPLATE_LENGTH)
 /** @deprecated use DEMO_SEQUENCE */
 export const SEQUENCE = DEMO_SEQUENCE
 
-/** @deprecated use DEMO_SEQUENCE.length */
-export const SEQUENCE_LENGTH = TEMPLATE_LENGTH
-
 /**
  * Relative annotation layout (coordinates match TEMPLATE_LENGTH).
  */
@@ -72,12 +69,6 @@ export function logicalTracksForSequenceLength(sequenceLength) {
   }))
 }
 
-/** Nightingale / nightingale-interpro-track `data` arrays (one per track row). */
-export function nightingaleFeaturesByTrack(sequenceLength) {
-  const len = sequenceLength ?? TEMPLATE_LENGTH
-  return nightingalePayloadFromLogicalTracks(logicalTracksForSequenceLength(len))
-}
-
 /** feature-viewer `addFeature` payloads — one object per track row. */
 export function featureViewerTrackDefinitions(sequenceLength) {
   const len = sequenceLength ?? TEMPLATE_LENGTH
@@ -87,33 +78,6 @@ export function featureViewerTrackDefinitions(sequenceLength) {
 /** Same coordinate space as {@link logicalTracksForSequenceLength} (scaled mock). */
 export function logicalTracksFromTemplate(sequenceLength) {
   return logicalTracksForSequenceLength(sequenceLength)
-}
-
-/**
- * @param {{ id: string, title: string, features: Array<{ label: string, start: number, end: number, color: string }> }} track
- */
-export function nightingaleInterproDataFromLogicalTrack(track) {
-  const isPlddt = track.id === "plddt"
-  return {
-    id: track.id,
-    title: track.title,
-    data: track.features.map(f => ({
-      accession: isPlddt ? "pLDDT" : f.label,
-      locations: [{ fragments: [{ start: f.start, end: f.end }] }],
-      color: f.color,
-      shape: isPlddt ? "rectangle" : "roundRectangle",
-      tooltipContent: isPlddt
-        ? typeof f.score === "number"
-          ? `pLDDT ${f.score.toFixed(1)} (${f.start}${f.end > f.start ? `–${f.end}` : ""})`
-          : `${f.label} (${f.start}–${f.end})`
-        : `${f.label}: ${f.start}–${f.end}`,
-    })),
-  }
-}
-
-/** @param {ReturnType<typeof logicalTracksForSequenceLength>} tracks */
-export function nightingalePayloadFromLogicalTracks(tracks) {
-  return tracks.map(nightingaleInterproDataFromLogicalTrack)
 }
 
 function featureViewerRectTrack(track) {

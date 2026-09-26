@@ -15,7 +15,6 @@ import { Link } from "gatsby"
 import Seo from "../../components/seo"
 import Container from "../../components/common/Container"
 import config from "../../config"
-import { useScrollHeader } from "../../hooks/useScrollHeader"
 import ProfileBadge from "../../components/annotation/ProfileBadge"
 import SamplePinMap from "../../components/annotation/SamplePinMap"
 import CoordinateLinks from "../../components/annotation/CoordinateLinks"
@@ -225,7 +224,6 @@ function SequenceList({ id }) {
 }
 
 export default function BiosamplePage({ params }) {
-  useScrollHeader()
   const id = params.id
   const [data, setData] = useState(null)
   const [status, setStatus] = useState("loading") // loading | ready | notfound | error

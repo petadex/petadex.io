@@ -317,15 +317,6 @@ const ProteinViewer = ({
     bumpLayout,
   ]);
 
-  const handleMouseEnter = () => {
-    if (!showControls) return;
-
-    const header = document.querySelector('.ui-section-header');
-    if (header && window.pageYOffset > 100) {
-      header.classList.add('header-hidden');
-    }
-  };
-
   const handleViewerMouseLeave = () => {
     setHoverTip(null);
   };
@@ -338,7 +329,6 @@ const ProteinViewer = ({
 
   return (
     <div
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleViewerMouseLeave}
       className={!showControls ? 'molstar-compact' : ''}
       style={{

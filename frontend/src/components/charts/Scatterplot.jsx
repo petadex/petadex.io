@@ -2,11 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react"
 import * as d3 from "d3"
 import { Axes } from "./Axes"
 import { Tooltip } from "./Tooltip"
-
-function familyColor(familyId) {
-  const hue = (familyId * 137.508) % 360
-  return `hsl(${hue}, 60%, 45%)`
-}
+import { familyColor } from "../../utils/familyColor"
 
 // Shared chip used by legend
 const LegendChip = ({ label, count, color, onClick }) => (

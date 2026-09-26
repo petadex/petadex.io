@@ -6,14 +6,8 @@ import Container from "../components/common/Container"
 import ScrollableArea from "../components/common/ScrollableArea"
 import IdentifierResolver from "../components/search/IdentifierResolver"
 import config from "../config"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import { cathDomainPathForComponent } from "../utils/cathDomainCatalogLookup"
-
-// Deterministic per-family color from family_id using golden-ratio hue spread
-function familyColor(familyId) {
-  const hue = (familyId * 137.508) % 360
-  return `hsl(${hue}, 60%, 45%)`
-}
+import { familyColor } from "../utils/familyColor"
 
 // ── EnzymeRow ──────────────────────────────────────────────────────────────
 
@@ -185,8 +179,6 @@ const FamilyCard = ({ family, isExpanded, onToggle }) => {
 // ── EnzymesPage ────────────────────────────────────────────────────────────
 
 const EnzymesPage = ({ location }) => {
-  useScrollHeader()
-
   const [families, setFamilies] = useState([])
   const [expandedFamilies, setExpandedFamilies] = useState(new Set())
   const [loadingFamilies, setLoadingFamilies] = useState(true)

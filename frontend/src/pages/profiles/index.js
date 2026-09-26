@@ -12,14 +12,12 @@ import { Link } from "gatsby"
 import Seo from "../../components/seo"
 import Container from "../../components/common/Container"
 import config from "../../config"
-import { useScrollHeader } from "../../hooks/useScrollHeader"
 import {
   profileLabel,
   profilePath,
   PROFILE_DESCRIPTIONS,
 } from "../../utils/annotation"
-
-const fmt = n => (n == null ? "—" : Number(n).toLocaleString())
+import { formatCount } from "../../utils/format"
 
 const EVIDENCE_ROWS = [
   ["n_stated", "Stated"],
@@ -50,7 +48,7 @@ function ProfileCard({ p }) {
       )}
       <div className="flex items-baseline gap-2">
         <span className="text-2xl font-semibold text-primary tabular-nums">
-          {fmt(p.n_biosamples)}
+          {formatCount(p.n_biosamples)}
         </span>
         <span className="text-sm text-muted-foreground">BioSamples</span>
       </div>
@@ -58,24 +56,23 @@ function ProfileCard({ p }) {
         {EVIDENCE_ROWS.filter(([k]) => p[k] > 0).map(([k, label]) => (
           <React.Fragment key={k}>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="m-0 text-right tabular-nums">{fmt(p[k])}</dd>
+            <dd className="m-0 text-right tabular-nums">{formatCount(p[k])}</dd>
           </React.Fragment>
         ))}
         <dt className="text-muted-foreground border-t border-border/60 pt-1">
           In universe
         </dt>
         <dd className="m-0 text-right tabular-nums border-t border-border/60 pt-1">
-          {fmt(p.n_in_universe)}
+          {formatCount(p.n_in_universe)}
         </dd>
         <dt className="text-muted-foreground">BioProjects</dt>
-        <dd className="m-0 text-right tabular-nums">{fmt(p.n_bioprojects)}</dd>
+        <dd className="m-0 text-right tabular-nums">{formatCount(p.n_bioprojects)}</dd>
       </dl>
     </article>
   )
 }
 
 export default function ProfilesPage() {
-  useScrollHeader()
   const [profiles, setProfiles] = useState(null)
   const [error, setError] = useState(null)
 

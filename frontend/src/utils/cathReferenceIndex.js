@@ -3,7 +3,7 @@
 // transitive imports must be parseable by Node's ESM loader. JSX-bearing
 // rendering lives in cathCaptionLinks.js, which re-exports these.
 
-function normalizeUrl(u) {
+export function normalizeUrl(u) {
   return String(u || "")
     .trim()
     .replace(/\/+$/, "")

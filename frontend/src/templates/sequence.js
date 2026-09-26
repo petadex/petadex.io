@@ -5,10 +5,8 @@ import SynthesizedGenePanel from "../components/SynthesizedGenePanel"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
 import config from "../config"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 
 export default function SequenceTemplate({ pageContext }) {
-  useScrollHeader()
   const [sequence, setSequence] = useState(pageContext.sequence || null)
   const [geneMetadata, setGeneMetadata] = useState([])
   const [headerData, setHeaderData] = useState(null)

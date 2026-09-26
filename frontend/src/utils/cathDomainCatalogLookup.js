@@ -24,13 +24,3 @@ export function cathDomainPathForComponent(component) {
   if (matches.length === 1) return `/cath-domains?id=${encodeURIComponent(matches[0].id)}`
   return `/cath-domains?component=${component}`
 }
-
-/**
- * @param {import("../data/cathDomainCatalog.js").CathDomainCatalogEntry[]} catalog
- * @param {number} component
- * @returns {import("../data/cathDomainCatalog.js").CathDomainCatalogEntry[]}
- */
-export function domainsSharingComponent(catalog, component) {
-  const n = Number(component)
-  return catalog.filter(d => d.component === n)
-}

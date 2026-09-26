@@ -12,13 +12,6 @@ import {
 
 export { refIndexForUrlToken, refIndexForPmcToken, findReferenceIndexInCatalog }
 
-function normalizeUrl(u) {
-  return String(u || "")
-    .trim()
-    .replace(/\/+$/, "")
-    .toLowerCase()
-}
-
 /**
  * @param {{ numbered?: boolean, linkClassName?: string }} [options]
  */

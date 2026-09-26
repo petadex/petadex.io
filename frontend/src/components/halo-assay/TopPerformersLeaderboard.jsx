@@ -1,15 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "gatsby"
-import config from "../../config"
 import { mediaColors, mediaLabels } from "../charts/ActivityLineChart"
+import { BENCHMARK_ENZYMES, COMPARISON_SUBSTRATES } from "./constants"
+import { fetchComparison } from "./comparison"
 
-const SUBSTRATES = ["BHET12.5", "BHET25", "BHET50"]
 const TOP_N = 6
-
-const benchmarkEnzymes = {
-  "WP_054022242.1": "IsPETase",
-  "WP_054022242.1_M1": "Fast-PETase",
-}
 
 const TopPerformersLeaderboard = () => {
   const [activity, setActivity] = useState([])
@@ -19,11 +14,7 @@ const TopPerformersLeaderboard = () => {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(
-          `${config.apiUrl}/plate-data/comparison?media=${SUBSTRATES.join(",")}`
-        )
-        if (!res.ok) throw new Error(`Status ${res.status}`)
-        const { activity: rows } = await res.json()
+        const { activity: rows } = await fetchComparison(COMPARISON_SUBSTRATES)
         setActivity(rows || [])
       } catch (err) {
         setError(err.toString())
@@ -96,7 +87,7 @@ const TopPerformersLeaderboard = () => {
         {ranked.map((entry, i) => {
           const pct = (entry.best.value / max) * 100
           const color = mediaColors[entry.best.media] || "#059669"
-          const benchmark = benchmarkEnzymes[entry.accession]
+          const benchmark = BENCHMARK_ENZYMES[entry.accession]
           return (
             <li
               key={entry.gene}

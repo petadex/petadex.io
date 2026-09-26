@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, navigate } from "gatsby"
 import Seo from "../components/seo"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import Container from "../components/common/Container"
 import config from "../config"
 import CathDomainHero from "../components/cath/CathDomainHero"
@@ -59,8 +58,6 @@ function domainsForComponent(domainModels, componentNum) {
 }
 
 const CathDomainsPage = ({ location }) => {
-  useScrollHeader()
-
   const [domainModels, setDomainModels] = useState([])
   const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)

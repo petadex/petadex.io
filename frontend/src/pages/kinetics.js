@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import config from "../config"
 
 // Predicted data (kept as static for now)
@@ -125,8 +124,6 @@ const PREDICTED_COLUMNS = makeBaseColumns(
 )
 
 const KineticsPage = () => {
-  useScrollHeader()
-
   const [activeTab, setActiveTab] = useState("published")
   const [searchTerm, setSearchTerm] = useState("")
   const [substrateFilter, setSubstrateFilter] = useState("")

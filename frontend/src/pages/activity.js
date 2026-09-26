@@ -2,53 +2,30 @@ import React from "react"
 import { Link } from "gatsby"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
-import { useScrollHeader } from "../hooks/useScrollHeader"
+import { ACTIVITY_LINKS } from "../data/activityLinks"
 
-// Overview cards for the Activity section. Keep in sync with the "Activity"
-// dropdown in components/SiteHeader.js.
-const ACTIVITY_ITEMS = [
-  {
-    title: "Kinetics",
-    path: "/kinetics",
-    blurb:
-      "Kinetic parameters for plastic-degrading enzymes, both measured in the lab and predicted by machine learning. Covers turnover number (kcat), Michaelis constant (Km), and catalytic efficiency (kcat/Km).",
-    tag: "kcat · Km · kcat/Km",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 15l3-3 3 3 5-6" />
-      </svg>
-    ),
-  },
-  {
-    title: "Substrates",
-    path: "/substrates",
-    blurb:
-      "Browse target polymers such as PET, PLA, PEF, polycarbonate, and nylons. Each one has an abstract, links to primary literature, and interactive 3D structures of its oligomers.",
-    tag: "Polymer structure viewer",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v9m0 0l8-4.5M12 12L4 7.5" />
-      </svg>
-    ),
-  },
-  {
-    title: "Halo Assay",
-    path: "/halo-assay",
-    blurb:
-      "Measurements from plate-based clearing (halo) assays. Shows median pixel intensity of enzyme activity across BHET substrate concentrations and timepoints.",
-    tag: "Median pixel intensity",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="8" strokeWidth={2} />
-        <circle cx="12" cy="12" r="3" strokeWidth={2} />
-      </svg>
-    ),
-  },
-]
+// Card icons for the Activity hub; the destinations themselves live in
+// data/activityLinks.js (shared with the SiteHeader dropdown).
+const ICONS = {
+  kinetics: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 15l3-3 3 3 5-6" />
+    </svg>
+  ),
+  substrates: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v9m0 0l8-4.5M12 12L4 7.5" />
+    </svg>
+  ),
+  "halo-assay": (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" strokeWidth={2} />
+      <circle cx="12" cy="12" r="3" strokeWidth={2} />
+    </svg>
+  ),
+}
 
 const ActivityPage = () => {
-  useScrollHeader()
-
   return (
     <>
       {/* Hero */}
@@ -70,16 +47,16 @@ const ActivityPage = () => {
       <section className="py-10 md:py-14">
         <Container>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {ACTIVITY_ITEMS.map(item => (
+            {ACTIVITY_LINKS.map(item => (
               <Link
-                key={item.path}
+                key={item.key}
                 to={item.path}
                 className="group flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 text-accent mb-4">
-                  {item.icon}
+                  {ICONS[item.key]}
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-1">{item.title}</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-1">{item.label}</h2>
                 <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
                   {item.tag}
                 </p>

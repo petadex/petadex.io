@@ -74,29 +74,3 @@ export async function applyAnnotationRepresentations(
     })
   }
 }
-
-
-/**
- * @param {import('molstar/lib/mol-plugin').PluginUIContext} plugin
- * @param {object} structureOrRef
- * @param {Array<{ seqPos: number }>} annotations
- */
-export async function focusAnnotationResidues(plugin, structureOrRef, annotations) {
-  if (!plugin || !structureOrRef || !annotations?.length) return
-
-  const { structureData } = resolveStructurePair(structureOrRef)
-  if (!structureData?.units) return
-
-  const { StructureElement } = await import('molstar/lib/mol-model/structure')
-  const { Schema } = await import(
-    'molstar/lib/mol-model/structure/structure/element/schema',
-  )
-
-  const loci = Schema.toLoci(structureData, {
-    items: annotations.map(a => ({ label_seq_id: a.seqPos })),
-  })
-
-  if (StructureElement.Loci.isEmpty(loci)) return
-
-  await plugin.managers.camera.focusLoci(loci)
-}

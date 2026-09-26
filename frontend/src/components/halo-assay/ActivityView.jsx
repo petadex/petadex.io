@@ -8,8 +8,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { Link } from "gatsby"
-import config from "../../config"
 import { generateCSV, downloadCSV } from "../../utils/csvDownload"
+import { BENCHMARK_ENZYMES } from "./constants"
+import { fetchComparison } from "./comparison"
 import ActivityLineChart, {
   mediaColors,
   mediaLabels,
@@ -46,11 +47,6 @@ const plotModes = {
     label: "Activity",
     description: "Peak intensity minus subsequent minimum (degradation signal)",
   },
-}
-
-const benchmarkEnzymes = {
-  "WP_054022242.1": "IsPETase",
-  "WP_054022242.1_M1": "Fast-PETase",
 }
 
 const diamondPoints = (cx, cy, r) =>
@@ -311,7 +307,7 @@ const SubstrateScatter = ({
   const labeledBenchmarkGenes = useMemo(() => {
     const winners = new Map()
     scatterData.forEach(d => {
-      if (!benchmarkEnzymes[d.accession]) return
+      if (!BENCHMARK_ENZYMES[d.accession]) return
       const score = (d.x || 0) + (d.y || 0)
       const current = winners.get(d.accession)
       if (!current || score > current.score) {
@@ -411,7 +407,7 @@ const SubstrateScatter = ({
     const q = searchQuery.trim().toLowerCase()
     if (!isFocused || !q) return null
     return scatterData.filter(d =>
-      [d.gene, d.nickname, d.accession, benchmarkEnzymes[d.accession]]
+      [d.gene, d.nickname, d.accession, BENCHMARK_ENZYMES[d.accession]]
         .some(v => v && String(v).toLowerCase().includes(q))
     )
   }, [searchQuery, scatterData, isFocused])
@@ -820,7 +816,7 @@ const SubstrateScatter = ({
               const isHighlighted =
                 (highlightedGene && payload.gene === highlightedGene) ||
                 (isFocused && payload.gene === searchFocusGene)
-              const benchmarkLabel = benchmarkEnzymes[payload.accession]
+              const benchmarkLabel = BENCHMARK_ENZYMES[payload.accession]
               const showBenchmarkLabel =
                 benchmarkLabel && labeledBenchmarkGenes.has(payload.gene)
               const isMatch = searchMatchGenes?.has(payload.gene)
@@ -1014,7 +1010,7 @@ const GeneSubstrateCard = ({
           )}
 
           <div className="flex gap-1.5 items-center flex-wrap">
-            {benchmarkEnzymes[accession] && (
+            {BENCHMARK_ENZYMES[accession] && (
               <span className="px-2 py-0.5 bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 rounded text-2xs font-bold">
                 Benchmark
               </span>
@@ -1221,9 +1217,9 @@ const ActivityView = ({ showTitle = false }) => {
     async function load() {
       setLoading(true)
       try {
-        const res = await fetch(`${config.apiUrl}/plate-data/comparison?media=${activeMediaString}`)
-        if (!res.ok) throw new Error(`Status ${res.status}`)
-        const { timeseries, activity } = await res.json()
+        const { timeseries, activity } = await fetchComparison(
+          activeMediaString.split(",")
+        )
         if (!cancelled) {
           setRawData(timeseries)
           setActivityData(activity)

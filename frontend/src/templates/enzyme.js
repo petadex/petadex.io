@@ -5,7 +5,6 @@ import LazyPetadexCatalyticDomainsPanel from "../components/petadexDomains/LazyP
 import Seo from "../components/seo"
 import config from "../config"
 import Container from "../components/common/Container"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 
 const getNCBILink = accession => {
   if (!accession) return null
@@ -43,7 +42,6 @@ const MetaPill = ({ label, children }) => (
 // ── Main template ──────────────────────────────────────────────────────────
 
 export default function EnzymeTemplate({ pageContext }) {
-  useScrollHeader()
   const [enzyme, setEnzyme] = useState(pageContext.enzyme || null)
   const [loading, setLoading] = useState(!pageContext.enzyme)
   const [error, setError] = useState(null)

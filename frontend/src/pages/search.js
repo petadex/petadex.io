@@ -2,11 +2,8 @@ import React from "react"
 import SequenceSearch from "../components/search/SequenceSearch"
 import Container from "../components/common/Container"
 import Seo from "../components/seo"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 
 const SearchPage = () => {
-  useScrollHeader()
-
   return (
     <>
       <section className="py-20 md:py-24">

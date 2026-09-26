@@ -48,12 +48,3 @@ export function addJobId(jobId) {
     // Ignore localStorage errors
   }
 }
-
-/**
- * Clear all stored job_ids (useful for testing)
- */
-export function clearStoredJobIds() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(SEARCH_HISTORY_KEY);
-  }
-}

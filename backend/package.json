@@ -9,8 +9,6 @@
     "dev": "nodemon src/index.js",
     "local": "node src/index.js",
     "test": "echo \"No tests specified yet\" && exit 0",
-    "generate-screenshots": "node scripts/generate-protein-screenshots.js",
-    "generate-screenshots:featured": "node scripts/generate-protein-screenshots.js --featured",
     "export-atlas": "node scripts/export-atlas.js",
     "check-annotation": "node scripts/check-annotation.js"
   },
@@ -30,7 +28,6 @@
   "devDependencies": {
     "@types/compression": "^1.8.1",
     "nodemon": "^3.1.10",
-    "puppeteer": "^24.36.1",
     "serverless": "^4.17.1"
   },
   "overrides": {

@@ -20,19 +20,3 @@ export function sequenceStripeFills(light = isLightTheme()) {
 export function sequenceLetterFill(_light = isLightTheme()) {
   return "oklch(0.18 0 0)"
 }
-
-/** Inherited into shadow DOM for D3 axis ticks (`fill=currentColor`). */
-export const SEQUENCE_AXIS_INK_VAR = "--petadex-seq-axis-ink"
-
-/**
- * Sequence ruler ticks: near-black on zebra stripes when letters show; otherwise theme default.
- * @param {boolean} [light]
- * @param {boolean} [lettersVisible]
- */
-export function sequenceAxisTickFill(
-  light = isLightTheme(),
-  lettersVisible = false,
-) {
-  if (lettersVisible) return sequenceLetterFill(light)
-  return light ? "oklch(0.32 0 0)" : "oklch(0.92 0 0)"
-}

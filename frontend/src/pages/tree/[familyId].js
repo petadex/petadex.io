@@ -6,7 +6,6 @@
 
 import React, { useMemo } from "react"
 import { Link } from "gatsby"
-import Layout from "../../components/layout"
 import PhyloTreePanel from "../../components/phyloTree/PhyloTreePanel"
 
 function parseHighlightParam(search) {
@@ -39,35 +38,33 @@ const TreePage = ({ params, location }) => {
   )
 
   return (
-    <Layout>
-      <div className="max-w-[1100px] mx-auto px-4 py-6">
-        <div className="mb-4 flex items-center gap-4 flex-wrap">
-          <h1 className="m-0 text-2xl font-semibold">
-            Family {familyId} — Phylogenetic Tree
-          </h1>
-          <Link
-            to={sessionId ? `/results?job=${sessionId}` : "/search"}
-            className="text-sm text-muted-foreground hover:text-foreground no-underline"
-          >
-            ← {sessionId ? "Back to results" : "Back to search"}
-          </Link>
-        </div>
-
-        {familyId ? (
-          <PhyloTreePanel
-            familyId={familyId}
-            layout="horizontal"
-            highlightIds={highlightIds}
-            sessionId={sessionId}
-            treeSource="search"
-            showSearch
-            showSearchBanner
-          />
-        ) : (
-          <div className="text-muted-foreground">Invalid family ID</div>
-        )}
+    <div className="max-w-[1100px] mx-auto px-4 py-6">
+      <div className="mb-4 flex items-center gap-4 flex-wrap">
+        <h1 className="m-0 text-2xl font-semibold">
+          Family {familyId} — Phylogenetic Tree
+        </h1>
+        <Link
+          to={sessionId ? `/results?job=${sessionId}` : "/search"}
+          className="text-sm text-muted-foreground hover:text-foreground no-underline"
+        >
+          ← {sessionId ? "Back to results" : "Back to search"}
+        </Link>
       </div>
-    </Layout>
+
+      {familyId ? (
+        <PhyloTreePanel
+          familyId={familyId}
+          layout="horizontal"
+          highlightIds={highlightIds}
+          sessionId={sessionId}
+          treeSource="search"
+          showSearch
+          showSearchBanner
+        />
+      ) : (
+        <div className="text-muted-foreground">Invalid family ID</div>
+      )}
+    </div>
   )
 }
 

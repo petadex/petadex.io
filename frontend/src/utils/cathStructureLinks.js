@@ -58,15 +58,3 @@ export function buildCathDomainPetadexLinks(domain) {
 
   return { atlas, enzymes, extras }
 }
-
-/** @deprecated Use buildCathDomainPetadexLinks */
-export function buildCathDomainStructureLinks(domain) {
-  const { atlas, enzymes, extras } = buildCathDomainPetadexLinks(domain)
-  const out = []
-  if (atlas) out.push({ ...atlas, internal: true })
-  if (enzymes) out.push({ ...enzymes, internal: true })
-  for (const x of extras) {
-    if (x.internal) out.push({ label: x.label, url: x.url, internal: true })
-  }
-  return out
-}

@@ -94,11 +94,6 @@ export function plddtGradientSegmentsFromScores(scores) {
   }))
 }
 
-/** @deprecated use {@link plddtGradientSegmentsFromScores} */
-export function plddtSegmentsFromScores(scores) {
-  return plddtGradientSegmentsFromScores(scores)
-}
-
 /**
  * Deterministic demo pLDDT (no API) — varies like a typical AF model.
  * @param {number} length
@@ -114,24 +109,6 @@ export function mockPlddtScores(length) {
       12 * Math.cos(t * Math.PI * 5.3)
     return Math.round(Math.min(98, Math.max(42, base)))
   })
-}
-
-/**
- * @param {number[]} scores
- */
-export function plddtLogicalTrack(scores) {
-  const segments = plddtGradientSegmentsFromScores(scores)
-  return {
-    id: "plddt",
-    title: "pLDDT",
-    features: segments.map(seg => ({
-      label: seg.label,
-      start: seg.start,
-      end: seg.end,
-      color: seg.color,
-      score: seg.score,
-    })),
-  }
 }
 
 /**
@@ -157,15 +134,4 @@ export function featureViewerPlddtDef(scores) {
       showDescriptionRect: false,
     },
   }
-}
-
-/**
- * @param {Array<{ id: string }>} logicalTracks
- * @param {number[] | null | undefined} scores
- */
-export function logicalTracksWithPlddt(logicalTracks, scores) {
-  if (!scores?.length) return logicalTracks
-  const plddt = plddtLogicalTrack(scores)
-  const rest = (logicalTracks || []).filter(t => t.id !== "plddt")
-  return [plddt, ...rest]
 }

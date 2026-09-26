@@ -22,9 +22,3 @@ export function annotationRecordForAccession(accession) {
   if (!accession) return null
   return BY_ACCESSION.get(accession) ?? null
 }
-
-export function annotationAccessions() {
-  return RECORDS.map(r => r.accession)
-}
-
-export { RECORDS as annotationRecords }

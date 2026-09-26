@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react"
 import Seo from "../components/seo"
 import Container from "../components/common/Container"
-import { useScrollHeader } from "../hooks/useScrollHeader"
 import MetadataMap from "../components/MetadataMap"
 import SequencesView from "../components/halo-assay/SequencesView"
 import ActivityView from "../components/halo-assay/ActivityView"
@@ -30,7 +29,6 @@ const TABS = [
 const isValidTab = key => TABS.some(t => t.key === key)
 
 const HaloAssayPage = ({ location }) => {
-  useScrollHeader()
   const [activeTab, setActiveTab] = useState("origins")
   const [headerHidden, setHeaderHidden] = useState(false)
 

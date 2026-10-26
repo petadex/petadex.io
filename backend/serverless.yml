@@ -15,6 +15,9 @@ provider:
     SEARCH_LAMBDA_NAME: ${env:SEARCH_LAMBDA_NAME, 'petadex-diamond-orchestrator'}
     RESULTS_BUCKET: ${env:RESULTS_BUCKET, 'petadex'}
     RESULTS_PREFIX: ${env:RESULTS_PREFIX, 'results'}
+    # Comma-separated DIAMOND builds a caller may pin via `database_version`.
+    # Empty = pinning off. See PINNABLE_VERSIONS in src/routes/search.js.
+    SEARCH_PINNABLE_VERSIONS: ${env:SEARCH_PINNABLE_VERSIONS, ''}
   iam:
     role:
       statements:

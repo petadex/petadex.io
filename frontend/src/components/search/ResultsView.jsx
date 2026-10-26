@@ -364,6 +364,8 @@ const ResultsView = ({
             <p className="text-xs text-muted-foreground">
               {[
                 metadata.query_length && `Query: ${metadata.query_length} aa`,
+                metadata.database_release &&
+                  `Release: ${metadata.database_release}`,
                 metadata.database_size &&
                   `DB: ${metadata.database_size.toLocaleString()} seqs`,
                 metadata.search_time_ms &&
@@ -713,22 +715,35 @@ const ResultsView = ({
                       >
                         <td className="py-2 px-2.5">{hit.rank}</td>
                         <td className="py-2 px-2.5">
-                          <a
-                            href={
-                              hit.sequence_href || `/sequence/${hit.accession}`
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline"
-                            style={{
-                              color:
-                                hit.family != null
-                                  ? familyColor(hit.family)
-                                  : undefined,
-                            }}
-                          >
-                            {hit.display_id || hit.accession}
-                          </a>
+                          {/* v260701 petadex_ids have no sequence page yet
+                              (sequence_href null): plain text, not a link to
+                              a v1.1 page with the wrong id. */}
+                          {hit.origin ? (
+                            <span>{hit.display_id || hit.accession}</span>
+                          ) : (
+                            <a
+                              href={
+                                hit.sequence_href ||
+                                `/sequence/${hit.accession}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                              style={{
+                                color:
+                                  hit.family != null
+                                    ? familyColor(hit.family)
+                                    : undefined,
+                              }}
+                            >
+                              {hit.display_id || hit.accession}
+                            </a>
+                          )}
+                          {hit.origin && (
+                            <span className="block text-xs text-muted-foreground">
+                              {hit.origin}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 px-2.5">{hit.name || "-"}</td>
                         <td className="py-2 px-2.5">

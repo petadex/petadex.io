@@ -2,7 +2,7 @@
  * Search Routes  –  backend/src/routes/search.js
  *
  * Lambda interface (petadex-diamond-orchestrator):
- *   Input:  { sessionId, sequence, max_results, clientIp }
+ *   Input:  { sessionId, sequence, max_results, clientIp, version? }
  *   Output: { job_id, s3_key }, or 429/503 { error, limit, retry_after } when
  *           the orchestrator's public-search limits refuse the job
  *   S3:     results/{sessionId}/{job_id}.json   (subfolder per session)
@@ -43,6 +43,7 @@ import { S3Client, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand, Pu
 import { pool } from '../db.js';
 import { getPublicReadS3Client, streamToString as publicStreamToString } from '../lib/s3Public.js';
 import { SEQUENCE_PATTERN, MAX_LEN, cleanSequenceForKey } from '../lib/sequenceValidation.js';
+import { parsePetadexId, isPetadexId } from '../lib/targetId.js';
 
 const router = Router();
 
@@ -81,6 +82,17 @@ const RESULT_DEPTH = Number.parseInt(process.env.SEARCH_RESULT_DEPTH, 10) || 250
 // Rows returned when a caller doesn't ask for a count. Matches the old
 // `max_results` default, so an un-parameterised poll looks exactly as it did.
 const DEFAULT_VIEW_RESULTS = 50;
+
+// ─── Pinned database versions ────────────────────────────────────────────────
+// A caller may pin a search to a specific DIAMOND build (e.g. the web/ rebuild
+// searching v260701 while Gatsby stays on diamond/LATEST), but only to a build
+// named here. Comma-separated full version strings, e.g.
+//   SEARCH_PINNABLE_VERSIONS=petadex_seq_v260701_20261026_202443
+// Empty by default, so pinning is OFF until ops opts in. Keep it off until the
+// worker's shard cache is keyed by full S3 key: today a warm worker can serve one
+// version's shards to another version's search (same basenames).
+const PINNABLE_VERSIONS = (process.env.SEARCH_PINNABLE_VERSIONS || '')
+  .split(',').map(v => v.trim()).filter(Boolean);
 
 function getLambdaClient() {
   if (!lambdaClient) {
@@ -152,18 +164,24 @@ function makeSessionId(cleanSequence, databaseVersion = 'unset', searchVersion =
 // values live in the orchestrator Lambda (it owns SEARCH_VERSION and resolves
 // diamond/LATEST), so we ask it via a lightweight `version` action and cache the
 // answer briefly to avoid an extra round-trip on every request.
-let _versionCache = { value: null, expires: 0 };
+//
+// `pinnedVersion` (already allowlisted) asks about that build instead of
+// LATEST; each gets its own cache slot so a pinned answer never leaks into an
+// unpinned key or the reverse.
+const _versionCache = new Map();  // pinnedVersion ('' = LATEST) → { value, expires }
 const VERSION_TTL_MS = 60_000;
 
-async function getSearchVersions() {
-  if (_versionCache.value && Date.now() < _versionCache.expires) {
-    return _versionCache.value;
+async function getSearchVersions(pinnedVersion = null) {
+  const slot = pinnedVersion || '';
+  const hit = _versionCache.get(slot);
+  if (hit && Date.now() < hit.expires) {
+    return hit.value;
   }
   try {
     const resp = await getLambdaClient().send(new InvokeCommand({
       FunctionName: SEARCH_LAMBDA_NAME,
       InvocationType: 'RequestResponse',
-      Payload: JSON.stringify({ action: 'version' }),
+      Payload: JSON.stringify(pinnedVersion ? { action: 'version', version: pinnedVersion } : { action: 'version' }),
     }));
     if (resp.FunctionError) {
       throw new Error(`version action returned FunctionError: ${resp.FunctionError}`);
@@ -185,6 +203,11 @@ async function getSearchVersions() {
     if (!parsed.database_version || !parsed.search_version) {
       throw new Error('version action returned no versions');
     }
+    // An orchestrator that ignored the pin would answer with LATEST, and we'd
+    // key (and later label) a LATEST search as the pinned build.
+    if (pinnedVersion && parsed.database_version !== pinnedVersion) {
+      throw new Error(`version action answered ${parsed.database_version} for pinned ${pinnedVersion}`);
+    }
     const value = {
       databaseVersion: parsed.database_version,
       searchVersion: parsed.search_version,
@@ -194,7 +217,7 @@ async function getSearchVersions() {
       // single request forced to re-search. Null means "ask RESULT_DEPTH".
       resultDepth: Number.isInteger(parsed.result_depth) ? parsed.result_depth : null,
     };
-    _versionCache = { value, expires: Date.now() + VERSION_TTL_MS };
+    _versionCache.set(slot, { value, expires: Date.now() + VERSION_TTL_MS });
     return value;
   } catch (err) {
     // Return null (NOT empty versions) so the caller forces a cache miss. A failed
@@ -262,6 +285,11 @@ function transformResults(rawResults, queryLength, maxResults = Infinity) {
     rank: index + 1,
     accession: hit.target_id,
     target_id: hit.target_id,
+    // 'petadex_id' (v260701 "LG113721682") or 'v1.1' (pipe-delimited header).
+    // Per hit, not per result: a mixed result is possible (see PINNABLE_VERSIONS).
+    id_format: isPetadexId(hit.target_id) ? 'petadex_id' : 'v1.1',
+    // From the petadex_id prefix; null for v1.1 ids.
+    origin: parsePetadexId(hit.target_id)?.origin ?? null,
     name: hit.target_name || hit.metadata?.definition || null,
     organism: hit.organism || hit.metadata?.organism || null,
     taxonomy: hit.taxonomy || hit.metadata?.taxonomy || null,
@@ -282,7 +310,61 @@ function transformResults(rawResults, queryLength, maxResults = Infinity) {
     // here by this whitelist, so it never reached the browser. `null` for a hit
     // merged from a part written by a pre-1.3.0 worker.
     target_sequence: hit.target_sequence ?? null,
+    // Tier-A enrichment block. null on every v260701 hit until v260701 is
+    // loaded into RDS; the UI must render without it.
+    metadata: hit.metadata ?? null,
   }));
+}
+
+// The id format a build's hits must use, from its database_version; null for
+// a build this code doesn't know (no check).
+function expectedIdFormat(databaseVersion) {
+  if (databaseVersion?.startsWith('petadex_seq_')) return 'petadex_id';
+  if (databaseVersion?.startsWith('catalytic_orfs_')) return 'v1.1';
+  return null;
+}
+
+// A warm worker that cached shards by basename could serve one build's shards
+// to another build's search, so a result mixes id formats ("2271374|MFC4015899.1|||||"
+// in a v260701 result, "LG28262293" in a v1.1 one). Log it loudly instead of
+// rendering it silently. Checks every stored hit, not just the displayed slice.
+function warnOnCrossVersionLeak(data, sessionId) {
+  const expected = expectedIdFormat(data?.database_version);
+  if (!expected) return;
+  const leaked = (data.results || [])
+    .map(h => h.target_id)
+    .filter(id => (isPetadexId(id) ? 'petadex_id' : 'v1.1') !== expected);
+  if (leaked.length) {
+    console.warn(
+      `Cross-version leak – sessionId=${sessionId} database_version=${data.database_version} ` +
+      `${leaked.length}/${data.results.length} hits not ${expected}, e.g. ${leaked.slice(0, 3).join(', ')}`
+    );
+  }
+}
+
+// Result-level metadata, shared by the POST cache-hit and poll responses.
+// database_release/database_version/search_version tell the client which build
+// produced the hits (v1.1 vs v260701 ids); enrichment_status lets it tell
+// "enrichment failed" apart from "this build has no enrichment yet".
+function resultMetadata(data, fallbackDepth) {
+  return {
+    query_header: data.query_header || null,
+    query_sequence: data.query_sequence || null,
+    query_length: data.query_length,
+    // Total stored, NOT the number of rows returned — the client needs it to
+    // know how many more rows it could ask for without a re-search.
+    num_results: data.num_results,
+    result_depth: data.result_depth ?? fallbackDepth,
+    // Results written by the 1.4.x aggregator carry db_sequence_count instead.
+    database_size: data.database_size ?? data.db_sequence_count ?? null,
+    search_time_ms: data.search_time_ms,
+    timestamp: data.timestamp,
+    engine: data.engine ?? null,
+    database_release: data.database_release ?? null,
+    database_version: data.database_version ?? null,
+    search_version: data.search_version ?? null,
+    enrichment_status: data.enrichment_status ?? null,
+  };
 }
 
 const searchSchema = Joi.object({
@@ -296,6 +378,17 @@ const searchSchema = Joi.object({
     .max(12000).required()
     .messages({ 'string.pattern.base': 'Sequence contains unrecognized characters. Use standard amino acid codes (single-letter).' }),
   max_results: Joi.number().integer().min(1).max(500).default(50),
+  // Pin the search to one DIAMOND build; omitted = diamond/LATEST.
+  // valid() with no arguments accepts anything, so an empty allowlist must
+  // forbid the field outright.
+  // (.optional() on forbidden() would undo it.)
+  database_version: (PINNABLE_VERSIONS.length
+    ? Joi.string().valid(...PINNABLE_VERSIONS).optional()
+    : Joi.forbidden()
+  ).messages({
+      'any.only': 'database_version is not a searchable database version.',
+      'any.unknown': 'database_version pinning is not enabled.',
+    }),
 });
 
 // Display count on the poll path. Purely presentational: it slices an already
@@ -489,7 +582,7 @@ router.post('/', async (req, res, next) => {
     const { error, value } = searchSchema.validate(req.body);
     if (error) return sendError(res, 400, error.details[0].message);
 
-    const { sequence, max_results } = value;
+    const { sequence, max_results, database_version: pinnedVersion } = value;
     // cleanSequenceForKey mirrors Python's validate_sequence cleaning so that
     // identical inputs produce the same session ID regardless of whether a FASTA
     // header, stop codons, or gap chars were present in the raw paste.
@@ -497,7 +590,7 @@ router.post('/', async (req, res, next) => {
     // Key on the CURRENT corpus + pipeline so a rebuilt DB or a search-pipeline
     // bump produces a fresh key (cache miss → re-run), instead of serving a stale
     // result from a prior corpus/pipeline under an unchanged key.
-    const versions = await getSearchVersions();
+    const versions = await getSearchVersions(pinnedVersion);
     const sessionId = versions
       ? makeSessionId(cleanSequence, versions.databaseVersion, versions.searchVersion)
       // Version lookup failed: force a miss with a per-request nonce so we recompute
@@ -541,26 +634,14 @@ router.post('/', async (req, res, next) => {
 
     if (cached) {
       console.log(`Cache hit – sessionId=${sessionId} job=${cached.jobId}`);
+      warnOnCrossVersionLeak(cached.data, sessionId);
       return res.json({
         job_id: cached.jobId,
         session_id: sessionId,
         status: 'completed',
         cached: true,
         results: transformResults(cached.data.results, cached.data.query_length, requested),
-        metadata: {
-          query_header: cached.data.query_header,
-          query_sequence: cached.data.query_sequence,
-          query_length: cached.data.query_length,
-          // Total stored, NOT the number returned above — the client needs it to
-          // know how many more rows it could ask for without a re-search.
-          num_results: cached.data.num_results,
-          result_depth: cached.data.result_depth ?? searchDepth,
-          database_size: cached.data.database_size,
-          search_time_ms: cached.data.search_time_ms,
-          timestamp: cached.data.timestamp,
-          query_sequence: cached.data.query_sequence || null,
-          query_header: cached.data.query_header || null,
-        },
+        metadata: resultMetadata(cached.data, searchDepth),
       });
     }
 
@@ -585,6 +666,8 @@ router.post('/', async (req, res, next) => {
           // Marks this as a public search: the orchestrator applies its
           // per-client and global limits only to events that carry it.
           clientIp: clientIpOf(req),
+          // Omitted (not null) when unpinned so the orchestrator resolves LATEST.
+          ...(pinnedVersion ? { version: pinnedVersion } : {}),
         }),
       }));
       if (resp.FunctionError) throw new Error(`orchestrator FunctionError: ${resp.FunctionError}`);
@@ -743,10 +826,15 @@ router.get('/results/:job_id', async (req, res, next) => {
       // Sliced here, before enrichWithFamilyData below — the DB round trip must
       // scale with what the caller renders, not with the full stored depth.
       const transformedResults = transformResults(result.data.results, result.data.query_length, viewCount)
+      warnOnCrossVersionLeak(result.data, jobId);
 
       // Enrich with family/component data from DB, then check S3 for tree files
       try {
-        const accessions = transformedResults.map(r => r.accession).filter(Boolean);
+        // v260701 petadex_ids aren't in enzyme_fastaa/variant_dictionary; their
+        // enrichment comes from `metadata` once v260701 is in RDS.
+        const accessions = transformedResults
+          .filter(r => r.id_format === 'v1.1')
+          .map(r => r.accession).filter(Boolean);
         const familyMap = await enrichWithFamilyData(accessions);
         for (const hit of transformedResults) {
           const info = familyMap[hit.accession];
@@ -773,19 +861,7 @@ router.get('/results/:job_id', async (req, res, next) => {
         session_id: jobId,
         cached: true,
         results: transformedResults,
-        metadata: {
-          query_header: result.data.query_header,
-          query_sequence: result.data.query_sequence,
-          query_length: result.data.query_length,
-          // Total stored, NOT the length of `results` above.
-          num_results: result.data.num_results,
-          result_depth: result.data.result_depth ?? null,
-          database_size: result.data.database_size,
-          search_time_ms: result.data.search_time_ms,
-          timestamp: result.data.timestamp,
-          query_sequence: result.data.query_sequence || null,
-          query_header: result.data.query_header || null,
-        },
+        metadata: resultMetadata(result.data, null),
       });
     }
 
@@ -839,6 +915,7 @@ router.get('/history', async (req, res, next) => {
             session_id: sessId,
             timestamp: obj.LastModified.toISOString(),
             query_length: data.query_length,
+            database_version: data.database_version ?? null,
             num_results: data.results?.length ?? data.num_results ?? null,
             top_hit: data.results?.[0]
               ? { target_id: data.results[0].target_id, percent_identity: data.results[0].percent_identity }

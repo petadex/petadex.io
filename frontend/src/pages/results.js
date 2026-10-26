@@ -62,6 +62,9 @@ function transformResults(rawResults, queryLength) {
       orf_id: hit.orf_id ?? parsed?.orfId ?? null,
       display_id: formatTargetIdLabel(targetId),
       sequence_href: sequenceHrefForTargetId(targetId),
+      // v260701 hits: source from the petadex_id prefix ("Logan", "NCBI nr").
+      // Their `metadata` is null until v260701 is loaded into RDS.
+      origin: parsed?.origin ?? null,
       name: hit.target_name || hit.name || hit.metadata?.definition || null,
       organism: hit.organism || hit.metadata?.organism || null,
       taxonomy: hit.taxonomy || hit.metadata?.taxonomy || null,

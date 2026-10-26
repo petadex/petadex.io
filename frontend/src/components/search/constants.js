@@ -23,19 +23,13 @@
 
 // Fixed depth every search requests.
 //
-// Held at 250 — the deepest option the old search-input selector offered — so
-// this ships no search-time worst case production has not already run. The
-// Lambda-side RESULT_DEPTH is 500 (the API's `max_results` Joi cap), but it is
-// implemented and *not yet deployed*, and its own §9 benchmark gate is still
-// open: 500 is a 10× increase in per-shard `-k` whose cost on the critical path
-// is unmeasured. Sending 250 from here does not front-run that gate.
-//
-// Once Part A deploys, the orchestrator ignores the caller's value entirely and
-// always searches to its own RESULT_DEPTH, so this constant stops governing
-// depth and only feeds the cache key (until Part B drops it from the key too).
-// The view selector is bounded by what actually arrived, not by this number, so
-// it follows the deployed depth automatically.
-export const SEARCH_RESULT_DEPTH = 250
+// 500: the orchestrator's RESULT_DEPTH since SEARCH_VERSION 1.4.0 (its §9
+// benchmark passed) and the API's `max_results` Joi cap. The orchestrator
+// searches to its own depth whatever we send and max_results is not in the
+// cache key, so this only bounds what the POST returns and is the fallback
+// depth for the view selector when a result carries no `result_depth`. The
+// selector is bounded by what actually arrived, not by this number.
+export const SEARCH_RESULT_DEPTH = 500
 
 // Rows shown on arrival. Matches the old `max_results` default so a search that
 // used to render 50 rows still opens on 50.

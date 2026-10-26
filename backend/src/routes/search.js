@@ -68,16 +68,14 @@ const GITHUB_REPO = process.env.GITHUB_REPO || 'ababaian/petadex.io';
 // Why Express substitutes it rather than just forwarding the caller's value:
 // dropping `max_results` from the cache key is only safe if it has ALSO stopped
 // parameterising the search — otherwise a 20-row result cached under the
-// version-only key is silently served to someone who asked for 200. The
-// orchestrator's own RESULT_DEPTH (Part A) closes that, but it is not deployed
-// yet, so Express injects the constant one layer up and the trap is shut either
-// way. Post-deploy the orchestrator ignores what we send and this becomes a
-// harmless no-op.
+// version-only key is silently served to someone who asked for 200. Since
+// SEARCH_VERSION 1.4.0 the orchestrator searches to its own RESULT_DEPTH (500)
+// whatever we send, and reports it as `result_depth` from the `version` action,
+// so this constant only matters when that lookup fails (the nonce path).
 //
-// Held at 250 — the deepest count the search UI ever offered — because the §9
-// benchmark that would authorise the orchestrator's 500 has not been run.
-// Overridable for ops without a redeploy of intent.
-const RESULT_DEPTH = Number.parseInt(process.env.SEARCH_RESULT_DEPTH, 10) || 250;
+// 500 matches the orchestrator (its §9 benchmark passed) and the `max_results`
+// Joi cap. Overridable for ops without a redeploy of intent.
+const RESULT_DEPTH = Number.parseInt(process.env.SEARCH_RESULT_DEPTH, 10) || 500;
 
 // Rows returned when a caller doesn't ask for a count. Matches the old
 // `max_results` default, so an un-parameterised poll looks exactly as it did.
@@ -623,7 +621,8 @@ router.post('/', async (req, res, next) => {
     // must have been written by this code — the re-key orphaned every older
     // entry — so it holds searchDepth rows. Caveat: raising RESULT_DEPTH while
     // unstamped entries are still live needs a deliberate SEARCH_VERSION bump,
-    // since nothing in an unstamped doc records the shallower depth.
+    // since nothing in an unstamped doc records the shallower depth. (The
+    // 250 → 500 raise needed none: every 1.4.0-keyed entry is stamped.)
     if (cached) {
       const storedDepth = cached.data.result_depth ?? searchDepth;
       if (requested > storedDepth) {

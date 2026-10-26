@@ -2,15 +2,17 @@
  * Search Routes  –  backend/src/routes/search.js
  *
  * Lambda interface (petadex-diamond-orchestrator):
- *   Input:  { sessionId, sequence, max_results }
- *   Output: { job_id, s3_key }
+ *   Input:  { sessionId, sequence, max_results, clientIp }
+ *   Output: { job_id, s3_key }, or 429/503 { error, limit, retry_after } when
+ *           the orchestrator's public-search limits refuse the job
  *   S3:     results/{sessionId}/{job_id}.json   (subfolder per session)
  *           results/{sessionId}.index           (contains job_id, written by Lambda)
  *
  * Flow:
  *   POST /api/search
  *     1. Check results/{sessionId}.index — return cached results immediately if found
- *     2. Fire Lambda async (Event) — returns 202 immediately
+ *     2. Invoke Lambda synchronously — returns 202 once the job has started,
+ *        or relays its 429/503 if the search limits refuse it
  *     3. Client polls GET /api/search/results/{sessionId}
  *
  *   GET /api/search/results/:sessionId
@@ -45,6 +47,7 @@ import { SEQUENCE_PATTERN, MAX_LEN, cleanSequenceForKey } from '../lib/sequenceV
 const router = Router();
 
 let lambdaClient = null;
+let searchInvokeClient = null;
 let s3Client = null;
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
@@ -87,12 +90,32 @@ function getLambdaClient() {
       // node handler has no socket timeout by default, so a cold/slow orchestrator
       // could block up to the 29s API-Gateway cap. Cap it: a timeout rejects
       // .send(), which throws → getSearchVersions returns null → nonce (forced
-      // miss), the safe outcome. The async search invoke is fire-and-forget, so a
-      // short request timeout there is harmless.
+      // miss), the safe outcome.
       requestHandler: { requestTimeout: 5000 },
     });
   }
   return lambdaClient;
+}
+// The search invoke is synchronous so the orchestrator's admission verdict
+// (429/503) reaches the caller. Its own client: a cold orchestrator takes up to
+// ~3s, and no SDK retries, since a retried invoke after a timeout could start a
+// second fan-out for the same request.
+function getSearchInvokeClient() {
+  if (!searchInvokeClient) {
+    searchInvokeClient = new LambdaClient({
+      region: AWS_REGION,
+      maxAttempts: 1,
+      requestHandler: { requestTimeout: 15000 },
+    });
+  }
+  return searchInvokeClient;
+}
+
+// The caller's address as API Gateway saw the TCP connection
+// (requestContext.http.sourceIp), which a client can't spoof the way it can
+// X-Forwarded-For. Falls back to the socket address when run locally.
+function clientIpOf(req) {
+  return req.requestContext?.http?.sourceIp || req.socket?.remoteAddress || 'unknown';
 }
 function getS3Client() {
   if (!s3Client) s3Client = new S3Client({ region: AWS_REGION });
@@ -458,7 +481,7 @@ async function resolveErrorSignal(s3, sessionId) {
  *    (versions fetched live so a corpus/pipeline change busts the cache;
  *     max_results is NOT a key input — it selects rows for display only)
  * 3. Check index file — return cached results immediately if found
- * 4. Fire Lambda async (Event) — returns 202 immediately
+ * 4. Invoke Lambda synchronously — 202 once started, or its 429/503 if refused
  * 5. Client polls GET /api/search/results/{sessionId}
  */
 router.post('/', async (req, res, next) => {
@@ -541,11 +564,16 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // ── Fire Lambda async ─────────────────────────────────────────────────────
+    // ── Start the search ──────────────────────────────────────────────────────
+    // Synchronous: the orchestrator answers in well under a second once warm,
+    // after checking the public-search limits (it refuses with 429/503) and
+    // starting the fan-out. Only cache misses get here, so cached results are
+    // never rate limited.
+    let orchestrator;
     try {
-      await getLambdaClient().send(new InvokeCommand({
+      const resp = await getSearchInvokeClient().send(new InvokeCommand({
         FunctionName: SEARCH_LAMBDA_NAME,
-        InvocationType: 'Event',
+        InvocationType: 'RequestResponse',
         Payload: JSON.stringify({
           sessionId: sessionId,
           sequence: sequence,
@@ -554,13 +582,57 @@ router.post('/', async (req, res, next) => {
           // undeployed: every entry under a given key holds the same depth, so
           // no request can be served a result shallower than it asked for.
           max_results: RESULT_DEPTH,
+          // Marks this as a public search: the orchestrator applies its
+          // per-client and global limits only to events that carry it.
+          clientIp: clientIpOf(req),
         }),
       }));
-      console.log(`Lambda invoked async – sessionId=${sessionId}`);
+      if (resp.FunctionError) throw new Error(`orchestrator FunctionError: ${resp.FunctionError}`);
+      orchestrator = resp.Payload ? JSON.parse(Buffer.from(resp.Payload).toString('utf8')) : {};
     } catch (lambdaErr) {
+      if (lambdaErr.name === 'TimeoutError') {
+        // The orchestrator may still have started the job, so let the client
+        // poll rather than report a failure that might not be one.
+        console.warn(`Search invoke timed out, assuming started – sessionId=${sessionId}`);
+        return res.status(202).json({
+          session_id: sessionId,
+          status: 'processing',
+          message: `Poll /api/search/results/${sessionId} for results.`,
+        });
+      }
+      if (lambdaErr.name === 'TooManyRequestsException') {
+        // The orchestrator's reserved concurrency (2) is full. That cap is what
+        // serializes the admission check against bursts, so this is "busy".
+        console.log(`Search refused (orchestrator throttled) – sessionId=${sessionId}`);
+        res.set('Retry-After', '15');
+        return res.status(429).json({
+          error: 'PETadex search is busy right now. Please try again in a moment.',
+          limit: 'throttled',
+          retry_after: 15,
+        });
+      }
       console.error('Lambda invocation failed:', lambdaErr);
       return sendError(res, 500, `Search failed: ${lambdaErr.message}`, sessionId);
     }
+
+    const status = orchestrator.statusCode ?? 200;
+    let body = orchestrator.body ?? orchestrator;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+    if (status === 429 || status === 503) {
+      // Rate limit or capacity, not a bug, so no bug-report link.
+      console.log(`Search refused (${body.limit}) – sessionId=${sessionId}`);
+      res.set('Retry-After', String(body.retry_after ?? 60));
+      return res.status(status).json({
+        error: body.error || 'PETadex search is busy. Please try again shortly.',
+        limit: body.limit,
+        retry_after: body.retry_after,
+      });
+    }
+    if (status === 400) return sendError(res, 400, body.error || 'Invalid search request.');
+    if (status >= 400) return sendError(res, 500, `Search failed: ${body.error || status}`, sessionId);
+    console.log(`Search started – sessionId=${sessionId} job=${body.job_id}`);
 
     return res.status(202).json({
       session_id: sessionId,

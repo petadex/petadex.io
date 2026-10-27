@@ -146,7 +146,8 @@ export interface PlasticomeMetadata extends HitMetadataBase {
   organism?: string | null
   accession?: string | null
   cath?: string | null
-  has_structure?: boolean | null
+  /** "yes" / "no" in the store. */
+  has_structure?: boolean | string | null
   pdb?: string | null
   doi?: string | null
   activity_mode?: string | null
@@ -235,7 +236,7 @@ export interface PlMember {
   substrates?: string | null
   ec?: string | null
   organism?: string | null
-  has_structure?: boolean | null
+  has_structure?: boolean | string | null
   pdb?: string | null
   doi?: string | null
 }
@@ -328,6 +329,7 @@ export interface SequenceSample {
   n_runs: number | null
   ka_max: number | null
   profile: string | null
+  /** "stated", "inferred", …, or "none". */
   profile_evidence: string | null
   isolation_source: string | null
   env_broad_scale: string | null

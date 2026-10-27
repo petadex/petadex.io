@@ -307,6 +307,20 @@ export function characterizedRelatives(
 
 /* ── Formatting ──────────────────────────────────────────────────────────── */
 
+/** Store profile slugs ("other_environmental") as display labels. */
+export function profileLabel(profile: string): string {
+  return profile.replace(/_/g, " ")
+}
+
+/** Store booleans may arrive as real booleans or as "yes" / "no" strings. */
+export function yesNo(
+  value: boolean | string | null | undefined
+): string | null {
+  if (value == null || value === "") return null
+  if (typeof value === "string") return value
+  return value ? "yes" : "no"
+}
+
 export function formatPercent(fraction: number, digits = 1): string {
   return `${(fraction * 100).toFixed(digits)} %`
 }

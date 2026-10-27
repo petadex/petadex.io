@@ -16,6 +16,8 @@ import {
   hasEnrichment,
   hitsInProfile,
   listValue,
+  profileLabel,
+  yesNo,
   onePerCluster,
   relativeHits,
   sortRelatives,
@@ -255,5 +257,20 @@ describe("listValue", () => {
     expect(listValue(["PET", "", "BHET"])).toEqual(["PET", "BHET"])
     expect(listValue("PET; BHET")).toEqual(["PET", "BHET"])
     expect(listValue(null)).toEqual([])
+  })
+})
+
+describe("store display values", () => {
+  it("shows profile slugs with spaces", () => {
+    expect(profileLabel("other_environmental")).toBe("other environmental")
+    expect(profileLabel("soil")).toBe("soil")
+  })
+
+  it('reads booleans and the store\'s "yes" / "no" strings', () => {
+    expect(yesNo(true)).toBe("yes")
+    expect(yesNo(false)).toBe("no")
+    expect(yesNo("yes")).toBe("yes")
+    expect(yesNo(null)).toBeNull()
+    expect(yesNo("")).toBeNull()
   })
 })

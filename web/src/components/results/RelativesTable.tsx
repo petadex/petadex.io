@@ -9,6 +9,7 @@ import {
   onePerCluster,
   ORIGIN_LABEL,
   RELATIVE_ORIGINS,
+  profileLabel,
   sortRelatives,
   toFasta,
   type RelativesSortKey,
@@ -32,8 +33,9 @@ function sourceCell(hit: SearchHit) {
   const m = hit.metadata as (LoganMetadata & { organism?: string }) | null
   if (!m) return null
   const field = hit.origin === "logan" ? "prof_dominant" : "organism"
-  const value = hit.origin === "logan" ? m.prof_dominant : m.organism
-  if (!value) return null
+  const raw = hit.origin === "logan" ? m.prof_dominant : m.organism
+  if (!raw) return null
+  const value = hit.origin === "logan" ? profileLabel(raw) : raw
   return (
     <span className="flex items-center gap-1.5">
       <span className="truncate">{value}</span>

@@ -7,6 +7,7 @@ import {
   formatPercent,
   formatXExpected,
   hitsInProfile,
+  profileLabel,
 } from "@/lib/searchMetadata"
 import { SectionTitle } from "./SectionTitle"
 
@@ -68,7 +69,7 @@ export function EnvironmentsChart({
               key={row.profile}
               tabIndex={0}
               role="img"
-              aria-label={`${row.profile}: hits from this search ${formatPercent(row.share)}, random PETadex sequence ${formatPercent(row.background_share)}, ${formatXExpected(row.x_expected)}`}
+              aria-label={`${profileLabel(row.profile)}: hits from this search ${formatPercent(row.share)}, random PETadex sequence ${formatPercent(row.background_share)}, ${formatXExpected(row.x_expected)}`}
               onMouseEnter={() => setActive(row.profile)}
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(row.profile)}
@@ -76,7 +77,7 @@ export function EnvironmentsChart({
               className={`grid min-h-8 grid-cols-[minmax(7rem,12rem)_1fr_6.5rem] items-center gap-3 rounded-sm px-1 outline-none ${isActive ? "bg-surface-raised" : ""}`}
             >
               <span aria-hidden className="text-foreground truncate text-xs">
-                {row.profile}
+                {profileLabel(row.profile)}
               </span>
               <span aria-hidden className="relative h-6">
                 <span className="bg-border absolute top-1/2 right-0 left-0 h-px" />
@@ -101,7 +102,9 @@ export function EnvironmentsChart({
                     className="bg-popover text-popover-foreground border-border absolute bottom-full z-(--z-tooltip) mb-1 rounded-md border px-2.5 py-1.5 text-xs whitespace-nowrap shadow-md"
                     style={{ left: `min(${pos(hi)}, calc(100% - 12rem))` }}
                   >
-                    <span className="block font-medium">{row.profile}</span>
+                    <span className="block font-medium">
+                      {profileLabel(row.profile)}
+                    </span>
                     <span className="block">
                       Hits from this search: {formatPercent(row.share)}
                     </span>
@@ -147,7 +150,7 @@ export function EnvironmentsChart({
               className="border-border rounded-lg border"
             >
               <summary className="text-foreground flex cursor-pointer items-center gap-2 px-3 py-2 text-sm">
-                {row.profile}
+                {profileLabel(row.profile)}
                 <span className="bg-muted text-muted-foreground tabular text-2xs rounded-full px-2 py-0.5 font-mono">
                   {members.length}
                 </span>

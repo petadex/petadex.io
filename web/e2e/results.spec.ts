@@ -1,16 +1,20 @@
 import { test, expect } from "@playwright/test"
 import AxeBuilder from "@axe-core/playwright"
-import enriched from "./fixtures/search/v260701-ispetase-enriched.json"
+import enriched from "./fixtures/search/v260701-ispetase-1.5.0.json"
+import partial from "./fixtures/search/v260701-synthetic-partial.json"
+import realSamples from "./fixtures/search/samples-LG58706675.json"
 
 /**
  * /results E2E. Mocked mode reads fixtures from e2e/mock-api-server.mjs by
  * job id; live mode (PLAYWRIGHT_BASE_URL) runs no searches and only renders
- * a stored example result.
+ * a stored example result. The main fixture is the real search_version 1.5.0
+ * IsPETase result, as the backend's transformResults()/resultMetadata() emit it.
  */
 const isLive = Boolean(process.env.PLAYWRIGHT_BASE_URL)
 
 const JOBS = {
   enriched: "regen_example_ispetase_v260701",
+  partial: "f".repeat(32),
   failed: "a".repeat(32),
   unavailable: "b".repeat(32),
   processing: "c".repeat(32),
@@ -96,11 +100,13 @@ test.describe("mocked", () => {
     page,
   }) => {
     await page.goto(`/results?job=${JOBS.enriched}`)
-    const firstLogan = enriched.results.find(
-      h => h.origin === "logan" && h.metadata
-    )!
-    await page.getByRole("button", { name: firstLogan.target_id }).click()
-    await expect(page.locator("#record-title")).toHaveText(firstLogan.target_id)
+    const hit = enriched.results.find(h => h.target_id === realSamples.id)!
+    const plMembers =
+      enriched.metadata.clusters.c60[
+        hit.metadata!.c60 as keyof typeof enriched.metadata.clusters.c60
+      ].pl_members
+    await page.getByRole("button", { name: hit.target_id }).click()
+    await expect(page.locator("#record-title")).toHaveText(hit.target_id)
     await expect(page.getByText("Catalytic core")).toBeVisible()
     await expect(page.getByText("inferred").first()).toBeVisible()
 
@@ -108,34 +114,50 @@ test.describe("mocked", () => {
       hasText: "Characterized relatives",
     })
     await expect(relatives).toHaveAttribute("open", "")
-    await expect(relatives.locator("tbody tr")).toHaveCount(3)
+    await expect(relatives.locator("tbody tr")).toHaveCount(plMembers.length)
 
     const samples = page.locator("details", { hasText: "Found in Samples" })
     expect(await samples.getAttribute("open")).toBeNull()
 
-    // Fetched on first open; the count badge is the true total.
+    // Fetched on first open, from the real orchestrator body.
     await samples.locator("summary").click()
     await expect(samples.locator("tbody tr")).toHaveCount(
-      Math.min(firstLogan.metadata!.n_biosamples!, 200)
+      realSamples.samples.length
     )
     await expect(samples.locator("summary")).toContainText(
-      String(firstLogan.metadata!.n_biosamples)
+      String(realSamples.n_biosamples)
     )
+    await expect(samples).toContainText(realSamples.samples[0].biosample)
+    // "none" evidence never renders as a badge.
+    await expect(samples.getByText("none", { exact: true })).toHaveCount(0)
   })
 
   test("found in samples: an unavailable lookup stays inside its section", async ({
     page,
   }) => {
     await page.goto(`/results?job=${JOBS.enriched}`)
-    // The mock answers 503 for the second Logan hit with metadata.
-    const second = enriched.results.filter(
-      h => h.origin === "logan" && h.metadata
-    )[1]
-    await page.getByRole("button", { name: second.target_id }).click()
+    // The mock answers 503 for the first Logan hit other than LG58706675.
+    const hit = enriched.results.find(
+      h => h.origin === "logan" && h.target_id !== realSamples.id
+    )!
+    await page.getByRole("button", { name: hit.target_id }).click()
     const samples = page.locator("details", { hasText: "Found in Samples" })
     await samples.locator("summary").click()
     await expect(samples).toContainText("Sample lookup unavailable.")
-    await expect(page.locator("#record-title")).toHaveText(second.target_id)
+    await expect(page.locator("#record-title")).toHaveText(hit.target_id)
+  })
+
+  test("partial enrichment: hits without a record render dashes", async ({
+    page,
+  }) => {
+    await page.goto(`/results?job=${JOBS.partial}`)
+    const missing = partial.results.find(
+      h => h.metadata === null && h.origin !== "plasticome"
+    )!
+    const row = page.locator("tbody tr", { hasText: missing.target_id })
+    await expect(row).toBeVisible()
+    await expect(row.locator("td").nth(6)).toHaveText("—")
+    await expect(page.getByText("Metadata lookup failed.")).toHaveCount(0)
   })
 
   test("failed enrichment shows hits with a note and no metadata columns", async ({

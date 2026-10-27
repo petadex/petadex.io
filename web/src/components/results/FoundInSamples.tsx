@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { getSequenceSamples } from "@/lib/api/search"
 import type { SequenceSamples } from "@/lib/api/types"
-import { formatPercent } from "@/lib/searchMetadata"
+import { formatPercent, profileLabel } from "@/lib/searchMetadata"
 import { CountBadge } from "./SectionTitle"
 
 type State =
@@ -130,12 +130,13 @@ function SamplesTable({ data }: { data: SequenceSamples }) {
                   <td className="px-4 py-1.5">
                     {s.profile ? (
                       <span className="inline-flex items-center gap-1.5">
-                        {s.profile}
-                        {s.profile_evidence && (
-                          <span className="border-chart-4/60 text-chart-4 text-2xs rounded-sm border px-1 font-mono leading-4">
-                            {s.profile_evidence}
-                          </span>
-                        )}
+                        {profileLabel(s.profile)}
+                        {s.profile_evidence &&
+                          s.profile_evidence !== "none" && (
+                            <span className="border-chart-4/60 text-chart-4 text-2xs rounded-sm border px-1 font-mono leading-4">
+                              {s.profile_evidence}
+                            </span>
+                          )}
                       </span>
                     ) : (
                       "—"

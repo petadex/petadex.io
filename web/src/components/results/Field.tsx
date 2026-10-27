@@ -7,14 +7,18 @@ export function Field({
   label,
   value,
   evidence = null,
+  hideEmpty = false,
 }: {
   label: string
   value: ReactNode
   evidence?: Evidence | null
+  /** Render nothing, rather than an em dash, when the value is absent. */
+  hideEmpty?: boolean
 }) {
   // `false` covers the `cond && value` idiom at call sites.
   const empty =
     value === null || value === undefined || value === "" || value === false
+  if (empty && hideEmpty) return null
   return (
     <div className="min-w-0">
       <dt className="text-muted-foreground text-2xs tracking-wide uppercase">

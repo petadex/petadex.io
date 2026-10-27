@@ -186,6 +186,12 @@ Built on `feat/web-results-metadata`; `/search` is not. Logic in
   "Sample lookup unavailable", kept inside the section).
 - `enrichment_status`: `ok`/`partial` show metadata (missing hits render —);
   `failed` shows hits plus one line; `unavailable` or `null` hides metadata.
+- Fixtures (`e2e/fixtures/search/`): `v260701-ispetase-1.5.0.json` is the
+  real 1.5.0 IsPETase result (petadex-sequence-search `0b601a6`) run through
+  the backend's `transformResults()`/`resultMetadata()`;
+  `samples-LG58706675.json` is a real `samples` body;
+  `v260701-synthetic-partial.json` covers `partial` and the missing
+  `pl_members` fallback.
 - **Backend dependency** (`feat/search-metadata-passthrough`):
   `resultMetadata()` passes through `metadata_version`, `clusters` and
   `summary`; `GET /api/sequence/:id/samples` proxies the orchestrator's

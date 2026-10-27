@@ -11,6 +11,8 @@ import {
   formatPercent,
   listValue,
   ORIGIN_LABEL,
+  profileLabel,
+  yesNo,
 } from "@/lib/searchMetadata"
 import { Field } from "./Field"
 import { FoundInSamples } from "./FoundInSamples"
@@ -18,10 +20,6 @@ import { SectionTitle } from "./SectionTitle"
 
 function num(value: number | null | undefined, digits = 0, unit = "") {
   return value == null ? null : `${value.toFixed(digits)}${unit}`
-}
-
-function yesNo(value: boolean | null | undefined) {
-  return value == null ? null : value ? "yes" : "no"
 }
 
 function OriginFields({ hit }: { hit: SearchHit }) {
@@ -36,24 +34,28 @@ function OriginFields({ hit }: { hit: SearchHit }) {
     return (
       <>
         <Field
+          hideEmpty
           label="Dominant environment"
           value={
             m.prof_dominant &&
-            `${m.prof_dominant}${m.prof_dominant_share != null ? ` · ${formatPercent(m.prof_dominant_share, 0)}` : ""}`
+            `${profileLabel(m.prof_dominant)}${m.prof_dominant_share != null ? ` · ${formatPercent(m.prof_dominant_share, 0)}` : ""}`
           }
           evidence={ev("prof_dominant")}
         />
         <Field
+          hideEmpty
           label="Environment temperature"
           value={m.tenv != null && `${m.tenv.toFixed(0)} °C${tenvRange}`}
           evidence={ev("tenv")}
         />
         <Field
+          hideEmpty
           label="Environment pH"
           value={num(m.phenv, 1)}
           evidence={ev("phenv")}
         />
         <Field
+          hideEmpty
           label="Measured temperature"
           value={
             m.meas_temp_median != null &&
@@ -62,6 +64,7 @@ function OriginFields({ hit }: { hit: SearchHit }) {
           evidence={ev("meas_temp_median")}
         />
         <Field
+          hideEmpty
           label="Measured pH"
           value={num(m.meas_ph_median, 1)}
           evidence={ev("meas_ph_median")}
@@ -75,6 +78,7 @@ function OriginFields({ hit }: { hit: SearchHit }) {
     return (
       <>
         <Field
+          hideEmpty
           label="Organism"
           value={
             m.organism &&
@@ -83,6 +87,7 @@ function OriginFields({ hit }: { hit: SearchHit }) {
           evidence={ev("organism")}
         />
         <Field
+          hideEmpty
           label="Lineage"
           value={[m.superkingdom, m.phylum, m.genus]
             .filter(Boolean)
@@ -90,6 +95,7 @@ function OriginFields({ hit }: { hit: SearchHit }) {
           evidence={ev("phylum")}
         />
         <Field
+          hideEmpty
           label="Nearest characterized"
           value={
             m.nearest_pl &&
@@ -98,38 +104,54 @@ function OriginFields({ hit }: { hit: SearchHit }) {
           evidence={ev("nearest_pl")}
         />
         <Field
+          hideEmpty
           label="Isolation source"
           value={m.isolation_source}
           evidence={ev("isolation_source")}
         />
-        <Field label="Host" value={m.host} evidence={ev("host")} />
-        <Field label="Country" value={m.country} evidence={ev("country")} />
+        <Field hideEmpty label="Host" value={m.host} evidence={ev("host")} />
         <Field
+          hideEmpty
+          label="Country"
+          value={m.country}
+          evidence={ev("country")}
+        />
+        <Field
+          hideEmpty
           label="MAG fraction"
           value={m.frac_mag != null && formatPercent(m.frac_mag, 0)}
           evidence={ev("frac_mag")}
         />
         <Field
+          hideEmpty
           label="Isolate genome"
           value={yesNo(m.any_isolate)}
           evidence={ev("any_isolate")}
         />
         <Field
+          hideEmpty
           label="Environment profile"
-          value={m.prof_dominant}
+          value={m.prof_dominant && profileLabel(m.prof_dominant)}
           evidence={ev("prof_dominant")}
         />
         <Field
+          hideEmpty
           label="Optimum temperature"
           value={num(m.t_opt_c, 0, " °C")}
           evidence={ev("t_opt_c")}
         />
         <Field
+          hideEmpty
           label="Optimum pH"
           value={num(m.ph_opt, 1)}
           evidence={ev("ph_opt")}
         />
-        <Field label="Oxygen" value={m.oxygen} evidence={ev("oxygen")} />
+        <Field
+          hideEmpty
+          label="Oxygen"
+          value={m.oxygen}
+          evidence={ev("oxygen")}
+        />
       </>
     )
   }
@@ -148,6 +170,7 @@ function SupportFields({ hit }: { hit: SearchHit }) {
     return (
       <>
         <Field
+          hideEmpty
           label="Samples"
           value={
             m.n_biosamples != null &&
@@ -156,11 +179,17 @@ function SupportFields({ hit }: { hit: SearchHit }) {
           evidence={ev("n_biosamples")}
         />
         <Field
+          hideEmpty
           label="Studies"
           value={fmt(m.n_bioprojects)}
           evidence={ev("n_bioprojects")}
         />
-        <Field label="Runs" value={fmt(m.n_runs)} evidence={ev("n_runs")} />
+        <Field
+          hideEmpty
+          label="Runs"
+          value={fmt(m.n_runs)}
+          evidence={ev("n_runs")}
+        />
       </>
     )
   }
@@ -169,16 +198,19 @@ function SupportFields({ hit }: { hit: SearchHit }) {
     return (
       <>
         <Field
+          hideEmpty
           label="Assemblies"
           value={fmt(m.n_assemblies)}
           evidence={ev("n_assemblies")}
         />
         <Field
+          hideEmpty
           label="Samples"
           value={fmt(m.n_biosamples)}
           evidence={ev("n_biosamples")}
         />
         <Field
+          hideEmpty
           label="Accessions"
           value={fmt(m.n_accessions)}
           evidence={ev("n_accessions")}

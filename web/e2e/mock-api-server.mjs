@@ -22,11 +22,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const fixture = readFileSync(
   path.join(__dirname, "fixtures", "corpus-summary.json")
 )
-const enriched = JSON.parse(
-  readFileSync(
-    path.join(__dirname, "fixtures", "search", "v260701-ispetase-enriched.json")
-  )
-)
+const readSearchFixture = name =>
+  JSON.parse(readFileSync(path.join(__dirname, "fixtures", "search", name)))
+
+/**
+ * The real search_version 1.5.0 IsPETase result (petadex-sequence-search
+ * tests/fixtures/result-1.5.0-ispetase.json), passed through the backend's
+ * transformResults()/resultMetadata() so it is exactly what the browser gets.
+ */
+const enriched = readSearchFixture("v260701-ispetase-1.5.0.json")
+/** Synthetic: enrichment_status "partial", hits without metadata, and a c60 card with no pl_members. */
+const partial = readSearchFixture("v260701-synthetic-partial.json")
+/** Real orchestrator `samples` body for one Logan hit of the real result. */
+const realSamples = readSearchFixture("samples-LG58706675.json")
 
 /** Same result with no enrichment: metadata null on every hit. */
 function withoutEnrichment(status) {
@@ -46,6 +54,7 @@ function withoutEnrichment(status) {
 /** Job ids the search-result route answers, by fixture. */
 const SEARCH_JOBS = {
   enriched: "regen_example_ispetase_v260701",
+  partial: "f".repeat(32),
   failed: "a".repeat(32),
   unavailable: "b".repeat(32),
   processing: "c".repeat(32),
@@ -53,19 +62,26 @@ const SEARCH_JOBS = {
 }
 
 /**
- * GET /sequence/:id/samples for the fixture's Logan hits, built from each
- * hit's prof_hist. The first Logan hit with metadata answers normally; the
- * second answers 503 (lookup unavailable); any other id 404s.
+ * GET /sequence/:id/samples. LG58706675 answers with the real body. The
+ * first other Logan hit of the real result answers 503 (lookup unavailable).
+ * The synthetic result's Logan hits get lists built from their prof_hist.
+ * Any other id 404s.
  */
-const loganHits = enriched.results.filter(
+const SAMPLES_UNAVAILABLE_ID = enriched.results.find(
+  h => h.origin === "logan" && h.target_id !== realSamples.id
+)?.target_id
+const syntheticLogan = partial.results.filter(
   h => h.origin === "logan" && h.metadata
 )
-const SAMPLES_UNAVAILABLE_ID = loganHits[1]?.target_id
 
 function sequenceSamples(id) {
+  if (id === realSamples.id) return { status: 200, body: realSamples }
   if (id === SAMPLES_UNAVAILABLE_ID)
-    return { status: 503, body: { error: "Sample lookup unavailable." } }
-  const hit = loganHits.find(h => h.target_id === id)
+    return {
+      status: 503,
+      body: { error: "Sample lookup unavailable.", upstream_status: 503 },
+    }
+  const hit = syntheticLogan.find(h => h.target_id === id)
   if (!hit)
     return { status: 404, body: { error: `No sample record for ${id}.` } }
   const m = hit.metadata
@@ -95,8 +111,10 @@ function sequenceSamples(id) {
     status: 200,
     body: {
       id,
+      status: "ok",
       n_biosamples: m.n_biosamples,
       n_bioprojects: m.n_bioprojects,
+      sample_cap: 200,
       samples,
     },
   }
@@ -109,6 +127,8 @@ function searchResult(jobId) {
   switch (jobId) {
     case SEARCH_JOBS.enriched:
       return enriched
+    case SEARCH_JOBS.partial:
+      return partial
     case SEARCH_JOBS.failed:
       return withoutEnrichment("failed")
     case SEARCH_JOBS.unavailable:

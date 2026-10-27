@@ -1,5 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import { createSequenceSamplesRouter } from './sequenceSamples.js';
 
@@ -80,4 +81,30 @@ test('503 when a 200 describes a different id or has no samples list', async () 
   assert.equal((await fetch(`${base}/LG5/samples`)).status, 503);
   respond = async id => ({ statusCode: 200, body: { id, n_biosamples: 1 } });
   assert.equal((await fetch(`${base}/LG5/samples`)).status, 503);
+});
+
+test('the real orchestrator envelope: headers, body as a JSON string, extra keys', async () => {
+  // petadex-sequence-search tests/fixtures/samples-LG58706675.json (e38b0c6),
+  // wrapped the way the orchestrator's _resp() returns it.
+  const real = JSON.parse(readFileSync(new URL('./fixtures/samples-LG58706675.json', import.meta.url)));
+  respond = async () => ({
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(real),
+  });
+  const res = await fetch(`${base}/${real.id}/samples`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body, real);
+  assert.equal(body.status, 'ok');
+  assert.equal(body.samples.length, body.n_biosamples);
+});
+
+test('the real unavailable status (no store configured) is a 503', async () => {
+  respond = async id => ({
+    statusCode: 503,
+    headers: {},
+    body: JSON.stringify({ id, status: 'unavailable' }),
+  });
+  assert.equal((await fetch(`${base}/LG58706675/samples`)).status, 503);
 });

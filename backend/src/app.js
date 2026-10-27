@@ -27,6 +27,7 @@ import clusterRoutes from './routes/cluster.js';
 import orfRoutes from './routes/orf.js';
 import kineticsRoutes from './routes/kinetics.js';
 import annotationRoutes from './routes/annotation.js';
+import sequenceSamplesRoutes from './routes/sequenceSamples.js';
 import { pool } from './db.js';
 
 const app = express();
@@ -73,6 +74,9 @@ app.use('/api/resolve', resolveRoutes);
 app.use('/api/cluster', clusterRoutes);
 app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
+// Found in Samples: per-sequence BioSample list from the v260701 metadata store,
+// via the search orchestrator's `samples` action.
+app.use('/api/sequence', sequenceSamplesRoutes);
 // BioSample annotation layer: /api/sequences, /api/annotations, /api/biosamples,
 // /api/clusters, /api/profiles (see routes/annotation.js for the full contract).
 app.use('/api', annotationRoutes);

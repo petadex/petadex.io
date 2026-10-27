@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "local": "node src/index.js",
-    "test": "echo \"No tests specified yet\" && exit 0",
+    "test": "node --test",
     "export-atlas": "node scripts/export-atlas.js",
     "check-annotation": "node scripts/check-annotation.js"
   },

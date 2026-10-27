@@ -68,6 +68,8 @@
 | `/api/sara-viewer/by-accession/:accession` | GET | None |
 | `/api/sara-viewer/:orfId` | GET | None |
 | `/api/search/` | POST | None |
+| `/api/search/export` | POST | None |
+| `/api/search/export/:exportSessionId` | GET | None |
 | `/api/search/phylo-tree/:family_id` | GET | None |
 | `/api/search/results/:job_id` | GET | None |
 | `/api/search/history` | GET | None |
@@ -1357,6 +1359,20 @@ SELECT DISTINCT orf_id FROM (
 Base: `/api/search`
 
 ### POST `/api/search/`
+
+**Tables**: None
+
+---
+
+### POST `/api/search/export`
+
+**Tables**: None
+
+---
+
+### GET `/api/search/export/:exportSessionId`
+
+**Parameters**: `exportSessionId`
 
 **Tables**: None
 

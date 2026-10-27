@@ -47,7 +47,9 @@ app.use(cors({
     // Scoped to this project's prefix rather than a blanket *.vercel.app, which
     // would let any app on Vercel call this API. Matches the production alias,
     // per-deployment URLs, and git-branch previews.
-    /^https:\/\/petadex-gatsby(-[a-z0-9-]+)?\.vercel\.app$/
+    /^https:\/\/petadex-gatsby(-[a-z0-9-]+)?\.vercel\.app$/,
+    // Vercel deployments of the web/ rebuild (project: petadex-io), same scoping.
+    /^https:\/\/petadex-io(-[a-z0-9-]+)?\.vercel\.app$/
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

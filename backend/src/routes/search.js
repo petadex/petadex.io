@@ -411,6 +411,12 @@ function resultMetadata(data, fallbackDepth) {
     database_version: data.database_version ?? null,
     search_version: data.search_version ?? null,
     enrichment_status: data.enrichment_status ?? null,
+    // Tier-A enrichment (search_version >= 1.5.0). Result-level, computed by
+    // the aggregator over every stored hit, not just the slice returned here.
+    // null on older results; the UI hides the metadata views then.
+    metadata_version: data.metadata_version ?? null,
+    clusters: data.clusters ?? null,
+    summary: data.summary ?? null,
   };
 }
 

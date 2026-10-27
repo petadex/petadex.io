@@ -112,6 +112,30 @@ test.describe("mocked", () => {
 
     const samples = page.locator("details", { hasText: "Found in Samples" })
     expect(await samples.getAttribute("open")).toBeNull()
+
+    // Fetched on first open; the count badge is the true total.
+    await samples.locator("summary").click()
+    await expect(samples.locator("tbody tr")).toHaveCount(
+      Math.min(firstLogan.metadata!.n_biosamples!, 200)
+    )
+    await expect(samples.locator("summary")).toContainText(
+      String(firstLogan.metadata!.n_biosamples)
+    )
+  })
+
+  test("found in samples: an unavailable lookup stays inside its section", async ({
+    page,
+  }) => {
+    await page.goto(`/results?job=${JOBS.enriched}`)
+    // The mock answers 503 for the second Logan hit with metadata.
+    const second = enriched.results.filter(
+      h => h.origin === "logan" && h.metadata
+    )[1]
+    await page.getByRole("button", { name: second.target_id }).click()
+    const samples = page.locator("details", { hasText: "Found in Samples" })
+    await samples.locator("summary").click()
+    await expect(samples).toContainText("Sample lookup unavailable.")
+    await expect(page.locator("#record-title")).toHaveText(second.target_id)
   })
 
   test("failed enrichment shows hits with a note and no metadata columns", async ({

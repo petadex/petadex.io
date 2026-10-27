@@ -181,11 +181,15 @@ Built on `feat/web-results-metadata`; `/search` is not. Logic in
   `<details>` listing Logan hits by `prof_hist` share.
 - **Sequence record**: one overview block; Characterized relatives
   (`clusters.c60[c60].pl_members`, else PL hits sharing the c60) open; Logan
-  "Found in Samples" closed, an empty slot until the samples lookup exists.
+  "Found in Samples" closed, fetched on first open from
+  `GET /api/sequence/:id/samples` (200 table, 404 "No sample record", 503
+  "Sample lookup unavailable", kept inside the section).
 - `enrichment_status`: `ok`/`partial` show metadata (missing hits render —);
   `failed` shows hits plus one line; `unavailable` or `null` hides metadata.
-- **Backend dependency**: `resultMetadata()` must pass through
-  `metadata_version`, `clusters` and `summary`, which it currently drops.
+- **Backend dependency** (`feat/search-metadata-passthrough`):
+  `resultMetadata()` passes through `metadata_version`, `clusters` and
+  `summary`; `GET /api/sequence/:id/samples` proxies the orchestrator's
+  `samples` action.
 
 ## Search form
 

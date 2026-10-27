@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ApiError } from "./client"
-import { getSearchResult, isJobId } from "./search"
+import { getSearchResult, getSequenceSamples, isJobId } from "./search"
 
 function respond(status: number, body: unknown) {
   return vi.fn().mockResolvedValue(
@@ -52,5 +52,25 @@ describe("getSearchResult", () => {
     await expect(getSearchResult("regen_example_x")).rejects.toBeInstanceOf(
       ApiError
     )
+  })
+})
+
+describe("getSequenceSamples", () => {
+  it("reads /sequence/:id/samples", async () => {
+    const body = { id: "LG1", n_biosamples: 1, n_bioprojects: 1, samples: [] }
+    const fetch = respond(200, body)
+    vi.stubGlobal("fetch", fetch)
+    await expect(getSequenceSamples("LG1")).resolves.toEqual(body)
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/sequence\/LG1\/samples$/)
+  })
+
+  it("resolves null when the store has no record", async () => {
+    vi.stubGlobal("fetch", respond(404, { error: "none" }))
+    await expect(getSequenceSamples("LG1")).resolves.toBeNull()
+  })
+
+  it("throws on 503 so the section can show the lookup as unavailable", async () => {
+    vi.stubGlobal("fetch", respond(503, { error: "unavailable" }))
+    await expect(getSequenceSamples("LG1")).rejects.toBeInstanceOf(ApiError)
   })
 })

@@ -13,7 +13,8 @@ import {
   ORIGIN_LABEL,
 } from "@/lib/searchMetadata"
 import { Field } from "./Field"
-import { CountBadge, SectionTitle } from "./SectionTitle"
+import { FoundInSamples } from "./FoundInSamples"
+import { SectionTitle } from "./SectionTitle"
 
 function num(value: number | null | undefined, digits = 0, unit = "") {
   return value == null ? null : `${value.toFixed(digits)}${unit}`
@@ -320,16 +321,12 @@ export function SequenceRecord({
       )}
 
       {hit.origin === "logan" && (
-        <details className="border-border rounded-lg border">
-          <summary className="text-foreground flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-semibold">
-            Found in Samples
-            {nSamples != null && <CountBadge count={nSamples} />}
-          </summary>
-          {/* Slot: per-sequence sample lookup (GET /api/sequence/:id/samples, not built yet). */}
-          <p className="border-border text-muted-foreground border-t px-4 py-3 text-xs">
-            Not loaded
-          </p>
-        </details>
+        // Keyed so switching hits never shows the previous sequence's list.
+        <FoundInSamples
+          key={hit.target_id}
+          id={hit.target_id}
+          count={nSamples}
+        />
       )}
     </article>
   )

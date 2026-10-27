@@ -1,6 +1,6 @@
 import { env } from "@/lib/env"
 import { apiFetchOrNull } from "./client"
-import type { SearchResultResponse } from "./types"
+import type { SearchResultResponse, SequenceSamples } from "./types"
 
 /** The three job-id shapes the backend's `jobIdSchema` accepts. */
 const JOB_ID_PATTERN =
@@ -26,5 +26,18 @@ export function getSearchResult(
       searchParams: { max_results: maxResults },
       cache: "no-store",
     }
+  )
+}
+
+/**
+ * GET /api/sequence/:id/samples — the BioSamples a Logan sequence was found
+ * in. `null` when the store has no record; 503 (lookup unavailable) throws.
+ */
+export function getSequenceSamples(
+  id: string
+): Promise<SequenceSamples | null> {
+  return apiFetchOrNull<SequenceSamples>(
+    `/sequence/${encodeURIComponent(id)}/samples`,
+    { baseUrl: env.searchApiUrl }
   )
 }

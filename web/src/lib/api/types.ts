@@ -319,3 +319,36 @@ export type SearchResultResponse =
       results: SearchHit[]
       metadata: SearchResultMetadata
     }
+
+/** One BioSample a Logan sequence was found in. */
+export interface SequenceSample {
+  biosample: string
+  bioproject: string | null
+  bioproject_title: string | null
+  n_runs: number | null
+  ka_max: number | null
+  profile: string | null
+  profile_evidence: string | null
+  isolation_source: string | null
+  env_broad_scale: string | null
+  env_medium: string | null
+  host: string | null
+  country: string | null
+  latitude: number | null
+  longitude: number | null
+  temperature_c: number | null
+  ph: number | null
+  /** [species name, share 0–1], largest first. */
+  top_species: [string, number][] | null
+}
+
+/**
+ * GET /api/sequence/:id/samples. `samples` is capped (200, by n_runs);
+ * `n_biosamples` is the true total.
+ */
+export interface SequenceSamples {
+  id: string
+  n_biosamples: number
+  n_bioprojects: number
+  samples: SequenceSample[]
+}

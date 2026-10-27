@@ -52,6 +52,56 @@ const SEARCH_JOBS = {
   searchFailed: "d".repeat(32),
 }
 
+/**
+ * GET /sequence/:id/samples for the fixture's Logan hits, built from each
+ * hit's prof_hist. The first Logan hit with metadata answers normally; the
+ * second answers 503 (lookup unavailable); any other id 404s.
+ */
+const loganHits = enriched.results.filter(
+  h => h.origin === "logan" && h.metadata
+)
+const SAMPLES_UNAVAILABLE_ID = loganHits[1]?.target_id
+
+function sequenceSamples(id) {
+  if (id === SAMPLES_UNAVAILABLE_ID)
+    return { status: 503, body: { error: "Sample lookup unavailable." } }
+  const hit = loganHits.find(h => h.target_id === id)
+  if (!hit)
+    return { status: 404, body: { error: `No sample record for ${id}.` } }
+  const m = hit.metadata
+  const profiles = Object.entries(m.prof_hist).flatMap(([profile, n]) =>
+    Array.from({ length: n }, () => profile)
+  )
+  const samples = profiles.slice(0, 200).map((profile, i) => ({
+    biosample: `SAMN${String(10_000_000 + i).padStart(8, "0")}`,
+    bioproject: `PRJNA${100 + (i % m.n_bioprojects)}`,
+    bioproject_title: `${profile} metagenome survey`,
+    n_runs: 1 + (i % 3),
+    ka_max: 0.5,
+    profile,
+    profile_evidence: i % 2 ? "inferred" : "stated",
+    isolation_source: profile,
+    env_broad_scale: null,
+    env_medium: null,
+    host: null,
+    country: i % 2 ? "Japan" : "Germany",
+    latitude: null,
+    longitude: null,
+    temperature_c: i % 4 ? 20 + (i % 10) : null,
+    ph: i % 4 ? 7.1 : null,
+    top_species: [["Ideonella sakaiensis", 0.12]],
+  }))
+  return {
+    status: 200,
+    body: {
+      id,
+      n_biosamples: m.n_biosamples,
+      n_bioprojects: m.n_bioprojects,
+      samples,
+    },
+  }
+}
+
 // The processing job answers `processing` twice, then completes.
 let processingReads = 0
 
@@ -81,6 +131,15 @@ const server = createServer((req, res) => {
   // /results polls from the browser on another origin.
   res.setHeader("Access-Control-Allow-Origin", "*")
   const url = new URL(req.url, "http://localhost")
+  const samplesMatch = /^\/api\/sequence\/([^/]+)\/samples$/.exec(url.pathname)
+  if (samplesMatch && req.method === "GET") {
+    const { status, body } = sequenceSamples(
+      decodeURIComponent(samplesMatch[1])
+    )
+    res.writeHead(status, { "Content-Type": "application/json" })
+    res.end(JSON.stringify(body))
+    return
+  }
   const searchMatch = /^\/api\/search\/results\/([^/]+)$/.exec(url.pathname)
   if (searchMatch && req.method === "GET") {
     const body = searchResult(decodeURIComponent(searchMatch[1]))

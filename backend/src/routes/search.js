@@ -18,6 +18,10 @@
  *   GET /api/search/results/:sessionId
  *     1. Check index file — return completed results if found
  *     2. Return processing if no index yet
+ *
+ *   POST /api/search/export  →  GET /api/search/export/{sessionId}_x?job_id=
+ *     Every significant hit (no 500 cap) as presigned .tsv.gz / .fasta.gz
+ *     downloads; see "Export: every significant hit" below.
  */
 
 /**
@@ -40,6 +44,7 @@ import Joi from 'joi';
 import { createHash, randomUUID } from 'crypto';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { S3Client, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { pool } from '../db.js';
 import { getPublicReadS3Client, streamToString as publicStreamToString } from '../lib/s3Public.js';
 import { SEQUENCE_PATTERN, MAX_LEN, cleanSequenceForKey } from '../lib/sequenceValidation.js';
@@ -272,6 +277,49 @@ function sendError(res, statusCode, message, jobId = null) {
   return res.status(statusCode).json(payload);
 }
 
+async function invokeOrchestrator(payload) {
+  const resp = await getSearchInvokeClient().send(new InvokeCommand({
+    FunctionName: SEARCH_LAMBDA_NAME,
+    InvocationType: 'RequestResponse',
+    Payload: JSON.stringify(payload),
+  }));
+  if (resp.FunctionError) throw new Error(`orchestrator FunctionError: ${resp.FunctionError}`);
+  return resp.Payload ? JSON.parse(Buffer.from(resp.Payload).toString('utf8')) : {};
+}
+
+// The orchestrator answers with a { statusCode, body } envelope (body may be a
+// JSON string); a bare object is treated as a 200 body.
+function unwrapEnvelope(orchestrator) {
+  const status = orchestrator.statusCode ?? 200;
+  let body = orchestrator.body ?? orchestrator;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+  return { status, body };
+}
+
+// The orchestrator's public-search limits refused the job (429 rate limit,
+// 503 capacity). Not a bug, so no bug-report link.
+function sendRefusal(res, status, body) {
+  res.set('Retry-After', String(body.retry_after ?? 60));
+  return res.status(status).json({
+    error: body.error || 'PETadex search is busy. Please try again shortly.',
+    limit: body.limit,
+    retry_after: body.retry_after,
+  });
+}
+
+// The orchestrator's reserved concurrency (2) is full. That cap is what
+// serializes the admission check against bursts, so this is "busy".
+function sendThrottled(res) {
+  res.set('Retry-After', '15');
+  return res.status(429).json({
+    error: 'PETadex search is busy right now. Please try again in a moment.',
+    limit: 'throttled',
+    retry_after: 15,
+  });
+}
+
 // `maxResults` trims the RAW array before the map, and that ordering is the
 // whole point: on the poll path every transformed hit's accession is fed to
 // enrichWithFamilyData(), a three-way CTE round trip to Postgres. Slicing after
@@ -365,16 +413,18 @@ function resultMetadata(data, fallbackDepth) {
   };
 }
 
+// Permissive pre-filter: accepts bare sequences or single-record FASTA,
+// full IUPAC ambiguity codes, stop codons (*) and gaps (-).
+// The Python Lambda (petadex-diamond-orchestrator / common.py) is the
+// authoritative gate — it strips */- and enforces the residue-length bounds.
+// Raw max is generous (12000) to allow for a header line + whitespace.
+const sequenceField = Joi.string()
+  .pattern(SEQUENCE_PATTERN)
+  .max(12000).required()
+  .messages({ 'string.pattern.base': 'Sequence contains unrecognized characters. Use standard amino acid codes (single-letter).' });
+
 const searchSchema = Joi.object({
-  // Permissive pre-filter: accepts bare sequences or single-record FASTA,
-  // full IUPAC ambiguity codes, stop codons (*) and gaps (-).
-  // The Python Lambda (petadex-diamond-orchestrator / common.py) is the
-  // authoritative gate — it strips */- and enforces the residue-length bounds.
-  // Raw max is generous (12000) to allow for a header line + whitespace.
-  sequence: Joi.string()
-    .pattern(SEQUENCE_PATTERN)
-    .max(12000).required()
-    .messages({ 'string.pattern.base': 'Sequence contains unrecognized characters. Use standard amino acid codes (single-letter).' }),
+  sequence: sequenceField,
   max_results: Joi.number().integer().min(1).max(500).default(50),
   // Pin the search to one DIAMOND build; omitted = diamond/LATEST.
   // valid() with no arguments accepts anything, so an empty allowlist must
@@ -394,6 +444,17 @@ const searchSchema = Joi.object({
 // no miss rule and no clamp — asking deeper than the stored result simply
 // returns all of it.
 const viewCountSchema = Joi.number().integer().min(1).max(500).default(DEFAULT_VIEW_RESULTS);
+
+// `database_version` here is NOT a pin request: it is the build the displayed
+// search ran against, so the export can be refused rather than silently run
+// against a newer LATEST whose hits wouldn't match the table on screen.
+const exportSchema = Joi.object({
+  sequence: sequenceField,
+  database_version: Joi.string().max(128).optional(),
+});
+
+const exportSessionIdSchema = Joi.string().pattern(/^[a-f0-9]{32}_x$/).required();
+const exportJobIdSchema = Joi.string().uuid().optional();
 
 const jobIdSchema = Joi.alternatives().try(
   Joi.string().pattern(/^[a-f0-9]{32}$/),                    // MD5 sessionId
@@ -509,16 +570,20 @@ function isNotFound(err) {
 // (index or result object not written yet). THROWS on a genuine failure — a real
 // S3 error or malformed result JSON — so the caller can surface `failed` rather
 // than let it masquerade as `processing`.
-async function resolveFromIndex(s3, sessionId) {
+async function readIndex(s3, sessionId) {
   const indexKey = `${RESULTS_PREFIX}/${sessionId}.index`;
-  let jobId;
   try {
     const idxResp = await s3.send(new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: indexKey }));
-    jobId = (await streamToString(idxResp.Body)).trim();
+    return (await streamToString(idxResp.Body)).trim();
   } catch (err) {
     if (isNotFound(err)) return null;  // index not written yet — still processing
     throw err;
   }
+}
+
+async function resolveFromIndex(s3, sessionId) {
+  const jobId = await readIndex(s3, sessionId);
+  if (!jobId) return null;
 
   const s3Key = `${RESULTS_PREFIX}/${sessionId}/${jobId}.json`;
   let content;
@@ -561,6 +626,110 @@ async function resolveErrorSignal(s3, sessionId) {
     // The sentinel exists but is unparseable — the search still failed, so honor it.
     return { status: 'failed', reason: 'Search failed' };
   }
+}
+
+// ─── Export: every significant hit ───────────────────────────────────────────
+// See "13 - Export All Significant Hits". The orchestrator's `export` action
+// re-runs a search with no hit cap under its own session id ({sessionId}_x) and
+// writes a summary JSON plus gzipped files under results/{sessionId}_x/{jobId}/.
+// It can list the bucket but not read it, so this backend reads the summary and
+// presigns the downloads.
+
+// Presigned download links are short-lived; the client refreshes a stale one
+// through the (free) poll route rather than re-running anything.
+const EXPORT_URL_TTL_S = 15 * 60;
+
+async function readExportSummary(s3, exportSid, jobId) {
+  const key = `${RESULTS_PREFIX}/${exportSid}/${jobId}.json`;
+  let content;
+  try {
+    const resp = await s3.send(new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: key }));
+    content = await streamToString(resp.Body);
+  } catch (err) {
+    if (isNotFound(err)) return null;
+    throw err;
+  }
+  return JSON.parse(content);
+}
+
+// Only presign keys inside this export's own job folder: the summary is
+// written by the aggregator, but a URL that signs an arbitrary key would turn a
+// bad summary into a read of anything in the bucket.
+async function presignExportFile(exportSid, jobId, file, fallbackKey = null) {
+  const key = file?.key ?? fallbackKey;
+  if (!key) return null;
+  if (!key.startsWith(`${RESULTS_PREFIX}/${exportSid}/${jobId}/`)) {
+    throw new Error(`export file key outside its job folder: ${key}`);
+  }
+  // ContentDisposition (attachment; filename=petadex_hits.*) is set on the
+  // object by the aggregator, so the plain GET downloads with the right name.
+  const url = await getSignedUrl(
+    getS3Client(),
+    new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: key }),
+    { expiresIn: EXPORT_URL_TTL_S },
+  );
+  return { url, bytes: file?.bytes ?? null };
+}
+
+async function exportReadyResponse(exportSid, jobId, summary) {
+  if (summary.status && summary.status !== 'complete') {
+    return { status: 'failed', export_session_id: exportSid, job_id: jobId, error: `Export ${summary.status}` };
+  }
+  const files = summary.files || {};
+  return {
+    status: 'ready',
+    export_session_id: exportSid,
+    job_id: jobId,
+    export_format: summary.export_format ?? null,
+    query_header: summary.query_header ?? null,
+    query_length: summary.query_length ?? null,
+    database_release: summary.database_release ?? null,
+    database_version: summary.database_version ?? null,
+    search_version: summary.search_version ?? null,
+    evalue_cutoff: summary.evalue_cutoff ?? null,
+    total_hits: summary.total_hits ?? null,
+    by_evalue: summary.by_evalue ?? null,
+    by_origin: summary.by_origin ?? null,
+    generated_at: summary.generated_at ?? null,
+    files: {
+      tsv: await presignExportFile(exportSid, jobId, files.hits_tsv_gz,
+        `${RESULTS_PREFIX}/${exportSid}/${jobId}/hits.tsv.gz`),
+      // Export format 1.1 adds the FASTA; a 1.0 summary has no hits_fasta_gz,
+      // so this is null and the client hides the link.
+      fasta: await presignExportFile(exportSid, jobId, files.hits_fasta_gz),
+    },
+    url_expires_in: EXPORT_URL_TTL_S,
+  };
+}
+
+// The export's state for a poll: none | running | ready | failed. `jobIdHint`
+// is the job the client was handed at start; without one (a page-load probe,
+// or the start invoke timed out) the index names it.
+async function exportStatus(s3, exportSid, jobIdHint = null) {
+  const jobId = jobIdHint || await readIndex(s3, exportSid);
+  // No job anywhere: nothing has been exported (or the start was so recent the
+  // index isn't written). The results page probes with this on load, so it
+  // must be distinguishable from a known job that is still running.
+  if (!jobId) return { status: 'none', export_session_id: exportSid, job_id: null };
+  const summary = await readExportSummary(s3, exportSid, jobId);
+  if (summary) return exportReadyResponse(exportSid, jobId, summary);
+  let errSignal = null;
+  try {
+    errSignal = await resolveErrorSignal(s3, exportSid);
+  } catch (sigErr) {
+    console.error(`resolveErrorSignal failed for ${exportSid} (non-fatal):`, sigErr);
+  }
+  // An old .error can outlive a later successful re-run of the same export, so
+  // only this job's own sentinel counts.
+  if (errSignal && errSignal.jobId === jobId) {
+    return {
+      status: 'failed',
+      export_session_id: exportSid,
+      job_id: jobId,
+      error: errSignal.reason || errSignal.cause || 'Export failed',
+    };
+  }
+  return { status: 'running', export_session_id: exportSid, job_id: jobId };
 }
 
 
@@ -651,26 +820,20 @@ router.post('/', async (req, res, next) => {
     // never rate limited.
     let orchestrator;
     try {
-      const resp = await getSearchInvokeClient().send(new InvokeCommand({
-        FunctionName: SEARCH_LAMBDA_NAME,
-        InvocationType: 'RequestResponse',
-        Payload: JSON.stringify({
-          sessionId: sessionId,
-          sequence: sequence,
-          // The server constant, never the caller's value. This is what makes
-          // dropping max_results from the cache key safe while Part A is still
-          // undeployed: every entry under a given key holds the same depth, so
-          // no request can be served a result shallower than it asked for.
-          max_results: RESULT_DEPTH,
-          // Marks this as a public search: the orchestrator applies its
-          // per-client and global limits only to events that carry it.
-          clientIp: clientIpOf(req),
-          // Omitted (not null) when unpinned so the orchestrator resolves LATEST.
-          ...(pinnedVersion ? { version: pinnedVersion } : {}),
-        }),
-      }));
-      if (resp.FunctionError) throw new Error(`orchestrator FunctionError: ${resp.FunctionError}`);
-      orchestrator = resp.Payload ? JSON.parse(Buffer.from(resp.Payload).toString('utf8')) : {};
+      orchestrator = await invokeOrchestrator({
+        sessionId: sessionId,
+        sequence: sequence,
+        // The server constant, never the caller's value. This is what makes
+        // dropping max_results from the cache key safe while Part A is still
+        // undeployed: every entry under a given key holds the same depth, so
+        // no request can be served a result shallower than it asked for.
+        max_results: RESULT_DEPTH,
+        // Marks this as a public search: the orchestrator applies its
+        // per-client and global limits only to events that carry it.
+        clientIp: clientIpOf(req),
+        // Omitted (not null) when unpinned so the orchestrator resolves LATEST.
+        ...(pinnedVersion ? { version: pinnedVersion } : {}),
+      });
     } catch (lambdaErr) {
       if (lambdaErr.name === 'TimeoutError') {
         // The orchestrator may still have started the job, so let the client
@@ -683,34 +846,17 @@ router.post('/', async (req, res, next) => {
         });
       }
       if (lambdaErr.name === 'TooManyRequestsException') {
-        // The orchestrator's reserved concurrency (2) is full. That cap is what
-        // serializes the admission check against bursts, so this is "busy".
         console.log(`Search refused (orchestrator throttled) – sessionId=${sessionId}`);
-        res.set('Retry-After', '15');
-        return res.status(429).json({
-          error: 'PETadex search is busy right now. Please try again in a moment.',
-          limit: 'throttled',
-          retry_after: 15,
-        });
+        return sendThrottled(res);
       }
       console.error('Lambda invocation failed:', lambdaErr);
       return sendError(res, 500, `Search failed: ${lambdaErr.message}`, sessionId);
     }
 
-    const status = orchestrator.statusCode ?? 200;
-    let body = orchestrator.body ?? orchestrator;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch { body = {}; }
-    }
+    const { status, body } = unwrapEnvelope(orchestrator);
     if (status === 429 || status === 503) {
-      // Rate limit or capacity, not a bug, so no bug-report link.
       console.log(`Search refused (${body.limit}) – sessionId=${sessionId}`);
-      res.set('Retry-After', String(body.retry_after ?? 60));
-      return res.status(status).json({
-        error: body.error || 'PETadex search is busy. Please try again shortly.',
-        limit: body.limit,
-        retry_after: body.retry_after,
-      });
+      return sendRefusal(res, status, body);
     }
     if (status === 400) return sendError(res, 400, body.error || 'Invalid search request.');
     if (status >= 400) return sendError(res, 500, `Search failed: ${body.error || status}`, sessionId);
@@ -722,6 +868,147 @@ router.post('/', async (req, res, next) => {
       message: `Poll /api/search/results/${sessionId} for results.`,
     });
 
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/search/export
+ *
+ * Body { sequence, database_version? }. Starts (or finds) the export of every
+ * significant hit for the search this sequence keys to.
+ *
+ * 1. Key exactly like POST / (sequence + live versions), so the export
+ *    belongs to the same cached search
+ * 2. Refuse when the export can't match that search: the database moved on
+ *    (409), the versions are unknown (503), or the search already holds every
+ *    hit (409 — nothing more to export, and it would cost a full re-run)
+ * 3. Relay `action: "export"`: 200 ready (cached, with presigned links),
+ *    202 running (poll GET /export/:exportSessionId?job_id=), or its 429/503
+ */
+router.post('/export', async (req, res, next) => {
+  try {
+    const { error, value } = exportSchema.validate(req.body);
+    if (error) return sendError(res, 400, error.details[0].message);
+    const { sequence, database_version: searchedVersion } = value;
+
+    let versions = await getSearchVersions();
+    let pinnedVersion = null;
+    if (versions && searchedVersion && searchedVersion !== versions.databaseVersion) {
+      if (!PINNABLE_VERSIONS.includes(searchedVersion)) {
+        return res.status(409).json({
+          error: 'The database has been updated since this search ran. Re-run the search to export its hits.',
+          database_version: versions.databaseVersion,
+        });
+      }
+      pinnedVersion = searchedVersion;
+      versions = await getSearchVersions(pinnedVersion);
+    }
+    if (!versions) {
+      // No nonce fallback here, unlike POST /: an export under a nonce key
+      // could never be found again, so it would be paid for and orphaned.
+      res.set('Retry-After', '15');
+      return res.status(503).json({
+        error: 'Could not confirm the database version. Please try again shortly.',
+        limit: 'unavailable',
+        retry_after: 15,
+      });
+    }
+
+    const sessionId = makeSessionId(
+      cleanSequenceForKey(sequence), versions.databaseVersion, versions.searchVersion,
+    );
+    const s3 = getS3Client();
+
+    let searched = null;
+    try {
+      searched = await resolveFromIndex(s3, sessionId);
+    } catch (cacheErr) {
+      console.warn(`Export: search lookup failed for sessionId=${sessionId}, continuing:`, cacheErr.message);
+    }
+    // No stored search is fine: "Also prepare the full hit list" starts the
+    // export alongside a search that hasn't finished yet.
+    if (searched) {
+      const depth = searched.data.result_depth ?? versions.resultDepth ?? RESULT_DEPTH;
+      if (searched.data.num_results < depth) {
+        return res.status(409).json({
+          error: `This search already holds all ${searched.data.num_results} significant hits; there is nothing more to export.`,
+          limit: 'exhaustive',
+        });
+      }
+    }
+
+    let orchestrator;
+    try {
+      orchestrator = await invokeOrchestrator({
+        action: 'export',
+        sessionId,
+        sequence,
+        clientIp: clientIpOf(req),
+        ...(pinnedVersion ? { version: pinnedVersion } : {}),
+      });
+    } catch (lambdaErr) {
+      if (lambdaErr.name === 'TimeoutError') {
+        // As for a search: it may have started, so let the client poll (with
+        // no job id; the poll falls back to the export's index).
+        console.warn(`Export invoke timed out, assuming started – sessionId=${sessionId}`);
+        return res.status(202).json({ status: 'running', export_session_id: `${sessionId}_x`, job_id: null });
+      }
+      if (lambdaErr.name === 'TooManyRequestsException') {
+        console.log(`Export refused (orchestrator throttled) – sessionId=${sessionId}`);
+        return sendThrottled(res);
+      }
+      console.error('Export invocation failed:', lambdaErr);
+      return sendError(res, 500, `Export failed: ${lambdaErr.message}`, sessionId);
+    }
+
+    const { status, body } = unwrapEnvelope(orchestrator);
+    if (status === 429 || status === 503) {
+      console.log(`Export refused (${body.limit}) – sessionId=${sessionId}`);
+      return sendRefusal(res, status, body);
+    }
+    if (status === 400) return sendError(res, 400, body.error || 'Invalid export request.');
+    if (status >= 400) return sendError(res, 500, `Export failed: ${body.error || status}`, sessionId);
+
+    const exportSid = body.export_session_id || `${sessionId}_x`;
+    if (body.status === 'ready') {
+      console.log(`Export cache hit – sessionId=${exportSid} job=${body.job_id}`);
+      const summary = await readExportSummary(s3, exportSid, body.job_id);
+      if (summary) {
+        res.set('Cache-Control', 'no-store');
+        return res.json(await exportReadyResponse(exportSid, body.job_id, summary));
+      }
+    }
+    console.log(`Export ${body.deduped ? 'deduped' : 'started'} – sessionId=${exportSid} job=${body.job_id}`);
+    return res.status(202).json({
+      status: 'running',
+      export_session_id: exportSid,
+      job_id: body.job_id ?? null,
+      ...(body.deduped ? { deduped: true } : {}),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/search/export/:exportSessionId?job_id=<uuid>
+ *
+ * Poll an export: ready (summary + fresh presigned links), failed (that job's
+ * own .error sentinel), or running. S3 reads only — never invokes a search,
+ * so the client also uses it to refresh an expired download link.
+ */
+router.get('/export/:exportSessionId', async (req, res, next) => {
+  try {
+    const { error, value: exportSid } = exportSessionIdSchema.validate(req.params.exportSessionId);
+    if (error) return sendError(res, 400, 'Invalid export session id.');
+    const { error: jobErr, value: jobId } = exportJobIdSchema.validate(req.query.job_id || undefined);
+    if (jobErr) return sendError(res, 400, 'Invalid job_id.');
+
+    const status = await exportStatus(getS3Client(), exportSid, jobId ?? null);
+    res.set('Cache-Control', 'no-store');
+    return res.json(status);
   } catch (err) {
     next(err);
   }

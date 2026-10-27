@@ -8,3 +8,4 @@ export {
 export { probeApiHealth, type HealthProbe } from "./health"
 export { fetchCorpusSummary, parseCount, formatCount } from "./corpus"
 export type * from "./types"
+export { getSearchResult, isJobId } from "./search"

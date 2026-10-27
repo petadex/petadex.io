@@ -165,6 +165,28 @@ the backend now logs any recurrence), so every decision is **per hit on
   `id_format` / `origin` win when present; the client parser covers results
   stored before that change.
 
+## Metadata views (search_version 1.5.0)
+
+Built on `feat/web-results-metadata`; `/search` is not. Logic in
+`src/lib/searchMetadata.ts`, views in `src/components/results/`.
+
+- Rules: data, never judgements (no score, shortlist or verdict; default order
+  is search rank). Section title + count badge; no explanatory prose. Every
+  value carries an evidence badge (`FIELD_EVIDENCE`, per origin).
+- **Relatives**: nr + Logan hits. Filters identity, coverage, origin; sort rank,
+  identity, samples, studies, coverage; "One per 90 % cluster" off by default;
+  Copy as FASTA.
+- **Environments**: `summary.environments` as a dumbbell per profile (this
+  search vs a random PETadex Logan sequence, "N× expected"); top 5 as closed
+  `<details>` listing Logan hits by `prof_hist` share.
+- **Sequence record**: one overview block; Characterized relatives
+  (`clusters.c60[c60].pl_members`, else PL hits sharing the c60) open; Logan
+  "Found in Samples" closed, an empty slot until the samples lookup exists.
+- `enrichment_status`: `ok`/`partial` show metadata (missing hits render —);
+  `failed` shows hits plus one line; `unavailable` or `null` hides metadata.
+- **Backend dependency**: `resultMetadata()` must pass through
+  `metadata_version`, `clusters` and `summary`, which it currently drops.
+
 ## Search form
 
 - Validation as Gatsby: `/^[ACDEFGHIKLMNPQRSTVWY\s\n\r*-]+$/i`, 10–10,000

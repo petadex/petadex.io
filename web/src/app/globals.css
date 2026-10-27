@@ -89,6 +89,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  /* Search-results environment chart: one hue, two shades (ordinal). */
+  --color-env-hits: var(--env-hits);
+  --color-env-background: var(--env-background);
 
   /* ── Sidebar ──────────────────────────────────────────────── */
   --color-sidebar: var(--sidebar);
@@ -228,6 +231,9 @@
   --chart-3: oklch(0.77 0.19 70);
   --chart-4: oklch(0.63 0.27 304);
   --chart-5: oklch(0.65 0.25 16);
+  /* Validated with dataviz validate_palette.js --ordinal against #1a1a19. */
+  --env-hits: #7fb0f5;
+  --env-background: #3d6aa8;
 
   /* Sidebar */
   --sidebar: oklch(0.2 0 0);
@@ -293,6 +299,9 @@
   --chart-3: oklch(0.4 0.07 227);
   --chart-4: oklch(0.83 0.19 84);
   --chart-5: oklch(0.77 0.19 70);
+  /* Validated with dataviz validate_palette.js --ordinal against #fcfcfb. */
+  --env-hits: #1c56b0;
+  --env-background: #86a9dc;
 
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.14 0 0);

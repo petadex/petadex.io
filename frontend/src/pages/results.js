@@ -9,6 +9,12 @@ import { addJobId } from "../utils/session"
 import SearchHistory from "../components/search/SearchHistory"
 import ResultsView from "../components/search/ResultsView"
 import { DEFAULT_RESULT_VIEW } from "../components/search/constants"
+import Seo from "../components/seo"
+import {
+  queryDisplayName,
+  queryFullTitle,
+  recallQueryTitle,
+} from "../utils/queryTitle"
 import Container from "../components/common/Container"
 import { LOADING_PROMPTS } from "../components/common/TerminalLoader"
 import {
@@ -293,15 +299,15 @@ const ResultsPage = () => {
     [stopAll]
   )
 
-  const applyResults = useCallback(data => {
-    setResults(
-      transformResults(
-        data.results,
-        data.query_length || data.metadata?.query_length
+  const applyResults = useCallback(
+    data => {
+      setResults(
+        transformResults(
+          data.results,
+          data.query_length || data.metadata?.query_length
+        )
       )
-    )
-    setMetadata(
-      data.metadata || {
+      const meta = data.metadata || {
         query_header: data.query_header,
         query_sequence: data.query_sequence,
         query_length: data.query_length,
@@ -310,8 +316,15 @@ const ResultsPage = () => {
         search_time_ms: data.search_time_ms,
         timestamp: data.timestamp,
       }
-    )
-  }, [])
+      // A cached result carries the first searcher's header; show the title
+      // this browser typed, when it typed one.
+      setMetadata({
+        ...meta,
+        query_header: recallQueryTitle(sessionId) ?? meta.query_header,
+      })
+    },
+    [sessionId]
+  )
 
   const handleResults = useCallback(
     (data, sid) => {
@@ -390,6 +403,19 @@ const ResultsPage = () => {
     return () => stopAll()
   }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Only once the result has landed: the header arrives with it.
+  const pageName = metadata
+    ? queryDisplayName(metadata.query_header, metadata.query_length)
+    : null
+
+  // Head can't see page state, so the per-query tab title is set here, on
+  // top of the static one Head renders.
+  useEffect(() => {
+    // Same "<title> | <site title>" shape the Seo component renders.
+    if (pageName)
+      document.title = `${pageName} · Search Results | PETadex - Plastic-Degrading Enzyme Database`
+  }, [pageName])
+
   const handleNewSearch = () => {
     stopAll()
     navigate("/search")
@@ -404,12 +430,31 @@ const ResultsPage = () => {
     <section className="px-4 py-6">
       <Container>
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-sm text-secondary mb-4">
-          <Link to="/" className="text-accent hover:text-accent-hover">
-            PETadex
+        {/* The query title is the FASTA header line, which has no length limit
+            upstream (only the API's 12,000-char cap on the whole submission),
+            so it is truncated to one line here with the full text on hover. */}
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center gap-1.5 text-sm text-secondary mb-4 min-w-0"
+        >
+          <Link
+            to="/search"
+            className="text-accent hover:text-accent-hover shrink-0"
+          >
+            Search Results
           </Link>
-          <span className="text-border-strong">/</span>
-          <span className="text-secondary-foreground">Search results</span>
+          {pageName && (
+            <>
+              <span className="text-border-strong shrink-0">/</span>
+              <span
+                className="text-secondary-foreground truncate max-w-xl"
+                title={queryFullTitle(metadata.query_header) || undefined}
+                aria-current="page"
+              >
+                {pageName}
+              </span>
+            </>
+          )}
         </nav>
 
         {/* Main card */}
@@ -444,3 +489,10 @@ const ResultsPage = () => {
 }
 
 export default ResultsPage
+
+export const Head = () => (
+  <Seo
+    title="Search Results"
+    description="Protein sequence similarity search results"
+  />
+)

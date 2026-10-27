@@ -14,35 +14,87 @@ import ProfileBadge from "../annotation/ProfileBadge"
 import {
   fetchAnnotations,
   resolveProfile,
-  profileFacetValue,
   profileLabel,
-  NO_PROFILE_FACET,
   biosamplePath,
 } from "../../utils/annotation"
 import { familyColor } from "../../utils/familyColor"
-
-// The profile facet lives in the URL (?profile=<slug>) so it survives bookmarking
-// and back-navigation. replaceState keeps the job id and adds no history entry.
-const PROFILE_PARAM = "profile"
-
-function readProfileFacet() {
-  if (typeof window === "undefined") return null
-  return new URLSearchParams(window.location.search).get(PROFILE_PARAM)
-}
-
-function writeProfileFacet(value) {
-  if (typeof window === "undefined") return
-  const url = new URL(window.location.href)
-  if (value) url.searchParams.set(PROFILE_PARAM, value)
-  else url.searchParams.delete(PROFILE_PARAM)
-  window.history.replaceState(window.history.state, "", url)
-}
+import { formatCount } from "../../utils/format"
+import ExportPanel from "./ExportPanel"
+import { queryFullTitle } from "../../utils/queryTitle"
 
 const TABS = [
   { id: "descriptions", label: "Descriptions" },
   { id: "graphic", label: "Graphic summary" },
   { id: "taxonomy", label: "Taxonomy" },
   { id: "atlas", label: "Atlas" },
+]
+
+// How the search orders hits (the aggregator's ranking, which the export
+// files use too).
+const RANK_ORDER =
+  "ordered by bit score, highest first; ties broken by lower e-value."
+
+// Descriptions-table columns. `help` is the header's hover text: what the
+// field is, in a sentence or two.
+const TABLE_COLUMNS = [
+  {
+    label: "#",
+    key: "rank",
+    help: `Rank in the search results, ${RANK_ORDER} Bit score measures alignment quality independent of database size.`,
+  },
+  {
+    label: "Accession",
+    key: "accession",
+    help: "PETadex ID of the matching sequence. The prefix shows its source: LG = Logan (assembled from public sequencing runs), NR = NCBI nr, PL = Plasticome.",
+  },
+  {
+    label: "Name",
+    key: "name",
+    help: "Protein name or description from the sequence's source record, when it has one.",
+  },
+  {
+    label: "Organism",
+    key: "organism",
+    help: "Organism the sequence comes from, as given in its source record.",
+  },
+  {
+    label: "Family",
+    key: "family",
+    minWidth: "10rem",
+    help: "PETadex enzyme family the hit belongs to.",
+  },
+  {
+    label: "Identity",
+    key: "identity",
+    help: "Percent of aligned positions where the hit has the same amino acid as the query.",
+  },
+  {
+    label: "E-value",
+    key: "evalue",
+    minWidth: "8rem",
+    help: "Number of hits this good expected by chance in a database this size. Lower is more significant; hits above 1e-3 aren't reported.",
+  },
+  {
+    label: "Coverage",
+    key: "query_coverage",
+    help: "Percent of the query's length covered by the alignment.",
+  },
+  {
+    label: "BioSample",
+    key: "biosample",
+    help: "NCBI BioSample of the sequencing run the sequence was assembled from. Only Logan hits can have one.",
+  },
+  {
+    label: "Environment profile",
+    key: "profile_sort",
+    minWidth: "12rem",
+    help: "Kind of environment the sample came from (e.g. soil, marine, human gut), sorted from its BioSample description. Marked when inferred rather than stated in the record.",
+  },
+  {
+    label: "Country",
+    key: "country",
+    help: "Country where the sample was collected, from its BioSample record.",
+  },
 ]
 
 // Empty enrichment cell: a pending marker while the batch is in flight, a dash
@@ -84,11 +136,8 @@ const ResultsView = ({
   // POST /api/annotations/batch AFTER the hits render — the table never waits.
   const [annotations, setAnnotations] = useState(() => new Map())
   const [annotationStatus, setAnnotationStatus] = useState("idle") // idle | loading | ready | error
-  const [profileFacet, setProfileFacetState] = useState(readProfileFacet)
-  const setProfileFacet = value => {
-    setProfileFacetState(value || null)
-    writeProfileFacet(value || null)
-  }
+  // The finished export's summary, for "Top 500 of N" in the header.
+  const [exportSummary, setExportSummary] = useState(null)
 
   // `allResults` is only what Express sent for the current view count — the
   // stored result is `num_results` deep, and that total is what the selector
@@ -111,6 +160,7 @@ const ResultsView = ({
   // num_results < result_depth means DIAMOND's e-value floor ran out of hits
   // before the depth cap did — the search was exhaustive, so every hit above the
   // significance threshold is reachable and no count can ever re-run the search.
+  // Otherwise the table is a top-N and ExportPanel offers the rest.
   const isExhaustive = totalHits < resultDepth
 
   // One batch call for the whole page of hits (≤ 500 rows; the cap is 1,000).
@@ -159,32 +209,10 @@ const ResultsView = ({
           biosample: ann.biosample,
           country: ann.country,
           profile_sort: profileLabel(resolved.profile),
-          profile_facet: profileFacetValue(ann),
         }
       }),
     [results, annotations]
   )
-
-  // Facet counts use the same own-or-cluster value the column shows.
-  const profileFacetOptions = useMemo(() => {
-    const counts = new Map()
-    for (const h of enrichedResults) {
-      if (!h.ann) continue
-      counts.set(h.profile_facet, (counts.get(h.profile_facet) || 0) + 1)
-    }
-    if (profileFacet && !counts.has(profileFacet)) counts.set(profileFacet, 0)
-    return [...counts.entries()]
-      .map(([value, count]) => ({
-        value,
-        count,
-        label: value === NO_PROFILE_FACET ? "No profile" : profileLabel(value),
-      }))
-      .sort(
-        (a, b) =>
-          (a.value === NO_PROFILE_FACET) - (b.value === NO_PROFILE_FACET) ||
-          b.count - a.count
-      )
-  }, [enrichedResults, profileFacet])
 
   const hitFamilyIds = useMemo(
     () => new Set(results.map(h => h.family).filter(f => f != null)),
@@ -253,7 +281,7 @@ const ResultsView = ({
   const maxCount = sorted[0]?.[1].count || 1
 
   const cleanSeq = cleanSequence(metadata.query_sequence)
-  const queryHeader = metadata.query_header || null
+  const queryHeader = queryFullTitle(metadata.query_header)
 
   const scatterData = results.map(hit => ({
     x: hit.identity,
@@ -274,14 +302,8 @@ const ResultsView = ({
   }
 
   const sortedResults = useMemo(() => {
-    // The facet only applies once enrichment has landed; until then every hit
-    // shows, rather than an empty table that looks like "no matches".
-    const rows =
-      profileFacet && annotationStatus === "ready"
-        ? enrichedResults.filter(h => h.profile_facet === profileFacet)
-        : enrichedResults
-    if (!sortKey) return rows
-    return [...rows].sort((a, b) => {
+    if (!sortKey) return enrichedResults
+    return [...enrichedResults].sort((a, b) => {
       let av = a[sortKey],
         bv = b[sortKey]
       if (av == null) return 1
@@ -293,7 +315,7 @@ const ResultsView = ({
       const cmp = av < bv ? -1 : av > bv ? 1 : 0
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [enrichedResults, sortKey, sortDir, profileFacet, annotationStatus])
+  }, [enrichedResults, sortKey, sortDir])
 
   const handleDownload = () => {
     const headers = [
@@ -355,11 +377,31 @@ const ResultsView = ({
       {/* Results header */}
       <div className="flex justify-between items-start mb-4 gap-2 py-4">
         <div>
+          {/* "Top 500 by bit score", never "500 results": a capped table is
+              not the complete answer (and DIAMOND's -k is a heuristic, so the
+              export can even hold a top-500 hit the table missed). */}
           <h2 className="text-lg">
             {allResults.length === 0
               ? "No results found"
-              : `${totalHits} sequences found`}
+              : isExhaustive
+              ? `${formatCount(totalHits)} significant ${
+                  totalHits === 1 ? "hit" : "hits"
+                }`
+              : `Top ${formatCount(resultDepth)} by bit score`}
           </h2>
+          {allResults.length > 0 && (
+            <p className="text-sm text-secondary-foreground">
+              {isExhaustive
+                ? `These are all ${formatCount(
+                    totalHits
+                  )} significant hits (e-value ≤ 1e-3).`
+                : exportSummary?.total_hits != null
+                ? `Top ${formatCount(resultDepth)} of ${formatCount(
+                    exportSummary.total_hits
+                  )} significant hits.`
+                : "More significant hits exist beyond these."}
+            </p>
+          )}
           {metadata && (
             <p className="text-xs text-muted-foreground">
               {[
@@ -376,40 +418,42 @@ const ResultsView = ({
             </p>
           )}
           {viewOptions.length > 1 && (
-            <div className="flex items-center gap-2 mt-2 text-sm text-foreground">
-              <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-3">
+              <span
+                id="row-count-label"
+                className="text-xs font-semibold uppercase tracking-tighter text-muted-foreground"
+              >
                 Show
-                <select
-                  value={shownCount}
-                  onChange={e =>
-                    onViewCountChange(parseInt(e.target.value, 10))
-                  }
-                  disabled={viewPending}
-                  className="bg-background border border-input text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring disabled:opacity-60 transition-colors"
-                >
-                  {viewOptions.map(n => (
-                    <option key={n} value={n}>
-                      {n === maxView ? `All (${n})` : n}
-                    </option>
-                  ))}
-                </select>
-                of {totalHits} hits
-              </label>
+              </span>
+              <div
+                role="group"
+                aria-labelledby="row-count-label"
+                className="inline-flex rounded-lg border border-input overflow-hidden"
+              >
+                {viewOptions.map(n => {
+                  const active = n === shownCount
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => !active && onViewCountChange(n)}
+                      disabled={viewPending}
+                      className={[
+                        "px-2.5 py-1 text-xs tabular-nums border-l border-input first:border-l-0 transition-colors disabled:cursor-wait",
+                        active
+                          ? "bg-accent text-accent-foreground font-semibold"
+                          : "bg-background text-secondary-foreground hover:bg-surface-raised",
+                      ].join(" ")}
+                    >
+                      {n === maxView ? `All ${n}` : n}
+                    </button>
+                  )
+                })}
+              </div>
               {viewPending && (
                 <span className="w-3.5 h-3.5 rounded-full border-2 border-border border-t-accent animate-spin" />
               )}
-              <span
-                className="text-xs text-muted-foreground"
-                title={
-                  isExhaustive
-                    ? "Every hit above DIAMOND's significance cutoff was stored — showing more re-reads the cached result, it never re-runs the search."
-                    : `The search stored the top ${resultDepth} hits; more may exist below this depth.`
-                }
-              >
-                {isExhaustive
-                  ? "· complete result set"
-                  : `· capped at search depth ${resultDepth}`}
-              </span>
             </div>
           )}
         </div>
@@ -433,27 +477,62 @@ const ResultsView = ({
           </button>
         </div>
       </div>
+      {!isExhaustive && allResults.length > 0 && (
+        <ExportPanel
+          metadata={metadata}
+          sessionId={sessionId}
+          onSummary={setExportSummary}
+        />
+      )}
       {/* Query sequence pill */}
       {cleanSeq && (
         <div className="bg-surface-raised border border-border rounded-md mb-4 overflow-hidden">
+          {/* Title on its own line, sequence below. Collapsed, each is one
+              truncated line; expanded, both wrap in full, with the sequence
+              viewer below. The sequence text sits outside the toggle button
+              so it can be selected and copied. */}
           <button
-            className="flex items-center gap-2 w-full px-4 py-2 cursor-pointer text-left bg-transparent hover:bg-border"
+            className="flex items-start gap-2 w-full px-4 pt-2 pb-0.5 cursor-pointer text-left bg-transparent hover:bg-border"
             onClick={() => setQueryOpen(o => !o)}
+            aria-expanded={queryOpen}
+            aria-controls="query-sequence"
           >
-            <span className="text-xs font-bold uppercase tracking-tighter text-muted-foreground shrink-0">
-              Query{queryHeader ? `: ${queryHeader}` : ""}
-            </span>
-            <span className="font-mono text-sm text-secondary-foreground overflow-hidden text-ellipsis whitespace-nowrap flex min-w-0">
-              {formatSeq(cleanSeq, 60)}
+            <span
+              className={`text-sm min-w-0 flex-1 ${
+                queryOpen ? "wrap-break-word" : "truncate"
+              }`}
+              title={queryOpen ? undefined : queryHeader || undefined}
+            >
+              <span className="text-xs font-bold uppercase tracking-tighter text-muted-foreground">
+                Query{queryHeader ? ": " : ""}
+              </span>
+              {queryHeader && (
+                <span className="font-semibold text-foreground">
+                  {queryHeader}
+                </span>
+              )}
             </span>
             <span
-              className={`text-sm text-gray-400 inline-block transition-transform duration-200 ml-auto ${
+              className={`text-sm text-gray-400 inline-block transition-transform duration-200 shrink-0 ${
                 queryOpen ? "rotate-180" : ""
               }`}
             >
               ▼
             </span>
           </button>
+          <p
+            id="query-sequence"
+            className={`px-4 pb-2 font-mono text-sm text-secondary-foreground ${
+              queryOpen ? "break-all select-text" : "truncate"
+            }`}
+          >
+            {queryOpen ? cleanSeq : formatSeq(cleanSeq, 60)}
+            {queryOpen && (
+              <span className="ml-2 text-xs text-muted-foreground font-sans">
+                ({cleanSeq.length} aa)
+              </span>
+            )}
+          </p>
           {queryOpen && (
             <SequenceViewer
               aminoAcidSequence={cleanSeq}
@@ -605,26 +684,6 @@ const ResultsView = ({
               <div className="overflow-x-auto">
                 <div className="flex flex-wrap items-center justify-end mb-2 gap-2">
                   <div className="mr-auto flex items-center gap-2 text-sm">
-                    <label
-                      htmlFor="profile-facet"
-                      className="text-muted-foreground"
-                    >
-                      Environment profile
-                    </label>
-                    <select
-                      id="profile-facet"
-                      value={profileFacet || ""}
-                      onChange={e => setProfileFacet(e.target.value)}
-                      disabled={annotationStatus !== "ready"}
-                      className="bg-background border border-input text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-ring disabled:opacity-60"
-                    >
-                      <option value="">All ({results.length})</option>
-                      {profileFacetOptions.map(o => (
-                        <option key={o.value} value={o.value}>
-                          {o.label} ({o.count})
-                        </option>
-                      ))}
-                    </select>
                     {annotationStatus === "loading" && (
                       <span className="text-xs text-muted-foreground">
                         Loading sample metadata…
@@ -633,18 +692,6 @@ const ResultsView = ({
                     {annotationStatus === "error" && (
                       <span className="text-xs text-destructive">
                         Sample metadata unavailable
-                      </span>
-                    )}
-                    {profileFacet && annotationStatus === "ready" && (
-                      <span className="text-xs text-muted-foreground">
-                        Showing {sortedResults.length} of {results.length}
-                        {" · "}
-                        <button
-                          className="text-accent hover:underline"
-                          onClick={() => setProfileFacet(null)}
-                        >
-                          clear
-                        </button>
                       </span>
                     )}
                   </div>
@@ -666,23 +713,7 @@ const ResultsView = ({
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr>
-                      {[
-                        { label: "#", key: "rank" },
-                        { label: "Accession", key: "accession" },
-                        { label: "Name", key: "name" },
-                        { label: "Organism", key: "organism" },
-                        { label: "Family", key: "family", minWidth: "10rem" },
-                        { label: "Identity", key: "identity" },
-                        { label: "E-value", key: "evalue", minWidth: "8rem" },
-                        { label: "Coverage", key: "query_coverage" },
-                        { label: "BioSample", key: "biosample" },
-                        {
-                          label: "Environment profile",
-                          key: "profile_sort",
-                          minWidth: "12rem",
-                        },
-                        { label: "Country", key: "country" },
-                      ].map(({ label, key, minWidth }) => (
+                      {TABLE_COLUMNS.map(({ label, key, minWidth, help }) => (
                         <th
                           key={key}
                           className="cursor-pointer select-none whitespace-nowrap bg-surface-raised text-left py-2 px-2.5 font-semibold"
@@ -690,8 +721,11 @@ const ResultsView = ({
                             minWidth: minWidth || undefined,
                           }}
                           onClick={() => handleSort(key)}
+                          title={`${help}\n\nClick to sort.`}
                         >
-                          {label}
+                          <span className="underline decoration-dotted decoration-muted-foreground/60 underline-offset-4">
+                            {label}
+                          </span>
                           <span
                             className={`ml-1 ${
                               sortKey === key ? "opacity-100" : "opacity-30"
@@ -713,7 +747,12 @@ const ResultsView = ({
                         key={`${hit.rank}-${hit.accession}`}
                         className="hover:bg-surface-raised"
                       >
-                        <td className="py-2 px-2.5">{hit.rank}</td>
+                        <td
+                          className="py-2 px-2.5 tabular-nums"
+                          title={`Rank ${hit.rank} of ${totalHits}: ${RANK_ORDER}`}
+                        >
+                          {hit.rank}
+                        </td>
                         <td className="py-2 px-2.5">
                           {/* v260701 petadex_ids have no sequence page yet
                               (sequence_href null): plain text, not a link to

@@ -50,6 +50,8 @@ jobs:
           DB_NAME: petadex
           DB_USER: readonly_user
           DB_PASS: petadex
+          # Builds a caller may pin a search to (comma-separated). Empty = pinning off.
+          SEARCH_PINNABLE_VERSIONS: petadex_seq_v260701_20261026_202443
           # SEARCH_LAMBDA_NAME / RESULTS_BUCKET / RESULTS_PREFIX intentionally omitted —
           # serverless.yml defaults (petadex-diamond-orchestrator / petadex / results)
           # are the source of truth. To flip the search Lambda without a code deploy,

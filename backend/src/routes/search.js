@@ -88,9 +88,10 @@ const DEFAULT_VIEW_RESULTS = 50;
 // searching v260701 while Gatsby stays on diamond/LATEST), but only to a build
 // named here. Comma-separated full version strings, e.g.
 //   SEARCH_PINNABLE_VERSIONS=petadex_seq_v260701_20261026_202443
-// Empty by default, so pinning is OFF until ops opts in. Keep it off until the
-// worker's shard cache is keyed by full S3 key: today a warm worker can serve one
-// version's shards to another version's search (same basenames).
+// Empty by default, so pinning is OFF until ops opts in. Prod sets it in
+// .github/workflows/backend-ci-deploy.yml. Safe since petadex-sequence-search
+// a6f6633 keyed the worker's shard cache by full S3 key (before that, a warm
+// worker could serve one version's shards to another version's search).
 const PINNABLE_VERSIONS = (process.env.SEARCH_PINNABLE_VERSIONS || '')
   .split(',').map(v => v.trim()).filter(Boolean);
 

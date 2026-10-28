@@ -8,7 +8,11 @@ import config from "../config"
 import { addJobId } from "../utils/session"
 import SearchHistory from "../components/search/SearchHistory"
 import ResultsView from "../components/search/ResultsView"
-import { DEFAULT_RESULT_VIEW } from "../components/search/constants"
+import {
+  DEFAULT_RESULT_VIEW,
+  SEARCH_RESULT_DEPTH,
+} from "../components/search/constants"
+import { hasEnrichment, enrichmentStatus } from "../utils/searchMetadata"
 import Seo from "../components/seo"
 import {
   queryDisplayName,
@@ -54,6 +58,10 @@ function buildBugReportUrl(message, jobId) {
   return `https://github.com/${GITHUB_REPO}/issues/new?title=${title}&body=${body}&labels=bug`
 }
 
+// petadex_id prefix → the store's origin key, for results that predate the
+// backend stamping `origin` on each hit.
+const PREFIX_DB = { PL: "plasticome", NR: "ncbi_nr", LG: "logan" }
+
 function transformResults(rawResults, queryLength) {
   return (rawResults || []).map((hit, index) => {
     const targetId = hit.target_id || hit.accession
@@ -71,6 +79,13 @@ function transformResults(rawResults, queryLength) {
       // v260701 hits: source from the petadex_id prefix ("Logan", "NCBI nr").
       // Their `metadata` is null until v260701 is loaded into RDS.
       origin: parsed?.origin ?? null,
+      // search_version 1.5.0: the store's origin key and the hit's metadata
+      // record (null when the store has none for it).
+      db:
+        hit.origin ??
+        (parsed?.petadexId ? PREFIX_DB[parsed.petadexId.slice(0, 2)] : null) ??
+        null,
+      card: hit.metadata ?? null,
       name: hit.target_name || hit.name || hit.metadata?.definition || null,
       organism: hit.organism || hit.metadata?.organism || null,
       taxonomy: hit.taxonomy || hit.metadata?.taxonomy || null,
@@ -92,6 +107,9 @@ function transformResults(rawResults, queryLength) {
       // Full subject protein (DIAMOND full_sseq). Null on hits merged from a
       // part written by a pre-1.3.0 worker.
       target_sequence: hit.target_sequence ?? null,
+      // DIAMOND trace-back over the aligned region (search_version 1.6.0+);
+      // null on older results.
+      btop: hit.btop ?? null,
       enzyme_id: hit.enzyme_id ?? null,
       family: hit.family ?? null,
       component: hit.component ?? null,
@@ -278,6 +296,10 @@ const ResultsPage = () => {
   // enriching it, so this bounds a Postgres round trip — it is not just cosmetic.
   const [viewCount, setViewCount] = useState(DEFAULT_RESULT_VIEW)
   const [viewPending, setViewPending] = useState(false)
+  // Every stored hit, for the metadata views: their counts, filters and
+  // environment totals describe the whole result, not the rows on screen.
+  // null until loaded.
+  const [allHits, setAllHits] = useState(null)
 
   const pollRef = useRef(null)
   const timerRef = useRef(null)
@@ -326,6 +348,36 @@ const ResultsPage = () => {
     [sessionId]
   )
 
+  // One deeper read of the same stored result (a cache hit; it can never
+  // re-run the search), only when the result carries metadata.
+  const loadAllHits = useCallback(
+    async (data, sid) => {
+      const queryLength = data.query_length || data.metadata?.query_length
+      if (!hasEnrichment(enrichmentStatus(data.metadata))) return
+      const total = Math.min(
+        data.metadata?.num_results ?? data.results.length,
+        data.metadata?.result_depth ?? SEARCH_RESULT_DEPTH
+      )
+      if (data.results.length >= total) {
+        setAllHits(transformResults(data.results, queryLength))
+        return
+      }
+      try {
+        const resp = await fetch(
+          `${searchApiUrl}/search/results/${sid}?max_results=${total}`
+        )
+        const full = await resp.json()
+        if (resp.ok && full.status === "completed")
+          setAllHits(transformResults(full.results, queryLength))
+        else setAllHits(transformResults(data.results, queryLength))
+      } catch {
+        // The views fall back to the rows already fetched.
+        setAllHits(transformResults(data.results, queryLength))
+      }
+    },
+    [searchApiUrl]
+  )
+
   const handleResults = useCallback(
     (data, sid) => {
       stopAll()
@@ -333,8 +385,9 @@ const ResultsPage = () => {
       applyResults(data)
       setStatus("completed")
       setNewSearchCount(n => n + 1)
+      loadAllHits(data, sid)
     },
-    [stopAll, applyResults]
+    [stopAll, applyResults, loadAllHits]
   )
 
   // Changing the row count re-fetches a deeper slice of the SAME stored result.
@@ -465,6 +518,7 @@ const ResultsPage = () => {
           {status === "completed" && results && (
             <ResultsView
               results={results}
+              allHits={allHits}
               metadata={metadata}
               sessionId={sessionId}
               onNewSearch={handleNewSearch}

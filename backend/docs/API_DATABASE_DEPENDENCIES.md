@@ -73,6 +73,8 @@
 | `/api/search/phylo-tree/:family_id` | GET | None |
 | `/api/search/results/:job_id` | GET | None |
 | `/api/search/history` | GET | None |
+| `/api/search-relays/` | POST | None |
+| `/api/search-relays/` | POST | None |
 | `/api/sequence-samples/:id/samples` | GET | None |
 
 ---
@@ -1400,6 +1402,26 @@ Base: `/api/search`
 **Tables**: None
 
 ---
+
+## SearchRelays Routes
+
+Base: `/api/search-relays`
+
+### POST `/api/search-relays/`
+
+**Tables**: None
+
+---
+
+### POST `/api/search-relays/`
+
+**Tables**: None
+
+---
+
+## SearchRelays.test Routes
+
+Base: `/api/search-relays.test`
 
 ## SequenceSamples Routes
 

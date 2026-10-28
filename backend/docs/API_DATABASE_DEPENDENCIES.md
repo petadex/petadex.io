@@ -1,6 +1,6 @@
 # PETadex API - Database Dependencies
 
-**Auto-generated**: 2026-10-27
+**Auto-generated**: 2026-10-28
 **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
 
 ---
@@ -73,6 +73,7 @@
 | `/api/search/phylo-tree/:family_id` | GET | None |
 | `/api/search/results/:job_id` | GET | None |
 | `/api/search/history` | GET | None |
+| `/api/sequence-samples/:id/samples` | GET | None |
 
 ---
 
@@ -1399,6 +1400,22 @@ Base: `/api/search`
 **Tables**: None
 
 ---
+
+## SequenceSamples Routes
+
+Base: `/api/sequence-samples`
+
+### GET `/api/sequence-samples/:id/samples`
+
+**Parameters**: `id`
+
+**Tables**: None
+
+---
+
+## SequenceSamples.test Routes
+
+Base: `/api/sequence-samples.test`
 
 ---
 

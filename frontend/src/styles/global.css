@@ -178,6 +178,15 @@
   --duration-normal: 200ms;
   --duration-slow:   350ms;
 
+  /* Search-hit origins (validated categorical set, dark surface) */
+  --origin-plasticome: #3987e5;
+  --origin-ncbi-nr:    #d95926;
+  --origin-logan:      #199e70;
+
+  /* Environment enrichment (validated diverging pair, dark surface) */
+  --env-enriched: #e66767;
+  --env-depleted: #3987e5;
+
   /* Surfaces */
   --background:      oklch(0.14 0 0);
   --foreground:      oklch(0.97 0 0);
@@ -251,6 +260,15 @@
 /* ─── Light mode ───────────────────────────────────────────── */
 .light {
   color-scheme: light;
+
+  /* Search-hit origins (validated categorical set, light surface) */
+  --origin-plasticome: #2a78d6;
+  --origin-ncbi-nr:    #eb6834;
+  --origin-logan:      #1baf7a;
+
+  /* Environment enrichment (validated diverging pair, light surface) */
+  --env-enriched: #e34948;
+  --env-depleted: #2a78d6;
 
   --background:      oklch(1 0 0);
   --foreground:      oklch(0.14 0 0);
@@ -440,4 +458,44 @@
 
   /* ── Divider ────────────────────────────────────────────────── */
   .divider { @apply border-0 border-t border-border my-0; }
+}
+
+/* ─── Dropdown (components/common/Dropdown.jsx) ────────────── */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dropdown-in { animation: dropdown-in var(--duration-fast) ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-in { animation: none; }
+}
+
+/* Always-visible, themed scrollbars for wide or tall data views (e.g. the
+   multiple alignment), where the thin overlay default is easy to miss. */
+/* Chrome and Safari: the ::-webkit-scrollbar rules below force classic,
+   always-shown bars. Chrome ignores them once scrollbar-color is set, so the
+   standard properties apply only where ::-webkit-scrollbar is unsupported. */
+@supports not selector(::-webkit-scrollbar) {
+  .scrollbar-visible {
+    scrollbar-width: auto;
+    scrollbar-color: var(--muted-foreground) var(--surface-sunken);
+  }
+}
+.scrollbar-visible::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: var(--surface-sunken);
+}
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border: 3px solid var(--surface-sunken);
+  border-radius: 999px;
+}
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+.scrollbar-visible::-webkit-scrollbar-corner {
+  background: var(--surface-sunken);
 }

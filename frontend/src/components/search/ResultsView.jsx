@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react"
+import React, { useState, useMemo, useEffect, useCallback } from "react"
 import { Link } from "gatsby"
 import { formatSeq, cleanSequence } from "../../utils/lib"
 import { generateCSV, downloadCSV } from "../../utils/csvDownload"
@@ -21,6 +21,21 @@ import { familyColor } from "../../utils/familyColor"
 import { formatCount } from "../../utils/format"
 import ExportPanel from "./ExportPanel"
 import { queryFullTitle } from "../../utils/queryTitle"
+import HitsView from "./metadata/HitsView"
+import AlignmentView from "./metadata/AlignmentView"
+import EnvironmentsView from "./metadata/EnvironmentsView"
+import RecordPanel from "./metadata/RecordPanel"
+import { useSamplesBatch, useSearchAlignment } from "./metadata/useSearchData"
+import { OriginTag } from "./metadata/parts"
+import { enrichmentStatus, hasEnrichment } from "../../utils/searchMetadata"
+
+// Tabs for a search_version 1.5.0 result, which carries store metadata.
+// Bookmarkable as #hits / #alignment / #environments. Older results keep TABS.
+const METADATA_TABS = [
+  { id: "hits", label: "Hits" },
+  { id: "alignment", label: "Alignment" },
+  { id: "environments", label: "Environments" },
+]
 
 const TABS = [
   { id: "descriptions", label: "Descriptions" },
@@ -124,8 +139,48 @@ const ResultsView = ({
   viewCount,
   onViewCountChange,
   viewPending = false,
+  allHits = null,
 }) => {
-  const [activeTab, setActiveTab] = useState("descriptions")
+  const metaStatus = enrichmentStatus(metadata)
+  const showMetadata = hasEnrichment(metaStatus)
+  const tabs = showMetadata ? METADATA_TABS : TABS
+  const [activeTab, setActiveTabState] = useState(() => {
+    const hash =
+      typeof window !== "undefined" ? window.location.hash.slice(1) : ""
+    if (tabs.some(t => t.id === hash)) return hash
+    return tabs[0].id
+  })
+  const setActiveTab = id => {
+    setActiveTabState(id)
+    try {
+      window.history.replaceState(null, "", `#${id}`)
+    } catch {
+      // Hash sync is a convenience only.
+    }
+  }
+  // The 1.5.0 views read every stored hit once loaded; until then, the rows
+  // already fetched.
+  const metaHits = allHits ?? allResults
+  // Found in Samples for every Logan hit, once all stored hits are loaded.
+  const samples = useSamplesBatch(metaHits, showMetadata && allHits != null)
+  const querySequence = cleanSequence(metadata?.query_sequence)
+  // The alignment + tree, read once the Alignment tab is first opened and
+  // kept across tab switches (each read can start a build).
+  const [alignmentWanted, setAlignmentWanted] = useState(false)
+  useEffect(() => {
+    if (activeTab === "alignment") setAlignmentWanted(true)
+  }, [activeTab])
+  const alignment = useSearchAlignment(
+    showMetadata && alignmentWanted ? sessionId : null
+  )
+  // TODO: the record popout stands in for the new dataset's sequence pages,
+  // which aren't built yet. Replace it with links to those pages (see
+  // RecordLink in metadata/parts.jsx).
+  const [recordId, setRecordId] = useState(null)
+  const closeRecord = useCallback(() => setRecordId(null), [])
+  const recordHit = recordId
+    ? metaHits.find(h => h.target_id === recordId) ?? null
+    : null
   const [familySummaryOpen, setFamilySummaryOpen] = useState(true)
   const [queryOpen, setQueryOpen] = useState(false)
   const [atlasActive, setAtlasActive] = useState(false)
@@ -417,7 +472,22 @@ const ResultsView = ({
                 .join("  ·  ")}
             </p>
           )}
-          {viewOptions.length > 1 && (
+          {showMetadata && metadata?.summary?.by_origin && (
+            <p className="text-xs text-muted-foreground">
+              {Object.entries(metadata.summary.by_origin).map(([o, n]) => (
+                <span key={o} className="mr-3 inline-flex items-center gap-1">
+                  <span className="tabular-nums">{n}</span>
+                  <OriginTag db={o} />
+                </span>
+              ))}
+            </p>
+          )}
+          {metaStatus === "failed" && (
+            <p role="status" className="text-xs text-warning">
+              Metadata lookup failed.
+            </p>
+          )}
+          {!showMetadata && viewOptions.length > 1 && (
             <div className="flex items-center gap-2 mt-3">
               <span
                 id="row-count-label"
@@ -553,85 +623,93 @@ const ResultsView = ({
         </div>
       ) : (
         <>
-          {/* Family summary — persists above tabs */}
-          <div className="mb-5 py-3.5 px-4 bg-surface-raised border border-border rounded-sm">
-            <div
-              role="button"
-              tabIndex={0}
-              className="flex justify-between items-center text-sm font-semibold text-muted-foreground uppercase tracking-tighter cursor-pointer select-none"
-              onClick={() => setFamilySummaryOpen(o => !o)}
-              onKeyDown={e => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  setFamilySummaryOpen(o => !o)
-                }
-              }}
-            >
-              <span>
-                {uniqueFamilies} {uniqueFamilies === 1 ? "family" : "families"}{" "}
-                represented across {results.length} hits
-              </span>
-              <span
-                className={`text-sm text-gray-400 inline-block transition-transform duration-200 ${
-                  familySummaryOpen ? "rotate-180" : ""
-                }`}
+          {/* Family summary — persists above tabs.
+              TODO: hidden for search_version 1.5.0 results, whose hits carry no
+              PETadex family number, so every hit lands in "Unknown". Bring it
+              back once the family clustering is done, counting hits per family
+              (it could read metadata.summary.clusters.c60 until then). */}
+          {!showMetadata && (
+            <div className="mb-5 py-3.5 px-4 bg-surface-raised border border-border rounded-sm">
+              <div
+                role="button"
+                tabIndex={0}
+                className="flex justify-between items-center text-sm font-semibold text-muted-foreground uppercase tracking-tighter cursor-pointer select-none"
+                onClick={() => setFamilySummaryOpen(o => !o)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setFamilySummaryOpen(o => !o)
+                  }
+                }}
               >
-                ▼
-              </span>
-            </div>
-            {familySummaryOpen && (
-              <div className="flex flex-col gap-1.5 mt-2.5">
-                {sorted.map(
-                  ([label, { count, family_num, has_tree, enzyme_ids }]) => (
-                    <div
-                      key={label}
-                      className="flex items-center gap-0.5 text-sm"
-                    >
-                      <div className="w-28 shrink-0 whitespace-nowrap text-muted-foreground flex items-center gap-1.5">
-                        {label !== "Unknown" && family_num != null ? (
+                <span>
+                  {uniqueFamilies}{" "}
+                  {uniqueFamilies === 1 ? "family" : "families"} represented
+                  across {results.length} hits
+                </span>
+                <span
+                  className={`text-sm text-gray-400 inline-block transition-transform duration-200 ${
+                    familySummaryOpen ? "rotate-180" : ""
+                  }`}
+                >
+                  ▼
+                </span>
+              </div>
+              {familySummaryOpen && (
+                <div className="flex flex-col gap-1.5 mt-2.5">
+                  {sorted.map(
+                    ([label, { count, family_num, has_tree, enzyme_ids }]) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-0.5 text-sm"
+                      >
+                        <div className="w-28 shrink-0 whitespace-nowrap text-muted-foreground flex items-center gap-1.5">
+                          {label !== "Unknown" && family_num != null ? (
+                            <Link
+                              to={familyUrl(family_num)}
+                              className="hover:underline"
+                              style={{ color: familyColor(family_num) }}
+                            >
+                              {label}
+                            </Link>
+                          ) : (
+                            label
+                          )}
+                        </div>
+                        <div className="flex flex-1 mr-2 h-2 bg-surface-sunken rounded-xs overflow-hidden">
+                          <div
+                            className="h-full rounded-xs transition-width duration-300 "
+                            style={{
+                              width: `${(count / maxCount) * 100}%`,
+                              background:
+                                label === "Unknown"
+                                  ? "#adb5bd"
+                                  : familyColor(family_num),
+                            }}
+                          />
+                        </div>
+                        <div className="w-15 shrink-0 text-right text-gray-400">
+                          {count} ({Math.round((count / results.length) * 100)}
+                          %)
+                        </div>
+                        {has_tree && family_num != null && (
                           <Link
-                            to={familyUrl(family_num)}
-                            className="hover:underline"
-                            style={{ color: familyColor(family_num) }}
+                            to={phyloTreeUrl(family_num, enzyme_ids)}
+                            className="shrink-0 text-xs text-accent hover:underline ml-2 whitespace-nowrap"
                           >
-                            {label}
+                            View phylogeny
                           </Link>
-                        ) : (
-                          label
                         )}
                       </div>
-                      <div className="flex flex-1 mr-2 h-2 bg-surface-sunken rounded-xs overflow-hidden">
-                        <div
-                          className="h-full rounded-xs transition-width duration-300 "
-                          style={{
-                            width: `${(count / maxCount) * 100}%`,
-                            background:
-                              label === "Unknown"
-                                ? "#adb5bd"
-                                : familyColor(family_num),
-                          }}
-                        />
-                      </div>
-                      <div className="w-15 shrink-0 text-right text-gray-400">
-                        {count} ({Math.round((count / results.length) * 100)}%)
-                      </div>
-                      {has_tree && family_num != null && (
-                        <Link
-                          to={phyloTreeUrl(family_num, enzyme_ids)}
-                          className="shrink-0 text-xs text-accent hover:underline ml-2 whitespace-nowrap"
-                        >
-                          View phylogeny
-                        </Link>
-                      )}
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-          </div>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {/* Tab navigation */}
-          <div className="flex border-b mt-2 mb-2 gap-0">
-            {TABS.map(tab => (
+          <div className="flex flex-wrap border-b mt-2 mb-2 gap-0">
+            {tabs.map(tab => (
               <button
                 key={tab.id}
                 className={`btn btn-ghost ${
@@ -647,6 +725,35 @@ const ResultsView = ({
           </div>
           {/* Tab panels */}
           <div className="px-6 py-4">
+            {showMetadata && activeTab === "hits" && (
+              <HitsView
+                hits={metaHits}
+                samples={samples}
+                clusters={metadata.clusters}
+                metadata={metadata}
+                sessionId={sessionId}
+                onOpenRecord={setRecordId}
+              />
+            )}
+            {showMetadata && activeTab === "alignment" && (
+              <AlignmentView
+                hits={metaHits}
+                sessionId={sessionId}
+                querySequence={querySequence}
+                alignment={alignment}
+                queryLength={metadata.query_length}
+                onOpenRecord={setRecordId}
+              />
+            )}
+            {showMetadata && activeTab === "environments" && (
+              <EnvironmentsView
+                hits={metaHits}
+                samples={samples}
+                environments={metadata.summary?.environments}
+                onOpenRecord={setRecordId}
+              />
+            )}
+
             {/* Graphic summary */}
             {activeTab === "graphic" && (
               <div className="grid gap-8 auto-cols-fr">
@@ -709,6 +816,9 @@ const ResultsView = ({
                   >
                     ⬇ Download CSV
                   </button>
+                  <p className="basis-full text-right text-xs text-muted-foreground">
+                    CSV and JSON downloads include metadata.
+                  </p>
                 </div>
                 <table className="w-full border-collapse text-sm">
                   <thead>
@@ -919,6 +1029,15 @@ const ResultsView = ({
             )}
           </div>
         </>
+      )}
+      {showMetadata && (
+        <RecordPanel
+          hit={recordHit}
+          querySequence={querySequence}
+          hits={metaHits}
+          clusters={metadata.clusters}
+          onClose={closeRecord}
+        />
       )}
     </div>
   )

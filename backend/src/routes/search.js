@@ -357,6 +357,11 @@ function transformResults(rawResults, queryLength, maxResults = Infinity) {
     // here by this whitelist, so it never reached the browser. `null` for a hit
     // merged from a part written by a pre-1.3.0 worker.
     target_sequence: hit.target_sequence ?? null,
+    // DIAMOND's BLAST trace-back over the aligned region (search_version
+    // 1.6.0): runs of identical residues as numbers, mismatches as query+target
+    // letter pairs, gaps as "-". Rebuilds the residue alignment client-side.
+    // `null` for hits from older parts.
+    btop: hit.btop ?? null,
     // Tier-A enrichment block. null on every v260701 hit until v260701 is
     // loaded into RDS; the UI must render without it.
     metadata: hit.metadata ?? null,

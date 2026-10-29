@@ -11,7 +11,9 @@ import {
   queryColumns,
   residueClass,
 } from "../../../utils/alignment"
-import { SectionTitle } from "./parts"
+import { downloadFile } from "../../../utils/csvDownload"
+import { standaloneSvg } from "../../../utils/svgExport"
+import { MethodsLink, SectionTitle } from "./parts"
 
 const ORIGIN_COLOR = {
   plasticome: "var(--origin-plasticome)",
@@ -39,6 +41,10 @@ const toggle = active =>
       ? "border-accent bg-accent-subtle text-foreground"
       : "border-border bg-background text-secondary-foreground hover:bg-surface-raised hover:text-foreground"
   }`
+
+/** Download filename stem for this search's alignment files. */
+const fileStem = (alignment, kind) =>
+  `petadex-${kind}-${alignment.data?.session_id || "search"}`
 
 /**
  * Parsed tree + alignment, rows in the tree's leaf order. null until the
@@ -584,6 +590,22 @@ export function TreePanel({ alignment, hits, onOpenRecord }) {
   const [focus, setFocus] = useState(false)
   const [colorLabels, setColorLabels] = useState(false)
   const closeFocus = useCallback(() => setFocus(false), [])
+  const figureRef = useRef(null)
+  // The tree as drawn: current branch-length and label-color settings.
+  const downloadSvg = () => {
+    const svg = figureRef.current?.querySelector("svg")
+    if (!svg) return
+    downloadFile(
+      standaloneSvg(svg),
+      `${fileStem(alignment, "tree")}.svg`,
+      "image/svg+xml"
+    )
+  }
+  const downloadNewick = () =>
+    downloadFile(
+      model.data.newick.trim() + "\n",
+      `${fileStem(alignment, "tree")}.nwk`
+    )
   const tree = useMemo(
     () =>
       model ? layoutRadial(model.parsed, { branchLengths: lengths }) : null,
@@ -632,18 +654,41 @@ export function TreePanel({ alignment, hits, onOpenRecord }) {
           </button>
         )}
       </div>
+      {model && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={downloadNewick}
+            title="The FastTree tree in Newick format, with branch lengths"
+          >
+            ⬇ Newick
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={downloadSvg}
+            title="The tree as drawn, as an SVG figure in light-theme colors"
+          >
+            ⬇ SVG
+          </button>
+          <MethodsLink anchor="phylogenetic-tree" className="ml-auto" />
+        </div>
+      )}
       <AlignmentStatus alignment={alignment} />
       {model && (
         <>
           <OriginLegend />
-          <TreeSvg
-            tree={tree}
-            byId={byId}
-            hover={hover}
-            setHover={setHover}
-            onOpenRecord={onOpenRecord}
-            colorLabels={colorLabels}
-          />
+          <div ref={figureRef}>
+            <TreeSvg
+              tree={tree}
+              byId={byId}
+              hover={hover}
+              setHover={setHover}
+              onOpenRecord={onOpenRecord}
+              colorLabels={colorLabels}
+            />
+          </div>
           {model.data.tree && (
             <p className="text-xs text-muted-foreground">
               {model.data.aligner?.toUpperCase()} alignment · {model.data.tree}
@@ -786,7 +831,16 @@ function ResidueLegend() {
 export function MsaPanel({ alignment, hits, onOpenRecord }) {
   const model = useAlignmentModel(alignment)
   const [queryOnly, setQueryOnly] = useState(true)
+  // Rows by identity to the query (query first) by default; or the tree's order.
+  const [order, setOrder] = useState("identity")
   const byId = useMemo(() => new Map(hits.map(h => [h.target_id, h])), [hits])
+  const rows = useMemo(() => {
+    if (!model) return null
+    if (order === "tree") return model.rows
+    const rank = r =>
+      r.id === "query" ? Infinity : byId.get(r.id)?.identity ?? -Infinity
+    return [...model.rows].sort((a, b) => rank(b) - rank(a))
+  }, [model, order, byId])
 
   const view = useMemo(() => {
     if (!model) return null
@@ -828,6 +882,41 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
           </button>
         )}
       </div>
+      {model && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs text-secondary-foreground">
+            <span className="mr-1">Order</span>
+            {[
+              ["identity", "Identity to query"],
+              ["tree", "Tree"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={order === key}
+                className={toggle(order === key)}
+                onClick={() => setOrder(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </span>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() =>
+              downloadFile(
+                model.data.afa.trim() + "\n",
+                `${fileStem(alignment, "msa")}.afa`
+              )
+            }
+            title="The whole FAMSA alignment as aligned FASTA, every column, rows in alignment order"
+          >
+            ⬇ Aligned FASTA
+          </button>
+          <MethodsLink anchor="multiple-alignment" className="ml-auto" />
+        </div>
+      )}
       <AlignmentStatus alignment={alignment} />
       {model && view && (
         <>
@@ -835,9 +924,6 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
             <OriginLegend />
             <ResidueLegend />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Rows in the tree's leaf order.
-          </p>
           {/* One box scrolls both ways, so both scrollbars sit on its
               visible edges; the id column stays pinned on the left. */}
           <div className="scrollbar-visible max-h-[75vh] overflow-auto rounded-md border border-border bg-background">
@@ -847,7 +933,7 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
                 style={{ width: ID_W }}
               >
                 <div style={{ height: HEAD }} />
-                {model.rows.map(r => {
+                {rows.map(r => {
                   const isQuery = r.id === "query"
                   const hit = byId.get(r.id)
                   return (
@@ -880,7 +966,7 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
               </div>
               <div>
                 <MsaCanvas
-                  rows={model.rows}
+                  rows={rows}
                   columns={view.columns}
                   qPositions={view.qPositions}
                 />

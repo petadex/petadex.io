@@ -2,7 +2,11 @@
 // store records about each. Search rank order by default; every other order
 // and every filter is the viewer's choice. An accession opens its record.
 import React, { useMemo, useState } from "react"
-import { generateCSV, downloadCSV } from "../../../utils/csvDownload"
+import {
+  downloadCSV,
+  downloadFile,
+  generateCSV,
+} from "../../../utils/csvDownload"
 import Dropdown from "../../common/Dropdown"
 import {
   ORIGIN_LABEL,
@@ -19,7 +23,13 @@ import {
   sortHits,
   toFasta,
 } from "../../../utils/searchMetadata"
-import { EvidenceBadge, OriginTag, RecordLink, SectionTitle } from "./parts"
+import {
+  EvidenceBadge,
+  MethodsLink,
+  OriginTag,
+  RecordLink,
+  SectionTitle,
+} from "./parts"
 
 const PAGE = 50
 
@@ -374,15 +384,11 @@ export default function HitsView({
     )
   }
 
-  const downloadFasta = () => {
-    const blob = new Blob([toFasta(rows) + "\n"], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `petadex-results-${sessionId || "search"}.fasta`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  const downloadFasta = () =>
+    downloadFile(
+      toFasta(rows) + "\n",
+      `petadex-results-${sessionId || "search"}.fasta`
+    )
 
   const downloadCsv = () => {
     const headers = [
@@ -428,20 +434,12 @@ export default function HitsView({
     )
   }
 
-  const downloadJson = () => {
-    const blob = new Blob(
-      [JSON.stringify({ metadata, results: rows }, null, 2)],
-      {
-        type: "application/json",
-      }
+  const downloadJson = () =>
+    downloadFile(
+      JSON.stringify({ metadata, results: rows }, null, 2),
+      `petadex-results-${sessionId || "search"}.json`,
+      "application/json"
     )
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `petadex-results-${sessionId || "search"}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <section aria-labelledby="hits-title" className="flex flex-col gap-3">
@@ -455,6 +453,7 @@ export default function HitsView({
             count={`${rows.length} of ${hits.length}`}
           />
         </div>
+        <MethodsLink anchor="hits" />
         <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-secondary-foreground">
           <Dropdown
             label="Origin"

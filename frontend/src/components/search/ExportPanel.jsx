@@ -10,7 +10,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
   startExport,
   pollExport,
-  takePendingExport,
   rememberExportJob,
   recallExportJob,
   forgetExportJob,
@@ -97,14 +96,9 @@ const ExportPanel = ({ metadata, sessionId, onSummary }) => {
     [handleStartResult]
   )
 
-  // On load: an export the search form just started, then one this tab was
-  // already polling, then (free, S3 reads only) one that already exists.
+  // On load: an export this tab was already polling, then (free, S3 reads
+  // only) one that already exists.
   useEffect(() => {
-    const pending = takePendingExport(sessionId)
-    if (pending) {
-      begin(pending)
-      return
-    }
     const remembered = recallExportJob(sessionId)
     if (remembered?.export_session_id) {
       startedAt.current = Date.now()

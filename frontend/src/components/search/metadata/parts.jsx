@@ -46,6 +46,24 @@ export function CountBadge({ children }) {
   )
 }
 
+// Methods for every figure on the results page, one section per figure.
+export const METHODS_URL =
+  "https://github.com/petadex/petadex.io/wiki/Search-Results-Methods"
+
+/** "Methods" link to one section of the results-page methods in the wiki. */
+export function MethodsLink({ anchor, className = "" }) {
+  return (
+    <a
+      href={`${METHODS_URL}${anchor ? `#${anchor}` : ""}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`text-xs text-accent hover:opacity-80 ${className}`}
+    >
+      Methods ↗
+    </a>
+  )
+}
+
 export function SectionTitle({ title, count, as: Tag = "h3" }) {
   return (
     <Tag className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
@@ -55,11 +73,13 @@ export function SectionTitle({ title, count, as: Tag = "h3" }) {
   )
 }
 
-/** Collapsible panel; the summary row holds the title and its count. */
+/** Collapsible panel; the summary row holds the title and its count. Pass
+ * `open` (with `onToggle`) to control it; otherwise `defaultOpen` seeds it. */
 export function Disclosure({
   title,
   count,
   defaultOpen = false,
+  open,
   onToggle,
   children,
   ...rest
@@ -67,7 +87,7 @@ export function Disclosure({
   return (
     <details
       className="group rounded-md border border-border bg-background"
-      open={defaultOpen || undefined}
+      open={(open ?? defaultOpen) || undefined}
       onToggle={onToggle}
       {...rest}
     >

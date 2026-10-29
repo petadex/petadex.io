@@ -10,7 +10,7 @@ function SequenceList({ title, sequenceList }) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT)
   // Only one row mounts the (heavy) feature-viewer at a time, on demand.
   const [openDomains, setOpenDomains] = useState(
-    /** @type {string | null} */ (null),
+    /** @type {string | null} */ (null)
   )
   const visibleSequences = sequenceList.slice(0, visibleCount)
   const hasMore = visibleCount < sequenceList.length
@@ -74,6 +74,7 @@ function SequenceList({ title, sequenceList }) {
                         </h3>
                         <SequenceViewer
                           aminoAcidSequence={seq.sequence}
+                          header={seq.accession}
                           nucleotideSequence={null}
                         />
                         {(seq.source || seq.synonyms) && (
@@ -145,7 +146,7 @@ function SequenceList({ title, sequenceList }) {
                     Load{" "}
                     {Math.min(
                       LOAD_MORE_INCREMENT,
-                      sequenceList.length - visibleCount,
+                      sequenceList.length - visibleCount
                     )}{" "}
                     More
                   </button>

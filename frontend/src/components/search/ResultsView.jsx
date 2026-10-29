@@ -607,6 +607,7 @@ const ResultsView = ({
             <SequenceViewer
               aminoAcidSequence={cleanSeq}
               nucleotideSequence={null}
+              header={queryHeader || "query"}
             />
           )}
         </div>

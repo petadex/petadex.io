@@ -220,6 +220,7 @@ export default function CorpusSequenceTemplate({ pageContext }) {
         </h2>
         <SequenceViewer
           aminoAcidSequence={orf.sequence}
+          header={orf.id}
           nucleotideSequence={null}
           highlightRange={domainSelection}
         />

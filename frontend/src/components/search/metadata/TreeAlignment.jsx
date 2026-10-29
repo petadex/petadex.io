@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { parseNewick } from "../../phyloTree/parseNewick"
 import {
+  coverageDepth,
   layoutRadial,
   parseAfa,
   queryColumns,
@@ -719,7 +720,9 @@ export function TreePanel({ alignment, hits, onOpenRecord }) {
 
 const ROW = 12
 const CHAR = 8
-const HEAD = 16 // position ruler, above row 0
+// Coverage depth over every hit, then the position ruler, above row 0.
+const DEPTH_H = 30
+const HEAD = DEPTH_H + 16
 const ID_W = 112
 
 // Keep the canvas backing store under every browser's limit (iOS Safari's is
@@ -740,7 +743,7 @@ function useThemeVersion() {
   return version
 }
 
-function MsaCanvas({ rows, columns, qPositions }) {
+function MsaCanvas({ rows, columns, qPositions, depth, maxDepth }) {
   const ref = useRef(null)
   const theme = useThemeVersion()
   const width = columns.length * CHAR
@@ -765,6 +768,16 @@ function MsaCanvas({ rows, columns, qPositions }) {
     const fg = color("--foreground")
     const muted = color("--muted-foreground")
     ctx.clearRect(0, 0, width, height)
+
+    // Depth at each column's query position; nothing where the query has a gap.
+    ctx.fillStyle = color("--info")
+    ctx.globalAlpha = 0.5
+    qPositions.forEach((p, i) => {
+      if (p == null) return
+      const h = (depth[p - 1] / maxDepth) * (DEPTH_H - 4)
+      ctx.fillRect(i * CHAR, DEPTH_H - 2 - h, CHAR, h)
+    })
+    ctx.globalAlpha = 1
 
     // Ruler, by query position.
     ctx.fillStyle = muted
@@ -792,7 +805,7 @@ function MsaCanvas({ rows, columns, qPositions }) {
         ctx.fillText(c, i * CHAR + CHAR / 2, y + ROW - 3)
       })
     })
-  }, [rows, columns, qPositions, width, height, theme])
+  }, [rows, columns, qPositions, depth, maxDepth, width, height, theme])
 
   return (
     <canvas
@@ -801,6 +814,150 @@ function MsaCanvas({ rows, columns, qPositions }) {
       role="img"
       aria-label={`Multiple sequence alignment: ${rows.length} sequences, ${columns.length} columns`}
     />
+  )
+}
+
+// Overview: the whole alignment at one pixel per residue, scaled to fit.
+const MINI_W = 240
+const MINI_MAX_H = 150
+
+/**
+ * Picture-in-picture overview of the alignment, floating over the scroll box.
+ * A rectangle marks the part on screen; click or drag to move it.
+ */
+function MsaMinimap({ rows, columns, scrollRef, onHide }) {
+  const canvasRef = useRef(null)
+  const theme = useThemeVersion()
+  const [box, setBox] = useState(null)
+  const nCols = columns.length
+  const nRows = rows.length
+  const scale = Math.min(MINI_W / nCols, MINI_MAX_H / nRows)
+  const w = Math.max(1, Math.round(nCols * scale))
+  const h = Math.max(1, Math.round(nRows * scale))
+
+  // Residues, one canvas pixel each; CSS scales the canvas up or down.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.width = nCols
+    canvas.height = nRows
+    const ctx = canvas.getContext("2d")
+    const css = getComputedStyle(document.documentElement)
+    ctx.clearRect(0, 0, nCols, nRows)
+    const byClass = {}
+    rows.forEach((r, y) =>
+      columns.forEach((ci, x) => {
+        const c = r.seq[ci]
+        if (!c || c === "-") return
+        const cls = residueClass(c) || "other"
+        if (!byClass[cls]) byClass[cls] = []
+        byClass[cls].push(x, y)
+      })
+    )
+    for (const [cls, pts] of Object.entries(byClass)) {
+      ctx.fillStyle = css
+        .getPropertyValue(CLASS_VAR[cls] || "--muted-foreground")
+        .trim()
+      for (let i = 0; i < pts.length; i += 2)
+        ctx.fillRect(pts[i], pts[i + 1], 1, 1)
+    }
+  }, [rows, columns, nCols, nRows, theme])
+
+  // The visible window, in alignment columns and rows.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = () => {
+      const c0 = el.scrollLeft / CHAR
+      const c1 = (el.scrollLeft + el.clientWidth - ID_W) / CHAR
+      const r0 = (el.scrollTop - HEAD) / ROW
+      const r1 = (el.scrollTop + el.clientHeight - HEAD) / ROW
+      const clamp = (v, n) => Math.max(0, Math.min(n, v))
+      setBox({
+        c0: clamp(c0, nCols),
+        c1: clamp(c1, nCols),
+        r0: clamp(r0, nRows),
+        r1: clamp(r1, nRows),
+      })
+    }
+    update()
+    el.addEventListener("scroll", update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("scroll", update)
+      ro.disconnect()
+    }
+  }, [scrollRef, nCols, nRows])
+
+  // Center the main view on the pointer's spot in the overview.
+  const jump = e => {
+    const el = scrollRef.current
+    if (!el) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const col = ((e.clientX - r.left) / r.width) * nCols
+    const row = ((e.clientY - r.top) / r.height) * nRows
+    el.scrollLeft = col * CHAR - (el.clientWidth - ID_W) / 2
+    el.scrollTop = HEAD + row * ROW - el.clientHeight / 2
+  }
+
+  return (
+    <div className="pointer-events-auto rounded-md border border-border-strong bg-background/90 p-1.5 shadow-lg backdrop-blur-sm">
+      <div className="mb-1 flex items-center justify-between font-mono text-[9px] text-muted-foreground">
+        <span>Overview</span>
+        <span className="flex items-center gap-2">
+          {box && (
+            <span>
+              cols {Math.floor(box.c0) + 1}–{Math.ceil(box.c1)} · rows{" "}
+              {Math.floor(box.r0) + 1}–{Math.ceil(box.r1)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onHide}
+            className="inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-accent bg-accent-subtle text-sm font-bold leading-none text-foreground hover:bg-accent hover:text-accent-foreground"
+            aria-label="Hide overview"
+            title="Hide overview"
+          >
+            ×
+          </button>
+        </span>
+      </div>
+      <div
+        className="relative cursor-crosshair touch-none select-none"
+        style={{ width: w, height: h }}
+        onPointerDown={e => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          jump(e)
+        }}
+        onPointerMove={e => {
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) jump(e)
+        }}
+        role="slider"
+        aria-label="Alignment overview: click or drag to move the view"
+        aria-valuenow={box ? Math.round(box.c0) : 0}
+        aria-valuemin={0}
+        aria-valuemax={nCols}
+        tabIndex={-1}
+      >
+        <canvas
+          ref={canvasRef}
+          className="block h-full w-full opacity-80"
+          style={{ imageRendering: scale >= 1 ? "pixelated" : "auto" }}
+        />
+        {box && (
+          <div
+            className="pointer-events-none absolute border-2 border-accent bg-accent/10"
+            style={{
+              left: (box.c0 / nCols) * w,
+              top: (box.r0 / nRows) * h,
+              width: Math.max(4, ((box.c1 - box.c0) / nCols) * w),
+              height: Math.max(4, ((box.r1 - box.r0) / nRows) * h),
+            }}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -831,6 +988,8 @@ function ResidueLegend() {
 export function MsaPanel({ alignment, hits, onOpenRecord }) {
   const model = useAlignmentModel(alignment)
   const [queryOnly, setQueryOnly] = useState(true)
+  const [showOverview, setShowOverview] = useState(true)
+  const scrollRef = useRef(null)
   // Rows by identity to the query (query first) by default; or the tree's order.
   const [order, setOrder] = useState("identity")
   const byId = useMemo(() => new Map(hits.map(h => [h.target_id, h])), [hits])
@@ -844,25 +1003,32 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
 
   const view = useMemo(() => {
     if (!model) return null
+    const query = model.rows.find(r => r.id === "query")
+    const qlen = query ? query.seq.replace(/-/g, "").length : 0
+    const depth = coverageDepth(hits, qlen)
     const all = model.rows[0].seq.length
     const columns = queryOnly
       ? queryColumns(model.rows) || [...Array(all).keys()]
       : [...Array(all).keys()]
-    const query = model.rows.find(r => r.id === "query")
     let pos = 0
     const qAt = new Map()
     if (query)
       for (let i = 0; i < query.seq.length; i++)
         if (query.seq[i] !== "-") qAt.set(i, ++pos)
-    return { columns, qPositions: columns.map(i => qAt.get(i) ?? null) }
-  }, [model, queryOnly])
+    return {
+      columns,
+      qPositions: columns.map(i => qAt.get(i) ?? null),
+      depth,
+      maxDepth: Math.max(1, ...depth),
+    }
+  }, [model, queryOnly, hits])
 
   return (
     <section aria-labelledby="msa-title" className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
         <div id="msa-title">
           <SectionTitle
-            title="Multiple alignment"
+            title="Multiple Sequence Alignment"
             count={
               model
                 ? `${model.rows.length} sequences · ${view.columns.length} columns`
@@ -914,8 +1080,24 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
           >
             ⬇ Aligned FASTA
           </button>
+          <button
+            type="button"
+            aria-pressed={showOverview}
+            className={toggle(showOverview)}
+            onClick={() => setShowOverview(v => !v)}
+            title="A small map of the whole alignment that shows where you are"
+          >
+            Overview
+          </button>
           <MethodsLink anchor="multiple-alignment" className="ml-auto" />
         </div>
+      )}
+      {model && (
+        <p className="text-xs text-muted-foreground">
+          {order === "identity"
+            ? "The query is first, then hits from highest to lowest percent identity to the query (DIAMOND's identity over each hit's own alignment, not over this MSA). Ties keep tree order."
+            : "Rows follow the tree's leaf order, top to bottom."}
+        </p>
       )}
       <AlignmentStatus alignment={alignment} />
       {model && view && (
@@ -925,52 +1107,86 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
             <ResidueLegend />
           </div>
           {/* One box scrolls both ways, so both scrollbars sit on its
-              visible edges; the id column stays pinned on the left. */}
-          <div className="scrollbar-visible max-h-[75vh] overflow-auto rounded-md border border-border bg-background">
-            <div className="flex w-max">
-              <div
-                className="sticky left-0 z-10 shrink-0 border-r border-border bg-background"
-                style={{ width: ID_W }}
-              >
-                <div style={{ height: HEAD }} />
-                {rows.map(r => {
-                  const isQuery = r.id === "query"
-                  const hit = byId.get(r.id)
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      disabled={isQuery}
-                      onClick={() => onOpenRecord(r.id)}
-                      className={`flex w-full items-center gap-1.5 px-2 text-left font-mono text-[9px] ${
-                        isQuery
-                          ? "font-bold text-accent"
-                          : "cursor-pointer text-secondary-foreground hover:text-foreground"
-                      }`}
-                      style={{ height: ROW, lineHeight: `${ROW}px` }}
-                      title={isQuery ? "Your query" : `Open ${r.id}`}
-                    >
-                      <i
-                        className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{
-                          background: isQuery
-                            ? "var(--accent)"
-                            : ORIGIN_COLOR[hit?.db] ||
-                              "var(--muted-foreground)",
-                        }}
-                      />
-                      {r.id}
-                    </button>
-                  )
-                })}
+              visible edges; the id column stays pinned on the left. The
+              overview floats over its bottom-right corner. */}
+          <div className="relative">
+            <div
+              ref={scrollRef}
+              className="scrollbar-visible max-h-[75vh] overflow-auto rounded-md border border-border bg-background"
+            >
+              <div className="flex w-max">
+                <div
+                  className="sticky left-0 z-10 shrink-0 border-r border-border bg-background"
+                  style={{ width: ID_W }}
+                >
+                  <div
+                    className="flex flex-col px-2 pt-1 font-mono text-[9px] leading-tight text-muted-foreground"
+                    style={{ height: HEAD }}
+                    title={`Hits covering each query position, over all ${hits.length} hits (not just the rows shown)`}
+                  >
+                    <span>Depth, {hits.length} hits</span>
+                    <span>max {view.maxDepth}</span>
+                  </div>
+                  {rows.map(r => {
+                    const isQuery = r.id === "query"
+                    const hit = byId.get(r.id)
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        disabled={isQuery}
+                        onClick={() => onOpenRecord(r.id)}
+                        className={`flex w-full items-center gap-1.5 px-2 text-left font-mono text-[9px] ${
+                          isQuery
+                            ? "font-bold text-accent"
+                            : "cursor-pointer text-secondary-foreground hover:text-foreground"
+                        }`}
+                        style={{ height: ROW, lineHeight: `${ROW}px` }}
+                        title={isQuery ? "Your query" : `Open ${r.id}`}
+                      >
+                        <i
+                          className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{
+                            background: isQuery
+                              ? "var(--accent)"
+                              : ORIGIN_COLOR[hit?.db] ||
+                                "var(--muted-foreground)",
+                          }}
+                        />
+                        {r.id}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div>
+                  <MsaCanvas
+                    rows={rows}
+                    columns={view.columns}
+                    qPositions={view.qPositions}
+                    depth={view.depth}
+                    maxDepth={view.maxDepth}
+                  />
+                </div>
               </div>
-              <div>
-                <MsaCanvas
+            </div>
+            <div className="pointer-events-none absolute right-5 bottom-5 z-20">
+              {showOverview ? (
+                <MsaMinimap
                   rows={rows}
                   columns={view.columns}
-                  qPositions={view.qPositions}
+                  scrollRef={scrollRef}
+                  onHide={() => setShowOverview(false)}
                 />
-              </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowOverview(true)}
+                  className="pointer-events-auto cursor-pointer rounded-md border border-border-strong bg-background/90 px-2 py-1 font-mono text-[10px] text-secondary-foreground shadow-lg backdrop-blur-sm hover:text-foreground"
+                  title="Show the overview of the whole alignment"
+                >
+                  ▣ Overview
+                </button>
+              )}
             </div>
           </div>
         </>

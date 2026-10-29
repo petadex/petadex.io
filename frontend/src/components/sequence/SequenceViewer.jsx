@@ -8,11 +8,45 @@ import {
 } from "./utils.js"
 import { NUCLEOTIDECOLORS, AACOLORS } from "./constants.js"
 
+/** FASTA text: ">header", then the whole sequence on one unbroken line. */
+const toFasta = (header, seq) =>
+  `>${header.replace(/\s+/g, " ")}\n${seq.replace(/\s+/g, "")}`
+
+/** Copy-to-clipboard button that reads "Copied!" for a moment after a click. */
+function CopyButton({ text, label, title }) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef(null)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard API unavailable or denied — silently ignore
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="btn btn-ghost"
+      title={title}
+    >
+      {copied ? "Copied!" : label}
+    </button>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function SequenceViewer({
   nucleotideSequence = null,
   aminoAcidSequence = null,
+  // FASTA header (without ">"), shown above the sequence and used by "Copy
+  // FASTA". Falls back to "sequence" when the caller has no id.
+  header = null,
   className = "",
   // Controlled external highlight (1-based, inclusive). When set (e.g. a domain
   // is selected in the corpus page's domain track), the viewer selects that
@@ -28,8 +62,6 @@ export default function SequenceViewer({
   // we mute the non-domain residues). Cleared the moment the user drags their
   // own selection.
   const [isExternalHighlight, setIsExternalHighlight] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const copyTimer = useRef(null)
   const isDragging = useRef(false)
   const dragAnchor = useRef(null)
   const containerRef = useRef(null)
@@ -113,26 +145,9 @@ export default function SequenceViewer({
     setSelStart(null)
     setSelEnd(null)
     setIsExternalHighlight(false)
-    setCopied(false)
   }
 
-  const copySelection = async () => {
-    if (!selectionInfo) return
-    try {
-      await navigator.clipboard.writeText(selectionInfo.slice)
-      setCopied(true)
-      if (copyTimer.current) clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // Clipboard API unavailable or denied — silently ignore
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (copyTimer.current) clearTimeout(copyTimer.current)
-    }
-  }, [])
+  const fastaHeader = header?.trim() || "sequence"
 
   // ── External (controlled) highlight ─────────────────────────────────────────
   // Drive the selection from `highlightRange` so a domain selected in the track
@@ -195,6 +210,21 @@ export default function SequenceViewer({
 
   return (
     <div className={` ${className} p-6`} ref={rootRef}>
+      {/* ── Header ────────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-2.5 py-2">
+        <span
+          className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-foreground"
+          title={`>${fastaHeader}`}
+        >
+          &gt;{fastaHeader}
+        </span>
+        <CopyButton
+          text={toFasta(fastaHeader, currentSeq)}
+          label="Copy FASTA"
+          title="Copy the header and the whole sequence, as FASTA"
+        />
+      </div>
+
       {/* ── Toggle ────────────────────────────────────────────────────────────── */}
       <div className="flex gap-2 items-center justify-between py-2 px-2.5">
         <label className="flex gap-2">
@@ -315,9 +345,11 @@ export default function SequenceViewer({
               {selectionInfo.slice.length}{" "}
               {seqType === "nucleotide" ? "bp" : "aa"})
             </span>
-            <button onClick={copySelection} className="btn btn-ghost">
-              {copied ? "Copied!" : "Copy"}
-            </button>
+            <CopyButton
+              text={selectionInfo.slice}
+              label="Copy selection"
+              title="Copy just the highlighted residues, without a header"
+            />
             <button onClick={clearSelection} className="btn btn-ghost">
               Clear
             </button>

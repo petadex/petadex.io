@@ -300,7 +300,7 @@ export function environmentRows(profiles) {
  */
 export const IDENTITY_STRATA = [
   { min: 90, label: "≥ 90 %" },
-  { min: 70, label: "≥ 70 %" },
+  { min: 60, label: "≥ 60 %" },
   { min: 0, label: "All" },
 ]
 

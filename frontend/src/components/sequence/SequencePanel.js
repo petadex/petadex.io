@@ -32,6 +32,7 @@ export default function SequencePanel({ sequence, accession, summaryStats, stats
 
       <SequenceViewer
         aminoAcidSequence={sequence}
+        header={accession}
         nucleotideSequence={null}
       />
     </div>

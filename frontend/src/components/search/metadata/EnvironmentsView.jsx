@@ -516,7 +516,7 @@ export default function EnvironmentsView({
   onOpenRecord,
 }) {
   const batch = samples?.status === "ready" ? samples.data : null
-  // Identity stratum: every hit by default; 90 and 70 keep closer relatives.
+  // Identity stratum: every hit by default; 90 and 60 keep closer relatives.
   const [minIdentity, setMinIdentity] = useState(0)
   const strata = useMemo(() => {
     const out = {}

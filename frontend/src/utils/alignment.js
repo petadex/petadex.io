@@ -190,3 +190,18 @@ export function layoutRadial(root, { branchLengths = true } = {}) {
   walk(root, 0)
   return { leaves, radials, arcs, depth }
 }
+
+/**
+ * Hits covering each query position, from every hit's query range. Index i is
+ * query position i + 1.
+ */
+export function coverageDepth(hits, qlen) {
+  const d = new Array(qlen + 2).fill(0)
+  for (const h of hits) {
+    if (h.query_start == null || h.query_end == null) continue
+    d[h.query_start] += 1
+    d[h.query_end + 1] -= 1
+  }
+  let run = 0
+  return d.slice(1, qlen + 1).map(v => (run += v))
+}

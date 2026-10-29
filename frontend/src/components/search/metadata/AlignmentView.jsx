@@ -4,6 +4,7 @@
 // representative hits (built after every search).
 import React, { useMemo, useRef, useState } from "react"
 import Dropdown from "../../common/Dropdown"
+import { coverageDepth } from "../../../utils/alignment"
 import { MsaPanel, TreePanel } from "./TreeAlignment"
 import { MethodsLink, OriginTag, SectionTitle } from "./parts"
 
@@ -138,16 +139,7 @@ function CoverageAndMap({ hits, qlen, count, colorBy, onOpenRecord }) {
   const res = inner / Math.max(1, qlen - 1)
 
   // 1. Depth: hits covering each query position, over every hit.
-  const depth = useMemo(() => {
-    const d = new Array(qlen + 2).fill(0)
-    for (const h of hits) {
-      if (h.query_start == null || h.query_end == null) continue
-      d[h.query_start] += 1
-      d[h.query_end + 1] -= 1
-    }
-    let run = 0
-    return d.slice(1, qlen + 1).map(v => (run += v))
-  }, [hits, qlen])
+  const depth = useMemo(() => coverageDepth(hits, qlen), [hits, qlen])
   const maxDepth = Math.max(1, ...depth)
   const DH = 70
   const depthPath =
@@ -624,7 +616,7 @@ const PANELS = [
   { id: "identity", label: "Identity" },
   { id: "coverage", label: "Coverage and alignment" },
   { id: "tree", label: "Phylogenetic tree" },
-  { id: "msa", label: "Multiple alignment" },
+  { id: "msa", label: "Multiple Sequence Alignment" },
 ]
 
 /** Sub-panel tabs; arrow keys move between them. */
@@ -711,16 +703,7 @@ export default function AlignmentView({
           className="grid gap-6 lg:grid-cols-2"
         >
           <div className="flex flex-col gap-2">
-            <SectionTitle title="Identity by origin" />
-            <p className="text-xs text-muted-foreground">
-              Hits per 5 % identity bin, stacked by origin. Hover a bar for the
-              per-origin counts.
-            </p>
-            <OriginToggles shown={histShown} onChange={setHistShown} />
-            <IdentityHistogram hits={hits} shown={histShown} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <SectionTitle title="Query coverage vs identity" />
+            <SectionTitle title="Query Coverage vs Identity" />
             <p className="text-xs text-muted-foreground">
               Top right: close, full-length relatives.
             </p>
@@ -730,6 +713,15 @@ export default function AlignmentView({
               shown={covShown}
               onOpenRecord={onOpenRecord}
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <SectionTitle title="Identity to Query" />
+            <p className="text-xs text-muted-foreground">
+              Hits per 5 % identity bin, stacked by origin. Hover a bar for the
+              per-origin counts.
+            </p>
+            <OriginToggles shown={histShown} onChange={setHistShown} />
+            <IdentityHistogram hits={hits} shown={histShown} />
           </div>
           <div className="flex items-end justify-end lg:col-span-2">
             <MethodsLink anchor="identity" />

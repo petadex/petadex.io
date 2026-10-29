@@ -183,6 +183,9 @@ export default function EnzymeTemplate({ pageContext }) {
               </h2>
               <SequenceViewer
                 aminoAcidSequence={enzyme.translated_sequence}
+                header={
+                  enzyme.genbank_accession_id || `enzyme_${enzyme.enzyme_id}`
+                }
                 nucleotideSequence={null}
               />
             </div>

@@ -244,6 +244,10 @@ function MembersTable({ familyId, centroid }) {
                             />
                             <SequenceViewer
                               aminoAcidSequence={row.translated_sequence}
+                              header={
+                                row.genbank_accession_id ||
+                                `enzyme_${row.enzyme_id}`
+                              }
                               nucleotideSequence={null}
                             />
                           </td>

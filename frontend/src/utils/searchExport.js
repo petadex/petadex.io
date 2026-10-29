@@ -48,23 +48,6 @@ export async function pollExport(exportSessionId, jobId) {
   return { ok: resp.ok, status: resp.status, data: await readJson(resp) }
 }
 
-// "Also prepare the full hit list" starts the export from the search form,
-// before the results page (and its session id) exist. The form hands the
-// in-flight request over here, keyed by the search's session id, and the
-// results page picks it up. In memory only: Gatsby navigation keeps the JS
-// context, and after a reload the page's own lookup finds the export anyway.
-const pendingStarts = new Map()
-
-export function registerPendingExport(sessionId, startPromise) {
-  pendingStarts.set(sessionId, startPromise)
-}
-
-export function takePendingExport(sessionId) {
-  const p = pendingStarts.get(sessionId) || null
-  pendingStarts.delete(sessionId)
-  return p
-}
-
 // Remembers the running job per search in this tab, so a reload mid-export
 // resumes polling instead of losing track of it. Wrapped because storage can
 // be unavailable (private mode, blocked site data).

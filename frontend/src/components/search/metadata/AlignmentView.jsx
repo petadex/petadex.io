@@ -5,7 +5,7 @@
 import React, { useMemo, useRef, useState } from "react"
 import Dropdown from "../../common/Dropdown"
 import { MsaPanel, TreePanel } from "./TreeAlignment"
-import { OriginTag, SectionTitle } from "./parts"
+import { MethodsLink, OriginTag, SectionTitle } from "./parts"
 
 const ORIGINS = ["plasticome", "ncbi_nr", "logan"]
 const ORIGIN_COLOR = {
@@ -26,6 +26,29 @@ const PLOT_W = W - LABEL_W - LABEL_GAP - 70
 const MAX_OVERHANG = 80
 
 const axisText = "fill-muted-foreground font-mono text-[10px]"
+const axisTitle = "fill-secondary-foreground text-[11px]"
+
+/** Axis titles: x centered under the plot, y rotated beside it. */
+function AxisTitles({ x, y, M, W: width = 500, H }) {
+  const cx = M.l + (width - M.l - M.r) / 2
+  const cy = M.t + (H - M.t - M.b) / 2
+  return (
+    <>
+      <text x={cx} y={H - 2} textAnchor="middle" className={axisTitle}>
+        {x}
+      </text>
+      <text
+        x={12}
+        y={cy}
+        textAnchor="middle"
+        transform={`rotate(-90 12 ${cy})`}
+        className={axisTitle}
+      >
+        {y}
+      </text>
+    </>
+  )
+}
 
 /** Lowest identity among `hits`, rounded down to 10 %. */
 export const identityFloor = hits =>
@@ -80,6 +103,7 @@ function HitTip({ hit, g, showRank = false }) {
       <div>
         {hit.identity?.toFixed(1)} % identity · query {hit.query_start}–
         {hit.query_end}
+        {hit.query_coverage != null && ` (${Math.round(hit.query_coverage)} %)`}
       </div>
       {g.tlen != null && (
         <div className="text-muted-foreground">
@@ -154,6 +178,14 @@ function CoverageAndMap({ hits, qlen, count, colorBy, onOpenRecord }) {
         {/* 1. depth */}
         <text x={LABEL_W - 8} y={14} textAnchor="end" className={axisText}>
           {maxDepth} hits
+        </text>
+        <text
+          x={LABEL_W - 8}
+          y={DH / 2 + 6}
+          textAnchor="end"
+          className={axisTitle}
+        >
+          Depth
         </text>
         <text x={LABEL_W - 8} y={DH} textAnchor="end" className={axisText}>
           0
@@ -293,93 +325,14 @@ function CoverageAndMap({ hits, qlen, count, colorBy, onOpenRecord }) {
           )
         })}
         <QueryAxis qlen={qlen} sx={sx} y={height - 6} />
-      </svg>
-      {tip.node}
-    </div>
-  )
-}
-
-/* ── 3. Identity by rank ────────────────────────────────────────────────── */
-
-function IdentityByRank({ hits, shown }) {
-  const tip = useTip()
-  const H = 260
-  const M = { l: 40, r: 10, t: 10, b: 28 }
-  const n = Math.max(1, hits.length)
-  const lo = Math.max(
-    0,
-    Math.floor(Math.min(...hits.map(h => h.identity ?? 100)) / 10) * 10
-  )
-  const sx = r => M.l + ((r - 1) / Math.max(1, n - 1)) * (500 - M.l - M.r)
-  const sy = v => M.t + ((100 - v) / (100 - lo || 1)) * (H - M.t - M.b)
-  const yTicks = []
-  for (let v = lo; v <= 100; v += 10) yTicks.push(v)
-  const xTicks = [1, ...[100, 200, 300, 400, 500].filter(t => t < n), n]
-  // Draw Logan first, Plasticome last, so the few characterized hits sit on top.
-  const order = ["logan", "ncbi_nr", "plasticome"]
-  // Hidden origins drop their dots; axes stay on every hit, so ranks don't move.
-  const sorted = hits
-    .filter(h => !ORIGINS.includes(h.db) || shown.has(h.db))
-    .sort((a, b) => order.indexOf(a.db) - order.indexOf(b.db))
-  return (
-    <div className="relative">
-      <svg
-        viewBox={`0 0 500 ${H}`}
-        className="block h-auto w-full"
-        role="img"
-        aria-label="Identity to the query by search rank, colored by origin"
-      >
-        {yTicks.map(v => (
-          <g key={v}>
-            <line
-              x1={M.l}
-              x2={500 - M.r}
-              y1={sy(v)}
-              y2={sy(v)}
-              stroke="var(--border)"
-            />
-            <text
-              x={M.l - 6}
-              y={sy(v) + 3}
-              textAnchor="end"
-              className={axisText}
-            >
-              {v}%
-            </text>
-          </g>
-        ))}
-        {xTicks.map(t => (
-          <text
-            key={t}
-            x={sx(t)}
-            y={H - 12}
-            textAnchor="middle"
-            className={axisText}
-          >
-            {t}
-          </text>
-        ))}
-        <text x={500 - M.r} y={H - 1} textAnchor="end" className={axisText}>
-          rank →
+        <text
+          x={LABEL_W - 8}
+          y={height - 6}
+          textAnchor="end"
+          className={axisTitle}
+        >
+          Query position
         </text>
-        {sorted.map(h => (
-          <circle
-            key={`${h.rank}-${h.target_id}`}
-            cx={sx(h.rank)}
-            cy={sy(h.identity ?? 0)}
-            r={h.db === "plasticome" ? 4 : 2.6}
-            fill={ORIGIN_COLOR[h.db] || OVERHANG_COLOR}
-            stroke={h.db === "plasticome" ? "var(--card)" : "none"}
-            strokeWidth={1}
-            onMouseEnter={e =>
-              tip.show(<HitTip hit={h} g={geometry(h)} showRank />, e)
-            }
-            onMouseMove={e =>
-              tip.show(<HitTip hit={h} g={geometry(h)} showRank />, e)
-            }
-            onMouseLeave={tip.hide}
-          />
-        ))}
       </svg>
       {tip.node}
     </div>
@@ -396,8 +349,8 @@ const niceStep = x => {
 
 function IdentityHistogram({ hits, shown }) {
   const tip = useTip()
-  const H = 260
-  const M = { l: 40, r: 10, t: 10, b: 28 }
+  const H = 270
+  const M = { l: 56, r: 10, t: 10, b: 38 }
   const lo = identityFloor(hits)
   const bins = []
   for (let v = lo; v < 100; v += 5) bins.push(v)
@@ -506,16 +459,120 @@ function IdentityHistogram({ hits, shown }) {
             <text
               key={b}
               x={M.l + ((b - lo) / 5) * bw}
-              y={H - 12}
+              y={H - M.b + 14}
               textAnchor="middle"
               className={axisText}
             >
               {b}%
             </text>
           ))}
-        <text x={500 - M.r} y={H - 1} textAnchor="end" className={axisText}>
-          identity to query →
-        </text>
+        <AxisTitles x="Identity to query (%)" y="Hits" M={M} H={H} />
+      </svg>
+      {tip.node}
+    </div>
+  )
+}
+
+/* ── 5. Query coverage vs identity ──────────────────────────────────────── */
+
+/** Each hit at (query coverage, identity): full-length close relatives sit
+ * top right; a high identity over a short stretch sits top left. */
+function CoverageVsIdentity({ hits, shown, onOpenRecord }) {
+  const tip = useTip()
+  const H = 270
+  const M = { l: 56, r: 10, t: 10, b: 38 }
+  const lo = identityFloor(hits)
+  const cLo = Math.max(
+    0,
+    Math.floor(Math.min(100, ...hits.map(h => h.query_coverage ?? 100)) / 10) *
+      10
+  )
+  const sx = c => M.l + ((c - cLo) / (100 - cLo || 1)) * (500 - M.l - M.r)
+  const sy = v => M.t + ((100 - v) / (100 - lo || 1)) * (H - M.t - M.b)
+  const ticks = (from, step = 10) => {
+    const out = []
+    for (let v = from; v <= 100; v += step) out.push(v)
+    return out
+  }
+  const xStep = 100 - cLo > 50 ? 20 : 10
+  const order = ["logan", "ncbi_nr", "plasticome"]
+  const sorted = hits
+    .filter(h => h.query_coverage != null)
+    .filter(h => !ORIGINS.includes(h.db) || shown.has(h.db))
+    .sort((a, b) => order.indexOf(a.db) - order.indexOf(b.db))
+  return (
+    <div className="relative">
+      <svg
+        viewBox={`0 0 500 ${H}`}
+        className="block h-auto w-full"
+        role="img"
+        aria-label="Each hit's identity to the query against the share of the query it covers, colored by origin"
+      >
+        {ticks(lo).map(v => (
+          <g key={`y${v}`}>
+            <line
+              x1={M.l}
+              x2={500 - M.r}
+              y1={sy(v)}
+              y2={sy(v)}
+              stroke="var(--border)"
+            />
+            <text
+              x={M.l - 6}
+              y={sy(v) + 3}
+              textAnchor="end"
+              className={axisText}
+            >
+              {v}%
+            </text>
+          </g>
+        ))}
+        {ticks(cLo, xStep).map(c => (
+          <g key={`x${c}`}>
+            <line
+              x1={sx(c)}
+              x2={sx(c)}
+              y1={M.t}
+              y2={H - M.b}
+              stroke="var(--border)"
+            />
+            <text
+              x={sx(c)}
+              y={H - M.b + 14}
+              textAnchor="middle"
+              className={axisText}
+            >
+              {c}%
+            </text>
+          </g>
+        ))}
+        <AxisTitles
+          x="Query coverage (%)"
+          y="Identity to query (%)"
+          M={M}
+          H={H}
+        />
+        {sorted.map(h => (
+          <circle
+            key={`${h.rank}-${h.target_id}`}
+            cx={sx(h.query_coverage)}
+            cy={sy(h.identity ?? 0)}
+            r={h.db === "plasticome" ? 4 : 2.6}
+            fill={ORIGIN_COLOR[h.db] || OVERHANG_COLOR}
+            fillOpacity={h.db === "plasticome" ? 1 : 0.75}
+            stroke={h.db === "plasticome" ? "var(--card)" : "none"}
+            strokeWidth={1}
+            className="cursor-pointer"
+            onClick={() => onOpenRecord(h.target_id)}
+            onMouseEnter={e =>
+              tip.show(<HitTip hit={h} g={geometry(h)} showRank />, e)
+            }
+            onMouseMove={e =>
+              tip.show(<HitTip hit={h} g={geometry(h)} showRank />, e)
+            }
+            onMouseLeave={tip.hide}
+          />
+        ))}
       </svg>
       {tip.node}
     </div>
@@ -625,8 +682,8 @@ export default function AlignmentView({
   onOpenRecord,
 }) {
   const [panel, setPanel] = useState("identity")
-  const [rankShown, setRankShown] = useState(() => new Set(ORIGINS))
   const [histShown, setHistShown] = useState(() => new Set(ORIGINS))
+  const [covShown, setCovShown] = useState(() => new Set(ORIGINS))
   const [count, setCount] = useState(100)
   const [colorBy, setColorBy] = useState("identity")
   const qlen =
@@ -654,14 +711,6 @@ export default function AlignmentView({
           className="grid gap-6 lg:grid-cols-2"
         >
           <div className="flex flex-col gap-2">
-            <SectionTitle title="Identity by rank" />
-            <p className="text-xs text-muted-foreground">
-              Rank is ordered by DIAMOND bit score.
-            </p>
-            <OriginToggles shown={rankShown} onChange={setRankShown} />
-            <IdentityByRank hits={hits} shown={rankShown} />
-          </div>
-          <div className="flex flex-col gap-2">
             <SectionTitle title="Identity by origin" />
             <p className="text-xs text-muted-foreground">
               Hits per 5 % identity bin, stacked by origin. Hover a bar for the
@@ -669,6 +718,21 @@ export default function AlignmentView({
             </p>
             <OriginToggles shown={histShown} onChange={setHistShown} />
             <IdentityHistogram hits={hits} shown={histShown} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <SectionTitle title="Query coverage vs identity" />
+            <p className="text-xs text-muted-foreground">
+              Top right: close, full-length relatives.
+            </p>
+            <OriginToggles shown={covShown} onChange={setCovShown} />
+            <CoverageVsIdentity
+              hits={hits}
+              shown={covShown}
+              onOpenRecord={onOpenRecord}
+            />
+          </div>
+          <div className="flex items-end justify-end lg:col-span-2">
+            <MethodsLink anchor="identity" />
           </div>
         </section>
       )}
@@ -702,12 +766,13 @@ export default function AlignmentView({
                 options={options}
                 onChange={setCount}
               />
+              <MethodsLink anchor="coverage-and-alignment" />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs text-secondary-foreground">
             {colorBy === "identity" ? (
               <span className="inline-flex items-center gap-1.5">
-                {identityFloor(hits.slice(0, shownCount))} %
+                Identity to query {identityFloor(hits.slice(0, shownCount))} %
                 <i
                   className="inline-block h-2.5 w-20 rounded-xs"
                   style={{

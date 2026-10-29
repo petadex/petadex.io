@@ -2,10 +2,14 @@
 // this search's Logan sequences than a random PETadex Logan sequence. The unit is
 // the sequence: each one weighs 1, split over the profiles of the BioSamples it
 // was assembled from (summary.environments, computed by the aggregator).
+// Stratified by identity to the query: the closest relatives alone, then
+// looser, then every hit (the aggregator's own rows).
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import {
+  IDENTITY_STRATA,
   MIN_SEQUENCES_FOR_RATIO,
   environmentRows,
+  environmentsFromHits,
   formatNumber,
   formatPercent,
   formatX,
@@ -17,6 +21,7 @@ import {
 import { formatP, profileStats } from "../../../utils/enrichmentStats"
 import {
   Disclosure,
+  MethodsLink,
   NcbiLink,
   RecordLink,
   SectionTitle,
@@ -57,7 +62,7 @@ const fewSequences = row => row.sequences < MIN_SEQUENCES_FOR_RATIO
 // q below this is drawn bright; at or above, faded.
 const SIGNIFICANCE = 0.05
 
-function Tooltip({ tip, stats }) {
+function Tooltip({ tip, stats, strata, minIdentity }) {
   if (!tip) return null
   const { row, x, y } = tip
   return (
@@ -78,7 +83,48 @@ function Tooltip({ tip, stats }) {
         {formatNumber(row.sequences, 1)} sequences
         {fewSequences(row) ? " (fewer than 5)" : ""}
       </div>
+      {strata && (
+        <StrataTable
+          profile={row.profile}
+          strata={strata}
+          minIdentity={minIdentity}
+        />
+      )}
       {stats && <SignificanceTable profile={row.profile} stats={stats} />}
+    </div>
+  )
+}
+
+/** One profile's × expected in every identity stratum, side by side. */
+function StrataTable({ profile, strata, minIdentity }) {
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <table className="w-full text-2xs tabular-nums">
+        <thead className="text-muted-foreground">
+          <tr>
+            <th className="pr-2 text-left font-normal">Identity</th>
+            <th className="pr-2 text-right font-normal">×</th>
+            <th className="text-right font-normal">Sequences</th>
+          </tr>
+        </thead>
+        <tbody>
+          {IDENTITY_STRATA.map(({ min, label }) => {
+            const env = strata[min]
+            const r = env.profiles.find(p => p.profile === profile)
+            return (
+              <tr key={min} className={min === minIdentity ? "font-bold" : ""}>
+                <td className="pr-2">{label}</td>
+                <td className="pr-2 text-right font-mono">
+                  {formatX(r?.x_expected)}
+                </td>
+                <td className="text-right font-mono">
+                  {formatNumber(r?.sequences ?? 0, 1)} / {env.n_sequences}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -140,16 +186,15 @@ function SignificanceTable({ profile, stats }) {
   )
 }
 
-function ProfileChart({ rows, stats, unit, onPick }) {
+/** Chart order: most enriched at the top, most depleted at the bottom. */
+const chartOrder = rows =>
+  rows
+    .filter(r => r.x_expected != null)
+    .sort((a, b) => b.x_expected - a.x_expected)
+
+function ProfileChart({ rows, stats, unit, onPick, strata, minIdentity }) {
   const [tip, setTip] = useState(null)
-  // Most enriched at the top, most depleted at the bottom.
-  const sorted = useMemo(
-    () =>
-      rows
-        .filter(r => r.x_expected != null)
-        .sort((a, b) => b.x_expected - a.x_expected),
-    [rows]
-  )
+  const sorted = useMemo(() => chartOrder(rows), [rows])
   const iw = W - M.l - M.r
   const height = M.t + M.b + sorted.length * ROW_H
   const log2 = x => Math.log2(Math.max(x, 2 ** -MAX_SPAN))
@@ -171,7 +216,7 @@ function ProfileChart({ rows, stats, unit, onPick }) {
     let x = e.clientX + pad
     let y = e.clientY + pad
     if (x + 330 > window.innerWidth) x = e.clientX - 330 - pad
-    if (y + 230 > window.innerHeight) y = e.clientY - 230 - pad
+    if (y + 320 > window.innerHeight) y = e.clientY - 320 - pad
     setTip({ row, x, y })
   }
 
@@ -291,7 +336,12 @@ function ProfileChart({ rows, stats, unit, onPick }) {
           strokeWidth={1.5}
         />
       </svg>
-      <Tooltip tip={tip} stats={stats} />
+      <Tooltip
+        tip={tip}
+        stats={stats}
+        strata={strata}
+        minIdentity={minIdentity}
+      />
     </div>
   )
 }
@@ -466,14 +516,30 @@ export default function EnvironmentsView({
   onOpenRecord,
 }) {
   const batch = samples?.status === "ready" ? samples.data : null
+  // Identity stratum: every hit by default; 90 and 70 keep closer relatives.
+  const [minIdentity, setMinIdentity] = useState(0)
+  const strata = useMemo(() => {
+    const out = {}
+    for (const { min } of IDENTITY_STRATA)
+      out[min] =
+        min === 0
+          ? environments
+          : environmentsFromHits(
+              hits.filter(h => (h.identity ?? 0) >= min),
+              environments?.profiles
+            )
+    return out
+  }, [hits, environments])
+  const stratumHits = useMemo(
+    () => hits.filter(h => (h.identity ?? 0) >= minIdentity),
+    [hits, minIdentity]
+  )
+  const env = strata[minIdentity]
   const totals = useMemo(
-    () => (batch ? batchTotals(batch, hits) : null),
-    [batch, hits]
+    () => (batch ? batchTotals(batch, stratumHits) : null),
+    [batch, stratumHits]
   )
-  const rows = useMemo(
-    () => environmentRows(environments?.profiles),
-    [environments]
-  )
+  const rows = useMemo(() => environmentRows(env?.profiles), [env])
   // Significance unit: each sequence by default (the aggregator's unit). The
   // toggle counts each 90 % cluster once, so a lineage seen many times in one
   // study weighs like one observation.
@@ -482,62 +548,93 @@ export default function EnvironmentsView({
     () =>
       rows.length
         ? {
-            sequence: profileStats(hits, rows, "sequence"),
-            cluster: profileStats(hits, rows, "cluster"),
+            sequence: profileStats(stratumHits, rows, "sequence"),
+            cluster: profileStats(stratumHits, rows, "cluster"),
           }
         : null,
-    [hits, rows]
+    [stratumHits, rows]
   )
-  // The top 5 by sequences, plus any profile picked from the chart.
-  const [picked, setPicked] = useState([])
-  const top = [
-    ...rows.slice(0, 5),
-    ...rows.slice(5).filter(r => picked.includes(r.profile)),
-  ]
+  // Every profile, in the chart's order; profiles the chart can't place
+  // (no background share) last.
+  const listed = useMemo(() => {
+    const charted = chartOrder(rows)
+    return [...charted, ...rows.filter(r => !charted.includes(r))]
+  }, [rows])
   const detailsRef = useRef(null)
-  const pendingOpen = useRef(null)
-
-  const reveal = profile => {
-    const el = detailsRef.current?.querySelector(
-      `details[data-profile="${profile}"]`
-    )
-    if (!el) return false
-    el.open = true
-    el.scrollIntoView({ block: "nearest", behavior: "smooth" })
-    return true
-  }
+  // Open profiles, held in state so a re-render never closes one.
+  const [open, setOpen] = useState(() => new Set())
+  const setProfileOpen = (profile, isOpen) =>
+    setOpen(prev => {
+      if (prev.has(profile) === isOpen) return prev
+      const next = new Set(prev)
+      isOpen ? next.add(profile) : next.delete(profile)
+      return next
+    })
+  // A bar click opens its profile, then scrolls it to the top once rendered.
+  const [scrollTo, setScrollTo] = useState(null)
   const pick = profile => {
-    if (reveal(profile)) return
-    pendingOpen.current = profile
-    setPicked(p => (p.includes(profile) ? p : [...p, profile]))
+    setProfileOpen(profile, true)
+    setScrollTo({ profile })
   }
-  // A newly added disclosure exists only after the render that adds it.
   useEffect(() => {
-    if (pendingOpen.current && reveal(pendingOpen.current))
-      pendingOpen.current = null
-  }, [picked])
+    if (!scrollTo) return
+    detailsRef.current
+      ?.querySelector(`details[data-profile="${scrollTo.profile}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" })
+  }, [scrollTo])
 
-  if (!rows.length)
+  if (!environments?.profiles?.length)
     return (
       <p className="text-sm text-muted-foreground">
         No Logan hit in this search has a profiled sample.
       </p>
     )
 
+  const stratumLabel = IDENTITY_STRATA.find(s => s.min === minIdentity).label
+
   return (
     <section aria-labelledby="env-title" className="flex flex-col gap-4">
-      <div id="env-title">
-        <SectionTitle
-          as="h2"
-          title="Environments, per sequence"
-          count={`${formatNumber(environments.n_sequences)} Logan sequences${
-            totals
-              ? ` · ${formatNumber(totals.samples)} samples · ${formatNumber(
-                  totals.studies
-                )} studies`
-              : ""
-          }`}
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div id="env-title">
+          <SectionTitle
+            as="h2"
+            title="Environments, per sequence"
+            count={`${formatNumber(env.n_sequences)} Logan sequences${
+              minIdentity ? ` at ${stratumLabel} identity` : ""
+            }${
+              totals
+                ? ` · ${formatNumber(totals.samples)} samples · ${formatNumber(
+                    totals.studies
+                  )} studies`
+                : ""
+            }`}
+          />
+        </div>
+        <div
+          role="group"
+          aria-label="Identity to the query"
+          className="ml-auto flex items-center gap-1 text-xs text-secondary-foreground"
+        >
+          <span className="mr-1">Identity to query</span>
+          {IDENTITY_STRATA.map(({ min, label }) => (
+            <button
+              key={min}
+              type="button"
+              aria-pressed={minIdentity === min}
+              onClick={() => setMinIdentity(min)}
+              title={`${formatNumber(
+                strata[min].n_sequences
+              )} profiled Logan sequences`}
+              className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors ${
+                minIdentity === min
+                  ? "border-accent bg-accent-subtle text-foreground"
+                  : "border-border bg-background hover:bg-surface-raised"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-4">
@@ -572,43 +669,74 @@ export default function EnvironmentsView({
           >
             Significance per 90 % cluster
           </button>
+          <MethodsLink anchor="environments" />
         </div>
-        <ProfileChart rows={rows} stats={stats} unit={unit} onPick={pick} />
+        {env.n_sequences ? (
+          <ProfileChart
+            rows={rows}
+            stats={stats}
+            unit={unit}
+            onPick={pick}
+            strata={strata}
+            minIdentity={minIdentity}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No profiled Logan hit at {stratumLabel} identity.
+          </p>
+        )}
       </div>
 
-      <div ref={detailsRef} className="flex flex-col gap-2">
-        {top.map(row => {
-          const members = hitsInProfile(hits, row.profile)
-          const inProfile = batch
-            ? profileSamples(batch, hits, row.profile)
-            : null
-          return (
-            <Disclosure
-              key={row.profile}
-              data-profile={row.profile}
-              title={profileName(row.profile)}
-              count={`${
-                row.sequences >= MIN_SEQUENCES_FOR_RATIO
-                  ? `${formatX(row.x_expected)}× expected · `
-                  : ""
-              }${members.length} hits${
-                inProfile
-                  ? ` · ${inProfile.samples.length} samples · ${inProfile.studies} studies`
-                  : ""
-              }`}
-            >
-              {inProfile ? (
-                <ProfileSamples
-                  samples={inProfile.samples}
-                  onOpenRecord={onOpenRecord}
-                />
-              ) : (
-                <ProfileHits members={members} onOpenRecord={onOpenRecord} />
-              )}
-            </Disclosure>
-          )
-        })}
-      </div>
+      {env.n_sequences > 0 && (
+        <div className="flex flex-col gap-2">
+          <SectionTitle title="BioSamples by environment" />
+          <p className="text-xs text-muted-foreground">
+            In the chart's order, most enriched first. Click a bar to open its
+            profile.
+          </p>
+          <div ref={detailsRef} className="flex flex-col gap-2">
+            {listed.map(row => {
+              const members = hitsInProfile(stratumHits, row.profile)
+              if (!members.length) return null
+              const inProfile = batch
+                ? profileSamples(batch, stratumHits, row.profile)
+                : null
+              return (
+                <Disclosure
+                  key={row.profile}
+                  data-profile={row.profile}
+                  open={open.has(row.profile)}
+                  onToggle={e =>
+                    setProfileOpen(row.profile, e.currentTarget.open)
+                  }
+                  title={profileName(row.profile)}
+                  count={`${
+                    row.sequences >= MIN_SEQUENCES_FOR_RATIO
+                      ? `${formatX(row.x_expected)}× expected · `
+                      : ""
+                  }${members.length} hits${
+                    inProfile
+                      ? ` · ${inProfile.samples.length} samples · ${inProfile.studies} studies`
+                      : ""
+                  }`}
+                >
+                  {inProfile ? (
+                    <ProfileSamples
+                      samples={inProfile.samples}
+                      onOpenRecord={onOpenRecord}
+                    />
+                  ) : (
+                    <ProfileHits
+                      members={members}
+                      onOpenRecord={onOpenRecord}
+                    />
+                  )}
+                </Disclosure>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

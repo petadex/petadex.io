@@ -295,6 +295,52 @@ export function environmentRows(profiles) {
 }
 
 /**
+ * Identity strata for the Environments chart, strictest first: the profile
+ * shares of only the closest relatives, then looser, then every hit.
+ */
+export const IDENTITY_STRATA = [
+  { min: 90, label: "≥ 90 %" },
+  { min: 70, label: "≥ 70 %" },
+  { min: 0, label: "All" },
+]
+
+/**
+ * Profile rows recomputed from `hits` alone, in the aggregator's shape and
+ * unit: each profiled Logan hit weighs 1, split over its samples' profiles.
+ * Background shares come from the aggregator's rows (`profiles`), so every
+ * profile it lists is kept, at 0 when no hit in `hits` reaches it. Over all
+ * of a search's stored hits this reproduces summary.environments exactly.
+ * Returns { n_sequences, profiles }.
+ */
+export function environmentsFromHits(hits, profiles) {
+  const sums = {}
+  let n = 0
+  for (const h of hits) {
+    if (h.db !== "logan") continue
+    const hist = h.card?.prof_hist
+    const total = hist ? Object.values(hist).reduce((s, v) => s + v, 0) : 0
+    if (!total) continue
+    n += 1
+    for (const [profile, v] of Object.entries(hist))
+      sums[profile] = (sums[profile] || 0) + v / total
+  }
+  return {
+    n_sequences: n,
+    profiles: (profiles || []).map(p => {
+      const sequences = sums[p.profile] || 0
+      const share = n ? sequences / n : 0
+      return {
+        ...p,
+        sequences,
+        share,
+        x_expected:
+          n && p.background_share > 0 ? share / p.background_share : null,
+      }
+    }),
+  }
+}
+
+/**
  * Logan hits whose samples include `profile`, in search rank order. Each
  * sequence counts once; its weight is the share of its samples in the profile.
  */

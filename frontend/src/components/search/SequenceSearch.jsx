@@ -16,7 +16,6 @@ import ExampleCards from "./ExampleCards"
 import SearchHistory from "./SearchHistory"
 import { cleanSequence } from "../../utils/lib"
 import { SEARCH_RESULT_DEPTH } from "./constants"
-import { startExport, registerPendingExport } from "../../utils/searchExport"
 import { headerOf, rememberQueryTitle } from "../../utils/queryTitle"
 
 const EXAMPLE_SEQUENCES = {
@@ -28,9 +27,6 @@ const SequenceSearch = () => {
   const [sequence, setSequence] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-  // Off by default: most users want the top hits, and an export costs about
-  // as much as a second search.
-  const [prepareFullList, setPrepareFullList] = useState(false)
 
   // Allow deep-links to pre-fill the form (e.g. the corpus sequence page's
   // "Search this sequence" action passes ?prefill=<FASTA>). We populate the
@@ -58,14 +54,6 @@ const SequenceSearch = () => {
     setError(null)
     setSubmitting(true)
 
-    // Started alongside the search, not after it, so the full list is often
-    // ready about when the top 500 is. Unpinned like the search itself, so
-    // both key to the same database. The results page picks up the request.
-    const exportStart = prepareFullList ? startExport({ sequence }) : null
-    // Dropped if the search itself fails; keep that from surfacing as an
-    // unhandled rejection. (The results page still sees any rejection.)
-    exportStart?.catch(() => {})
-
     try {
       const response = await fetch(`${searchApiUrl}/search`, {
         method: "POST",
@@ -82,7 +70,6 @@ const SequenceSearch = () => {
       }
 
       rememberQueryTitle(data.session_id, headerOf(sequence))
-      if (exportStart) registerPendingExport(data.session_id, exportStart)
       navigate(`/results?job=${data.session_id}`)
     } catch (err) {
       setError(err.message || "Failed to submit search. Please try again.")
@@ -152,24 +139,6 @@ const SequenceSearch = () => {
           </button>
         </p>
       </div>
-
-      <label className="flex items-start gap-2 text-sm text-foreground cursor-pointer select-none">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          checked={prepareFullList}
-          onChange={e => setPrepareFullList(e.target.checked)}
-          disabled={submitting}
-        />
-        <span>
-          Also prepare the full hit list
-          <span className="block text-xs text-muted-foreground">
-            Results show the top {SEARCH_RESULT_DEPTH} by bit score. This also
-            exports every significant hit for download (usually about a minute;
-            for a large family the sequence file can be over 1 GB).
-          </span>
-        </span>
-      </label>
 
       {/* Submit */}
       <button

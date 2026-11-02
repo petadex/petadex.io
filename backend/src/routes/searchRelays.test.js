@@ -134,13 +134,22 @@ test('align: 400 before invoking for a bad sessionId or id list', async () => {
     { sessionId: '../etc' },
     { sessionId: 'abc', ids: [] },
     { sessionId: 'abc', ids: ['XX1'] },
-    { sessionId: 'abc', ids: Array.from({ length: 201 }, (_, i) => `LG${i + 1}`) },
+    { sessionId: 'abc', ids: Array.from({ length: 501 }, (_, i) => `LG${i + 1}`) },
   ];
   for (const body of bad) {
     const res = await post('align', body);
     assert.equal(res.status, 400, JSON.stringify(body).slice(0, 60));
   }
   assert.deepEqual(calls, []);
+});
+
+test('align: a whole 500-hit result is one request (the full tree)', async () => {
+  calls.length = 0;
+  respond = async () => ({ statusCode: 200, body: { status: 'running', n_sequences: 501 } });
+  const ids = Array.from({ length: 500 }, (_, i) => `LG${i + 1}`);
+  const res = await post('align', { sessionId: 'abc', jobId: 'j1', ids });
+  assert.equal(res.status, 200);
+  assert.equal(calls[0].ids.length, 500);
 });
 
 test('align: 400 and 404 pass through; 503, other errors and odd bodies are 503', async () => {

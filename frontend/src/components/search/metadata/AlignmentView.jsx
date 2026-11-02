@@ -1,12 +1,14 @@
 // Alignment: where hits align on the query, how much sequence they carry
 // beyond it, and how identity falls off by source (from each hit's
 // coordinates and full subject sequence); and the alignment of every hit with
-// the tree of the representative hits (built after every search).
+// the tree of the representative hits (built after every search), or on
+// request a tree of every hit (about a minute, then cached).
 import React, { useMemo, useRef, useState } from "react"
 import Dropdown from "../../common/Dropdown"
 import { coverageDepth } from "../../../utils/alignment"
 import { MsaPanel, TreePanel } from "./TreeAlignment"
 import { MethodsLink, OriginTag, SectionTitle } from "./parts"
+import { useSearchAlignment } from "./useSearchData"
 
 const ORIGINS = ["plasticome", "ncbi_nr", "logan"]
 const ORIGIN_COLOR = {
@@ -687,6 +689,34 @@ export default function AlignmentView({
     .concat({ value: hits.length, label: `All ${hits.length}` })
   const shownCount = Math.min(count, hits.length)
 
+  // The full tree: every aligned hit as a custom alignment of the same job.
+  // Started on the first click only (FastTree takes about a minute at 500
+  // leaves), then kept, so switching back and forth costs nothing.
+  const [fullWanted, setFullWanted] = useState(false)
+  const [treeView, setTreeView] = useState("reps")
+  const reps = alignment.status === "ready" ? alignment.data : null
+  const full = useSearchAlignment(fullWanted && reps ? sessionId : null, {
+    jobId: reps?.job_id,
+    ids: reps?.ids,
+  })
+  const shownAlignment =
+    treeView === "full" && full.status === "ready" ? full : alignment
+  const nAll = reps ? reps.ids.length + 1 : 0
+  const nReps = reps ? reps.n_tree ?? nAll : 0
+  const treeChoice =
+    reps && nAll > nReps
+      ? {
+          view: treeView,
+          full,
+          nReps,
+          nAll,
+          select: view => {
+            if (view === "full") setFullWanted(true)
+            setTreeView(view)
+          },
+        }
+      : null
+
   const panelProps = id => ({
     role: "tabpanel",
     id: `alignment-panel-${id}`,
@@ -797,7 +827,8 @@ export default function AlignmentView({
       {panel === "tree" && (
         <div {...panelProps("tree")}>
           <TreePanel
-            alignment={alignment}
+            alignment={shownAlignment}
+            treeChoice={treeChoice}
             hits={hits}
             onOpenRecord={onOpenRecord}
           />
@@ -807,7 +838,7 @@ export default function AlignmentView({
       {panel === "msa" && (
         <div {...panelProps("msa")}>
           <MsaPanel
-            alignment={alignment}
+            alignment={shownAlignment}
             hits={hits}
             onOpenRecord={onOpenRecord}
           />

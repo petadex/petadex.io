@@ -21,10 +21,11 @@
  *
  * POST /api/search/align  {sessionId, jobId?, ids?, poll?}
  *   The alignment + tree the aggregator builds after every search (FAMSA, then
- *   FastTree), or a custom one over up to 200 of that result's hits.
+ *   FastTree), or a custom one over up to 500 of that result's hits (the
+ *   results page's on-demand full tree sends all of them).
  *   Response: { status: none|running|ready|failed, session_id, job_id, key,
  *     started_at, n_sequences, ... }; when ready also afa, newick, ids,
- *     n_columns, timing, database_version, search_version; failed has error.
+ *     n_tree, groups, n_columns, timing, database_version, search_version; failed has error.
  *   200 any status · 400 bad ids · 404 no such result · 503 not configured or
  *   unavailable. Never cached: the status moves.
  */
@@ -40,7 +41,7 @@ const SEARCH_LAMBDA_NAME =
   'petadex-diamond-orchestrator';
 
 const BATCH_MAX = 500;
-const ALIGN_MAX = 200;
+const ALIGN_MAX = 500;
 
 const samplesSchema = Joi.object({
   ids: Joi.array()

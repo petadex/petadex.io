@@ -52,13 +52,15 @@ const POLL_MS = 3000
 const RUNNING_LIMIT_MS = 5 * 60 * 1000
 
 /**
- * The search's alignment + tree (built by the aggregator after every search).
- * Polls while it runs. Any non-200 answer, e.g. before the align action is
- * deployed, reads as unavailable.
+ * The search's alignment + tree (built by the aggregator after every search),
+ * or, with `ids`, a custom one over those hits of `jobId`, started on first
+ * request (the full tree). Polls while it runs. Any non-200 answer, e.g.
+ * before the align action is deployed, reads as unavailable.
  * Returns { status: loading|running|ready|failed|unavailable, data, error }.
  */
-export function useSearchAlignment(sessionId) {
+export function useSearchAlignment(sessionId, { jobId, ids } = {}) {
   const [state, setState] = useState({ status: "loading", data: null })
+  const idsKey = ids ? ids.join(",") : ""
 
   useEffect(() => {
     if (!sessionId) {
@@ -74,7 +76,11 @@ export function useSearchAlignment(sessionId) {
         const resp = await fetch(`${searchApiUrl()}/search/align`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({
+            sessionId,
+            ...(jobId && { jobId }),
+            ...(idsKey && { ids: idsKey.split(",") }),
+          }),
         })
         const body = await resp.json().catch(() => ({}))
         if (cancelled) return
@@ -101,7 +107,7 @@ export function useSearchAlignment(sessionId) {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [sessionId])
+  }, [sessionId, jobId, idsKey])
 
   return state
 }

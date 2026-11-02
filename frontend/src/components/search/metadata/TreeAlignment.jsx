@@ -3,7 +3,9 @@
 // query, every Plasticome hit and the best-ranked hit of each 90 % cluster)
 // from that alignment. Two panels share one parsed model: a circular tree with
 // leaves colored by origin, and the alignment with rows in the tree's leaf
-// order, each leaf followed by the rest of its cluster. A hit opens its record.
+// order, each leaf followed by the rest of its cluster. On request, a tree of
+// every hit replaces the representatives' (built then, about a minute). A hit
+// opens its record.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { parseNewick } from "../../phyloTree/parseNewick"
 import {
@@ -44,9 +46,11 @@ const toggle = active =>
       : "border-border bg-background text-secondary-foreground hover:bg-surface-raised hover:text-foreground"
   }`
 
-/** Download filename stem for this search's alignment files. */
+/** Download filename stem for this search's alignment files; `-full` for the full tree. */
 const fileStem = (alignment, kind) =>
-  `petadex-${kind}-${alignment.data?.session_id || "search"}`
+  `petadex-${kind}${alignment.data?.key?.startsWith("ids-") ? "-full" : ""}-${
+    alignment.data?.session_id || "search"
+  }`
 
 /**
  * Parsed tree + alignment, rows in the tree's leaf order, each leaf followed by
@@ -590,7 +594,57 @@ function TreeFocus({
   )
 }
 
-export function TreePanel({ alignment, hits, onOpenRecord }) {
+/**
+ * Representatives' tree or the full tree. The full one is built on its first
+ * selection; until it is ready the representatives' tree stays on screen.
+ */
+function TreeChoice({ choice }) {
+  const { view, full, nReps, nAll, select } = choice
+  const building = view === "full" && full.status !== "ready"
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="inline-flex items-center gap-1 text-xs text-secondary-foreground">
+        <span className="mr-1">Tree</span>
+        <button
+          type="button"
+          aria-pressed={view === "reps"}
+          className={toggle(view === "reps")}
+          onClick={() => select("reps")}
+          title="The query, every Plasticome hit and the best-ranked hit of each 90 % cluster"
+        >
+          Representatives ({nReps})
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === "full"}
+          className={toggle(view === "full")}
+          onClick={() => select("full")}
+          title="Every hit. Built on request: about a minute the first time"
+        >
+          Full tree ({nAll})
+        </button>
+      </span>
+      {building && (
+        <span
+          role="status"
+          className={`text-xs ${
+            full.status === "failed" || full.status === "unavailable"
+              ? "text-warning"
+              : "text-muted-foreground"
+          }`}
+        >
+          {full.status === "failed" || full.status === "unavailable"
+            ? `The full tree could not be built${
+                full.error ? ` (${full.error})` : ""
+              }; showing the representatives.`
+            : `Building the full tree for ${nAll} sequences… about a minute. The representatives' tree stays until it is ready.`}
+        </span>
+      )}
+    </div>
+  )
+}
+
+export function TreePanel({ alignment, treeChoice, hits, onOpenRecord }) {
   const model = useAlignmentModel(alignment)
   const byId = useMemo(() => new Map(hits.map(h => [h.target_id, h])), [hits])
   const [hover, setHover] = useState(null)
@@ -663,6 +717,7 @@ export function TreePanel({ alignment, hits, onOpenRecord }) {
           </button>
         )}
       </div>
+      {treeChoice && <TreeChoice choice={treeChoice} />}
       {model && (
         <div className="flex flex-wrap items-center gap-2">
           <button

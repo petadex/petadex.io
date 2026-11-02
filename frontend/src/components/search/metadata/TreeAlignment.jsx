@@ -1,8 +1,9 @@
-// Tree and multiple alignment of the search's representative hits: the query,
-// every Plasticome hit and the best-ranked hit of each 90 % cluster, aligned
-// by FAMSA and treed by FastTree after every search. Two panels share one
-// parsed model: a circular tree with leaves colored by origin, and the
-// alignment with rows in the tree's leaf order. A hit opens its record.
+// Tree and multiple alignment of the search, built after every search: FAMSA
+// aligns the query and every hit; FastTree trees the representative hits (the
+// query, every Plasticome hit and the best-ranked hit of each 90 % cluster)
+// from that alignment. Two panels share one parsed model: a circular tree with
+// leaves colored by origin, and the alignment with rows in the tree's leaf
+// order, each leaf followed by the rest of its cluster. A hit opens its record.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { parseNewick } from "../../phyloTree/parseNewick"
 import {
@@ -48,7 +49,8 @@ const fileStem = (alignment, kind) =>
   `petadex-${kind}-${alignment.data?.session_id || "search"}`
 
 /**
- * Parsed tree + alignment, rows in the tree's leaf order. null until the
+ * Parsed tree + alignment, rows in the tree's leaf order, each leaf followed by
+ * the hits it stands for (`groups`); rows in neither come last. null until the
  * alignment is ready.
  */
 export function useAlignmentModel(alignment) {
@@ -60,7 +62,13 @@ export function useAlignmentModel(alignment) {
     // Leaf order is the same with or without branch lengths.
     const tree = layoutRadial(parsed)
     const byName = new Map(rows.map(r => [r.id, r]))
-    const ordered = tree.leaves.map(l => byName.get(l.name)).filter(Boolean)
+    const groups = data.groups || {}
+    const ids = tree.leaves.flatMap(l => [l.name, ...(groups[l.name] || [])])
+    const placed = new Set(ids)
+    const ordered = ids
+      .map(id => byName.get(id))
+      .concat(rows.filter(r => !placed.has(r.id)))
+      .filter(Boolean)
     return { rows: ordered, tree, parsed, data }
   }, [status, data])
 }
@@ -1096,7 +1104,7 @@ export function MsaPanel({ alignment, hits, onOpenRecord }) {
         <p className="text-xs text-muted-foreground">
           {order === "identity"
             ? "The query is first, then hits from highest to lowest percent identity to the query (DIAMOND's identity over each hit's own alignment, not over this MSA). Ties keep tree order."
-            : "Rows follow the tree's leaf order, top to bottom."}
+            : "Rows follow the tree's leaf order, top to bottom; hits not in the tree sit under the leaf of their 90 % cluster."}
         </p>
       )}
       <AlignmentStatus alignment={alignment} />

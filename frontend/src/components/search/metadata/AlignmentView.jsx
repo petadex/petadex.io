@@ -1,7 +1,7 @@
 // Alignment: where hits align on the query, how much sequence they carry
 // beyond it, and how identity falls off by source (from each hit's
-// coordinates and full subject sequence); and the tree and alignment of the
-// representative hits (built after every search).
+// coordinates and full subject sequence); and the alignment of every hit with
+// the tree of the representative hits (built after every search).
 import React, { useMemo, useRef, useState } from "react"
 import Dropdown from "../../common/Dropdown"
 import { coverageDepth } from "../../../utils/alignment"

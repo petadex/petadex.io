@@ -21,7 +21,8 @@ on:
       - 'backend/src/app.js'
 
 permissions:
-  contents: write  # Needed to commit docs and push to wiki
+  contents: write       # Needed to commit docs and push to wiki
+  pull-requests: write  # Needed for the "Comment on PR" step
 
 jobs:
   generate-api-docs:

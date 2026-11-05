@@ -73,36 +73,12 @@ pm2 startup systemd -u ec2-user --hp /home/ec2-user
 | ------ | --------------------------------- | -------------------------------------------------- |
 | GET    | `/api/fastaa`                     | list all sequences                                 |
 | GET    | `/api/fastaa/:accession`          | fetch a single sequence                            |
-| POST   | `/api/fastaa`                     | insert (JSON body: `{ accession, sequence }`)      |
 | GET    | `/api/enzymes`                    | list enzymes (filterable by family/component)      |
 | GET    | `/api/enzymes/:enzyme_id`         | fetch a single enzyme by ID                        |
-| GET    | `/api/enzymes/accession/:acc`     | fetch a single enzyme by GenBank accession         |
-| GET    | `/api/enzymes/:enzyme_id/variants`| list all variants for an enzyme centroid           |
 | GET    | `/api/enzymes/family/:family_id`  | list all enzymes in a family                       |
-| GET    | `/api/enzymes/component/:id`      | list all enzymes in a component                    |
-| GET    | `/api/enzymes/stats/overview`     | database-wide counts (see below)                   |
 | GET    | `/api/enzymes/families/summary`   | paginated family list with variant/component stats |
-| GET    | `/api/enzymes/search`             | unified search across families, enzymes, variants  |
 
-### `GET /api/enzymes/stats/overview`
-
-Returns aggregate counts used by the homepage stats banner. All four values are computed in a single query across three tables:
-
-| Field              | Source                                      |
-| ------------------ | ------------------------------------------- |
-| `total_families`   | `COUNT(DISTINCT family)` in `enzyme_taxonomy`    |
-| `total_enzymes`    | `COUNT(DISTINCT enzyme_id)` in `enzyme_fastaa`   |
-| `total_components` | `COUNT(DISTINCT component)` in `enzyme_taxonomy` |
-| `total_variants`   | `COUNT(DISTINCT variant_id)` in `variant_dictionary` |
-
-```json
-{
-  "total_enzymes": 1048585,
-  "total_families": 64730,
-  "total_components": 42,
-  "total_variants": 2735959
-}
-```
+Full, auto-generated endpoint list: [API Documentation](https://github.com/petadex/petadex.io/wiki/API-Documentation).
 
 See interactive docs at `` (Swagger UI).
 

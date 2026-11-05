@@ -6,18 +6,6 @@ import { pool } from '../db.js';
 const router = Router();
 const accessionSchema = Joi.string().max(64).required();
 
-// GET all features
-router.get('/', async (req, res, next) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT * FROM aa_seq_features ORDER BY accession ASC'
-    );
-    res.json(rows);
-  } catch (err) {
-    next(err);
-  }
-});
-
 // GET features by accession
 router.get('/:accession', async (req, res, next) => {
   const { error, value } = accessionSchema.validate(req.params.accession);

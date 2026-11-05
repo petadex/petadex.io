@@ -523,9 +523,10 @@ const AtlasMap = ({
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 30000)
-        const endpoint = highlightFamilyId != null
-          ? `${config.apiUrl}/family/${highlightFamilyId}/umap`
-          : config.atlasDataUrl
+        // Always the pre-exported S3 atlas: the full payload exceeds Lambda's
+        // 6 MB response cap, so the API can't serve it. The current family is
+        // highlighted client-side (getPointColor / buildScatterLayer).
+        const endpoint = config.atlasDataUrl
         let res
         try {
           res = await fetch(endpoint, { signal: controller.signal })

@@ -7,6 +7,11 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci-deploy.yml'
+  # PRs run build_and_test only; the deploy job is skipped for pull_request.
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci-deploy.yml'
   workflow_dispatch:
 
 jobs:
@@ -24,11 +29,16 @@ jobs:
         run: cd backend && npm ci
       - name: Run tests
         run: cd backend && npm test
+      # Imports src/app.js and walks every mounted route (no DB/AWS needed), so a
+      # broken route import fails here instead of in the deployed Lambda.
+      - name: Verify app loads and routes mount
+        run: cd backend && npm run docs:api
 
   deploy:
     needs: build_and_test
     # Forks without AWS credentials should not fail CI after tests pass.
-    if: github.repository == 'petadex/petadex.io'
+    # Never deploy from a PR — only from push to main or a manual dispatch.
+    if: github.repository == 'petadex/petadex.io' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

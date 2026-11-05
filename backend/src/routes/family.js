@@ -10,8 +10,6 @@ import { getSchemaFlags } from '../schemaFlags.js';
 import {
   FAMILY_METADATA_FROM_BASE_TABLES,
   FAMILY_METADATA_FROM_FAMILY_ATLAS,
-  UMAP_POINTS_FROM_BASE_TABLES,
-  UMAP_POINTS_FROM_FAMILY_ATLAS,
 } from '../atlasQueries.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getPublicReadS3Client, streamToString } from '../lib/s3Public.js';
@@ -154,27 +152,6 @@ router.get('/:familyId/metadata', async (req, res, next) => {
     const { rows } = await pool.query(sql, [familyId]);
     if (!rows.length) return res.status(404).json({ error: `No atlas metadata for family ${familyId}` });
     res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * GET /api/family/:familyId/umap
- * Returns all UMAP points from family_atlas for the scatter panel.
- * Current family is identified client-side for highlighting.
- */
-router.get('/:familyId/umap', async (req, res, next) => {
-  const { error } = familyIdSchema.validate(req.params.familyId);
-  if (error) return res.status(400).json({ error: error.message });
-
-  try {
-    const flags = await getSchemaFlags(pool);
-    const sql = flags.familyAtlas
-      ? UMAP_POINTS_FROM_FAMILY_ATLAS
-      : UMAP_POINTS_FROM_BASE_TABLES;
-    const { rows } = await pool.query(sql);
-    res.json({ points: rows });
   } catch (err) {
     next(err);
   }

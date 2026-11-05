@@ -57,7 +57,6 @@ const TreePage = ({ params, location }) => {
           layout="horizontal"
           highlightIds={highlightIds}
           sessionId={sessionId}
-          treeSource="search"
           showSearch
           showSearchBanner
         />

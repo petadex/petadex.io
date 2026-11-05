@@ -1,32 +1,9 @@
 /**
- * Atlas / family UMAP payloads: production uses `family_atlas` (materialized view);
+ * Atlas / family queries: production uses `family_atlas` (materialized view);
  * some databases only have `family_umap_coordinates` + `enzyme_taxonomy`.
+ * The full UMAP point set is not served by the API (it exceeds Lambda's 6 MB
+ * response cap) — it is exported to S3 by scripts/export-atlas.js.
  */
-
-export const UMAP_POINTS_FROM_FAMILY_ATLAS = `
-  SELECT family_id, umap_x, umap_y, family_size,
-         organism, taxonomy, country, component,
-         cath_domain, domain_name
-  FROM family_atlas`;
-
-/**
- * ~65k rows; DISTINCT ON + hash join — typically a few seconds on RDS.
- */
-export const UMAP_POINTS_FROM_BASE_TABLES = `
-  WITH fam_tax AS (
-    SELECT DISTINCT ON (family) family AS family_id, component, cath_domain, domain_name
-    FROM enzyme_taxonomy
-    ORDER BY family, enzyme_id
-  )
-  SELECT f.family_id, f.umap_x, f.umap_y, f.family_size,
-         NULL::text AS organism,
-         (COALESCE(t.domain_name::text, 'Unknown') || '; Unknown') AS taxonomy,
-         NULL::text AS country,
-         t.component,
-         t.cath_domain,
-         t.domain_name
-  FROM family_umap_coordinates f
-  LEFT JOIN fam_tax t ON t.family_id = f.family_id`;
 
 export const FAMILY_METADATA_FROM_FAMILY_ATLAS = `
   SELECT family_id, genbank_accession_id, definition, organism, taxonomy,

@@ -10,12 +10,11 @@ export default function PhyloTreePanel({
   layout = "horizontal",
   highlightIds = new Set(),
   sessionId = null,
-  treeSource = "search",
   showSearch = true,
   showSearchBanner = true,
 }) {
   const { treeRoot, loading, error, parseError, treeUrl, nwk } =
-    useFamilyTree(familyId, treeSource)
+    useFamilyTree(familyId)
   const { memberIndex, loading: membersLoading } =
     useFamilyMemberIndex(familyId)
 

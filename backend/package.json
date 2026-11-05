@@ -10,7 +10,8 @@
     "local": "node src/index.js",
     "test": "node --test",
     "export-atlas": "node scripts/export-atlas.js",
-    "check-annotation": "node scripts/check-annotation.js"
+    "check-annotation": "node scripts/check-annotation.js",
+    "docs:api": "node scripts/generate-api-docs.js"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.750.0",

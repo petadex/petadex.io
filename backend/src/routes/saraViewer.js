@@ -3,12 +3,10 @@ import { Router } from 'express';
 import Joi from 'joi';
 import { pool } from '../db.js';
 import { buildSaraViewerPayload } from '../lib/saraViewerData.js';
-import { resolveOrfId } from '../lib/orfResolve.js';
 
 const router = Router();
 
 const orfIdSchema = Joi.number().integer().min(1).required();
-const accessionSchema = Joi.string().max(128).required();
 
 router.get('/', async (req, res, next) => {
   try {
@@ -24,24 +22,6 @@ router.get('/', async (req, res, next) => {
     );
     const orfIds = rows.map((r) => Number(r.orf_id)).filter((n) => Number.isFinite(n));
     res.json({ orfIds: orfIds.length ? orfIds : [1] });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/by-accession/:accession', async (req, res, next) => {
-  const { error, value: accession } = accessionSchema.validate(req.params.accession);
-  if (error) {
-    return res.status(400).json({ error: error.message });
-  }
-
-  try {
-    const orfId = await resolveOrfId({ accession });
-    if (!orfId) {
-      return res.status(404).json({ error: `No ORF mapping for accession ${accession}` });
-    }
-    const payload = await buildSaraViewerPayload(orfId);
-    res.json({ ...payload, resolvedFrom: 'accession', accession });
   } catch (err) {
     next(err);
   }

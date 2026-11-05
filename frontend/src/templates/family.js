@@ -512,7 +512,6 @@ export default function FamilyTemplate({ pageContext }) {
                   <PhyloTreePanel
                     familyId={familyId}
                     layout="radial"
-                    treeSource="family"
                     showSearch
                     showSearchBanner={false}
                   />

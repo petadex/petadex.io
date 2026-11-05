@@ -7,7 +7,7 @@ let cache = null;
 
 /**
  * @param {import('pg').Pool} pool
- * @returns {Promise<{ familyAtlas: boolean, enzymeStatsOverview: boolean, enzymeFamilySummary: boolean }>}
+ * @returns {Promise<{ familyAtlas: boolean, enzymeFamilySummary: boolean }>}
  */
 export async function getSchemaFlags(pool) {
   if (cache) return cache;
@@ -18,11 +18,10 @@ export async function getSchemaFlags(pool) {
     WHERE n.nspname = 'public'
       AND c.relname = ANY($1::text[])
       AND c.relkind IN ('r', 'v', 'm', 'p')
-  `, [['family_atlas', 'enzyme_stats_overview', 'enzyme_family_summary']]);
+  `, [['family_atlas', 'enzyme_family_summary']]);
   const found = new Set(rows.map((r) => r.relname));
   cache = {
     familyAtlas: found.has('family_atlas'),
-    enzymeStatsOverview: found.has('enzyme_stats_overview'),
     enzymeFamilySummary: found.has('enzyme_family_summary'),
   };
   return cache;

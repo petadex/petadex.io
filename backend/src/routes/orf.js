@@ -8,7 +8,7 @@
 //                                    ancestors (petadex_clustering) + computed
 //                                    stats + provenance (dispatched on orf_origin,
 //                                    folded in per "03 - Frontend Wiring").
-//   GET /api/orf/:orfId/provenance   provenance block alone.
+//   GET /api/orf/:orfId/domains      catalytic-domain HMM evidence.
 //
 // All reads are by orf_id primary key (sub-ms); the only variable cost is the
 // single S3 Range read. Degrades gracefully: if S3 is unreachable the route
@@ -56,29 +56,6 @@ async function fetchOrfCore(orfId) {
   )
   return rows[0] || null
 }
-
-// GET /api/orf/:orfId/provenance — provenance block alone (orf_origin dispatch).
-router.get('/:orfId/provenance', async (req, res, next) => {
-  const { error, value: orfId } = orfIdSchema.validate(Number(req.params.orfId))
-  if (error) return res.status(400).json({ error: error.message })
-
-  try {
-    const core = await fetchOrfCore(orfId)
-    if (!core) return res.status(404).json({ error: `ORF ${orfId} not found` })
-    const { provenance } = await fetchProvenance(orfId, core.orf_origin)
-    res.json({
-      orf_id: orfId,
-      orf_origin: core.orf_origin,
-      orf_origin_label: ORIGIN_LABELS[core.orf_origin] ?? null,
-      provenance,
-    })
-  } catch (err) {
-    if (err.code === '42P01') {
-      return res.status(503).json({ error: 'A provenance backing table is unavailable' })
-    }
-    next(err)
-  }
-})
 
 // GET /api/orf/:orfId/domains — factual catalytic-domain evidence (corpus-keyed).
 // petadex_catalytic_domains (307M, by corpus orf_id) joined to pazy_hmms by the

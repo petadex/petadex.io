@@ -4,17 +4,13 @@ import { parseNewick } from "./parseNewick"
 
 /**
  * @param {string|number} familyId
- * @param {'search'|'family'} source — which API path to use
  */
-export function useFamilyTree(familyId, source = "search") {
+export function useFamilyTree(familyId) {
   const [nwk, setNwk] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const treeUrl =
-    source === "family"
-      ? `${config.apiUrl}/family/${familyId}/tree`
-      : `${config.apiUrl}/search/phylo-tree/${familyId}`
+  const treeUrl = `${config.apiUrl}/family/${familyId}/tree`
 
   useEffect(() => {
     if (!familyId) return undefined

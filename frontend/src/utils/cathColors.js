@@ -1,7 +1,7 @@
 // CATH domain mapping and shade color computation for the Family Atlas
 //
-// Source of truth: `family_atlas.cath_domain` from the API (see GET /api/atlas/umap and
-// /api/atlas/components). Use `resolveCathDomain()` from cathDomainResolve.js when both
+// Source of truth: `family_atlas.cath_domain` from the API (see the S3 atlas export
+// atlas/umap.json.gz and GET /api/atlas/components). Use `resolveCathDomain()` from cathDomainResolve.js when both
 // `component` and DB `cath_domain` are available. COMPONENT_TO_CATH remains a fallback for
 // charts and rows where the DB field is null.
 

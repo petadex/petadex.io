@@ -46,7 +46,7 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { S3Client, GetObjectCommand, ListObjectsV2Command, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { pool } from '../db.js';
-import { getPublicReadS3Client, streamToString as publicStreamToString } from '../lib/s3Public.js';
+import { getPublicReadS3Client } from '../lib/s3Public.js';
 import { SEQUENCE_PATTERN, MAX_LEN, cleanSequenceForKey } from '../lib/sequenceValidation.js';
 import { parsePetadexId, isPetadexId } from '../lib/targetId.js';
 
@@ -473,31 +473,6 @@ const jobIdSchema = Joi.alternatives().try(
   Joi.string().uuid({ version: 'uuidv4' }),                   // Lambda job_id
   Joi.string().pattern(/^regen_example_[a-zA-Z0-9_]+$/)      // example slugs
 ).required();
-
-const EXAMPLE_SEARCHES = [
-  {
-    job_id: 'regen_example_ispetase',
-    name: 'IsPETase',
-    description: 'Well-characterized PETase from Ideonella sakaiensis',
-    organism: 'Ideonella sakaiensis',
-    query_length: 290,
-  },
-  {
-    job_id: 'regen_example_fast_petase',
-    name: 'FAST-PETase',
-    description: 'Engineered variant with enhanced activity and thermostability',
-    organism: 'Engineered',
-    query_length: 290,
-  },
-  {
-    job_id: 'regen_example_srr10663367',
-    name: 'SRR10663367',
-    description: 'Logan-discovered enzyme with activity exceeding FAST-PETase',
-    organism: 'Metagenome',
-    query_length: 290,
-  },
-];
-
 
 // Check S3 in parallel for which family IDs have a phylogenetic tree file.
 // Returns a Set of family IDs (numbers) that have a corresponding .nwk file.
@@ -1025,43 +1000,6 @@ router.get('/export/:exportSessionId', async (req, res, next) => {
     next(err);
   }
 });
-
-/**
- * GET /api/phylo-tree/:family_id
- * Serve the Newick tree file for a given enzyme family from S3.
- * Proxies the content so external viewers (e.g. icytree.org) can fetch it via CORS.
- */
-router.get('/phylo-tree/:family_id', async (req, res, next) => {
-  const familyId = parseInt(req.params.family_id, 10);
-  if (!Number.isInteger(familyId) || familyId <= 0) {
-    return res.status(400).json({ error: 'Invalid family_id' });
-  }
-
-  const key = `search-phylo-trees/family_${familyId}.nwk`;
-  const client = getPublicReadS3Client();
-
-  try {
-    const getCommand = new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: key });
-    const response = await client.send(getCommand);
-    const content = await publicStreamToString(response.Body);
-
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Disposition', `inline; filename="family_${familyId}.nwk"`);
-    res.send(content);
-  } catch (err) {
-    if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
-      return res.status(404).json({ error: `No phylogenetic tree found for family ${familyId}` });
-    }
-    next(err);
-  }
-});
-
-/**
- * GET /api/search/examples
- */
-router.get('/examples', (_req, res) => res.json({ examples: EXAMPLE_SEARCHES }));
-
 
 /**
  * GET /api/search/results/:job_id

@@ -34,21 +34,6 @@ paths:
                 $ref: '#/components/schemas/Fastaa'
         '404':
           description: Not found
-  /api/atlas/umap:
-    get:
-      summary: Family atlas UMAP points (family_atlas)
-      responses:
-        '200':
-          description: Points with component, cath_domain, domain_name
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  points:
-                    type: array
-                    items:
-                      type: object
   /api/atlas/components:
     get:
       summary: Distinct atlas components for CATH domain page selector

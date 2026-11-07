@@ -10,6 +10,7 @@
     "local": "node src/index.js",
     "test": "node --test",
     "export-atlas": "node scripts/export-atlas.js",
+    "export-superfamily-atlas": "node scripts/export-superfamily-atlas.js",
     "check-annotation": "node scripts/check-annotation.js"
   },
   "dependencies": {

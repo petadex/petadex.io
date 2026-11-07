@@ -86,3 +86,27 @@ export const ATLAS_COMPONENTS_FROM_BASE_TABLES = `
   FROM rep r
   INNER JOIN counts c ON c.component = r.component
   ORDER BY r.component`;
+
+/**
+ * Superfamily atlas (v260701 Run 2, 30 % identity centroids): one row per superfamily with
+ * every layout's coordinates. Source: `superfamily_atlas` (materialized view over
+ * `superfamily_atlas_metadata` + `superfamily_atlas_coordinates`). Served to the site as a
+ * static S3 export (see scripts/export-superfamily-atlas.js), like `family_atlas`.
+ * `domain_name` falls back to the pipeline fold label where the fold has no CATH code (C024).
+ */
+export const SUPERFAMILY_ATLAS_POINTS = `
+  SELECT superfamily_id,
+         round(umap_x::numeric, 4)::float8 AS umap_x, round(umap_y::numeric, 4)::float8 AS umap_y,
+         round(tsne_x::numeric, 4)::float8 AS tsne_x, round(tsne_y::numeric, 4)::float8 AS tsne_y,
+         source, cath_fold, cath_domain, COALESCE(domain_name, cath_fold) AS domain_name, component,
+         core_length, n_sequences::int AS n_sequences, n_families, n_enzyme_clusters, organism, taxonomy
+  FROM superfamily_atlas
+  ORDER BY superfamily_id`;
+
+/** Layout provenance shown under the map (model, method, parameters). */
+export const SUPERFAMILY_ATLAS_LAYOUTS = `
+  SELECT layout, label, embedding, parameters,
+         to_char(date_computed, 'YYYY-MM-DD') AS date_computed,
+         to_char(date_clustered, 'YYYY-MM-DD') AS date_clustered
+  FROM superfamily_atlas_layouts
+  ORDER BY CASE layout WHEN 'umap' THEN 0 ELSE 1 END, layout`;

@@ -1,16 +1,18 @@
 import { CATH_GROUPS, COMPONENT_TO_CATH } from "./cathColors"
 
 /**
+ * `component` is a legacy integer (family atlas, e.g. 8) or a v260701 label (superfamily
+ * atlas, e.g. C001 or C001-2).
  * @param {string|undefined} search
- * @returns {{ focusComponent: number|null, focusCathDomain: string|null }}
+ * @returns {{ focusComponent: number|string|null, focusCathDomain: string|null }}
  */
 export function parseAtlasQuery(search) {
   const params = new URLSearchParams(search || "")
-  const componentRaw = params.get("component")
+  const componentRaw = (params.get("component") || "").trim()
   const cathRaw = params.get("cath")
-  const parsed =
-    componentRaw != null && componentRaw !== "" ? parseInt(componentRaw, 10) : null
-  const focusComponent = Number.isFinite(parsed) ? parsed : null
+  let focusComponent = null
+  if (/^\d+$/.test(componentRaw)) focusComponent = parseInt(componentRaw, 10)
+  else if (/^C\d{3}(-\d+)?$/i.test(componentRaw)) focusComponent = componentRaw.toUpperCase()
   const focusCathDomain =
     cathRaw != null && cathRaw !== "" ? decodeURIComponent(cathRaw.trim()) : null
   return { focusComponent, focusCathDomain }

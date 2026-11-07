@@ -55,6 +55,37 @@ function hashColor(str, alpha = 200) {
   return [...color, alpha]
 }
 
+// Superfamily atlas (v260701): PETadex source colours, and a per-layout radius scale so a
+// layout with a wider coordinate range (t-SNE) draws points at the same apparent size as UMAP.
+const SOURCE_COLORS = {
+  logan: [103, 154, 121, 220],
+  nr:    [157,  94, 145, 220],
+  pazy:  [ 94, 104, 158, 220],
+}
+const SOURCE_LABELS = { logan: "Logan", nr: "NCBI nr", pazy: "PAZy" }
+let radiusScale = 1
+
+const compareComponents = (a, b) =>
+  typeof a === "number" && typeof b === "number"
+    ? a - b
+    : String(a).localeCompare(String(b), undefined, { numeric: true })
+
+/** 1st-99th percentile span of a coordinate list (robust to stray points). */
+function robustSpan(values) {
+  const v = [...values].sort((a, b) => a - b)
+  const q = f => v[Math.min(v.length - 1, Math.max(0, Math.round(f * (v.length - 1))))]
+  return (q(0.99) - q(0.01)) || 1
+}
+
+/** Copy the chosen layout's coordinates into umap_x / umap_y (the fields every map helper reads). */
+function applyLayout(points, layout, scales) {
+  for (const p of points) {
+    const xy = p._xy?.[layout]
+    if (xy) { p.umap_x = xy[0]; p.umap_y = xy[1] }
+  }
+  radiusScale = scales?.[layout] ?? 1
+}
+
 const HIDDEN_COLOR = [30, 41, 59, 40]
 const HIGHLIGHT_COLOR = [255, 20, 147, 255]
 
@@ -66,6 +97,11 @@ function getPointColor(point, colorBy, hidden, highlightFamilyId, highlightFamil
       : [100, 116, 139, 100]
   }
   if (colorBy === "none") return [100, 210, 190, 200]
+  if (colorBy === "source") {
+    const key = SOURCE_LABELS[point.source] || "Unknown"
+    if (hidden.has(key)) return HIDDEN_COLOR
+    return SOURCE_COLORS[point.source] || [148, 163, 184, 160]
+  }
   const { domain, phylum } = parseTaxonomy(point.taxonomy)
   if (colorBy === "domain") {
     if (hidden.has(domain)) return HIDDEN_COLOR
@@ -113,7 +149,7 @@ function buildLegend(points, colorBy) {
       if (!cathGroups.has(groupKey)) cathGroups.set(groupKey, [])
       cathGroups.get(groupKey).push(comp)
     }
-    for (const g of cathGroups.values()) g.sort((a, b) => a - b)
+    for (const g of cathGroups.values()) g.sort(compareComponents)
 
     // Rebuild dynamic color maps
     dynamicCompRGBA = {}
@@ -170,6 +206,18 @@ function buildLegend(points, colorBy) {
     return { grouped: true, groups }
   }
 
+  if (colorBy === "source") {
+    const counts = new Map()
+    for (const p of points) {
+      const key = SOURCE_LABELS[p.source] || "Unknown"
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    const colorOf = Object.fromEntries(Object.entries(SOURCE_LABELS).map(([k, v]) => [v, SOURCE_COLORS[k]]))
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count, color: colorOf[label] || [148, 163, 184, 160] }))
+  }
+
   const counts = new Map()
   for (const p of points) {
     const { domain, phylum } = parseTaxonomy(p.taxonomy)
@@ -203,7 +251,7 @@ function buildScatterLayer(points, maxSize, ScatterplotLayer, colorBy, hidden, h
     data: sorted,
     getPosition: d => [d.umap_x, d.umap_y],
     getRadius: d => {
-      const base = Math.sqrt(d.family_size / maxSize) * 1.5
+      const base = Math.sqrt(d.family_size / maxSize) * 1.5 * radiusScale
       return (highlightFamilyIds?.has(d.family_id)) ? base * 1.8 : base
     },
     radiusMinPixels: 2,
@@ -214,7 +262,55 @@ function buildScatterLayer(points, maxSize, ScatterplotLayer, colorBy, hidden, h
   })
 }
 
+function superfamilyRows(o) {
+  const { domain, phylum } = parseTaxonomy(o.taxonomy)
+  return [
+    ["Superfamily", o.superfamily_id],
+    ["Sequences", o.n_sequences.toLocaleString()],
+    ["Families", `${o.n_families.toLocaleString()} (60% id.)`],
+    ["Enzymes", `${o.n_enzyme_clusters.toLocaleString()} (90% id.)`],
+    ["Source", SOURCE_LABELS[o.source] || o.source],
+    o.organism ? ["Organism", o.organism] : null,
+    o.taxonomy ? ["Domain", domain] : null,
+    o.taxonomy ? ["Phylum", phylum] : null,
+    ["Fold", o.domain_name || o.cath_fold],
+    o.cath_domain ? ["CATH", o.cath_domain] : null,
+    ["Component", o.component],
+  ].filter(Boolean)
+}
+
+function rowsToHtml(rows) {
+  return rows
+    .map(
+      ([k, v]) =>
+        `<div style="display:flex;gap:8px;margin-top:3px">
+           <span style="color:#94a3b8;min-width:72px">${k}</span>
+           <span style="color:#f1f5f9;word-break:break-word">${v}</span>
+         </div>`
+    )
+    .join("")
+}
+
+const TOOLTIP_STYLE = {
+  background: "#1e293b",
+  padding: "10px 12px",
+  borderRadius: "6px",
+  fontSize: "12px",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+  border: "1px solid #334155",
+  pointerEvents: "auto",
+}
+
 function buildTooltip(object, highlightFamilyId) {
+  if (object.superfamily_id != null) {
+    const link = object.cath_domain
+      ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid #334155;display:flex;flex-wrap:wrap;gap:10px;pointer-events:auto"><a href="/cath-domains?cath=${encodeURIComponent(object.cath_domain)}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">CATH domain page</a></div>`
+      : ""
+    return {
+      html: `<div style="max-width:280px;pointer-events:none">${rowsToHtml(superfamilyRows(object))}${link}</div>`,
+      style: TOOLTIP_STYLE,
+    }
+  }
   const { domain, phylum } = parseTaxonomy(object.taxonomy)
   const isCurrent = highlightFamilyId != null && object.family_id === highlightFamilyId
   const rows = [
@@ -279,6 +375,7 @@ function buildTooltip(object, highlightFamilyId) {
 
 const COLOR_MODES = [
   { value: "component", label: "Component" },
+  { value: "source",    label: "Source",  superfamilyOnly: true },
   { value: "domain",    label: "Domain" },
   { value: "phylum",    label: "Phylum" },
   { value: "none",      label: "None" },
@@ -306,6 +403,15 @@ const AtlasMap = ({
 } = {}) => {
   const propHighlightId = familyIdProp != null ? parseInt(familyIdProp) : null
   const compact = propHighlightId != null
+  // /atlas and other uses without legacy family IDs show the v260701 superfamily atlas;
+  // family pages and search results keep the legacy family atlas they key on.
+  const superfamilyMode = propHighlightId == null && highlightFamilyIds == null
+  if (superfamilyMode && typeof focusComponent === "number") {
+    // legacy integer component links (/atlas?component=8) → that component's CATH domain
+    const cath = COMPONENT_TO_CATH[focusComponent]
+    focusCathDomain = /^\d+(\.\d+)+$/.test(cath || "") ? cath : focusCathDomain
+    focusComponent = null
+  }
   const hasAtlasFocus = focusComponent != null || Boolean(focusCathDomain)
   const focusMeta = useMemo(() => {
     if (focusComponent != null) {
@@ -322,6 +428,9 @@ const AtlasMap = ({
   const pointsRef       = useRef([])
   const maxSizeRef      = useRef(1)
   const LayerRef        = useRef(null)   // ScatterplotLayer constructor
+  const layoutScalesRef = useRef({})     // superfamily mode: layout → radius scale
+  const [layout,  setLayoutState] = useState("umap")
+  const [layouts, setLayouts]     = useState([])   // superfamily mode: [{layout,label,embedding,parameters,...}]
 
   const highlightPosRef = useRef(null)   // world [x, y] of highlighted point
 
@@ -413,7 +522,7 @@ const AtlasMap = ({
     }
     const lower = q.toLowerCase()
     const matches = pointsRef.current.filter(p =>
-      String(p.family_id).includes(lower) ||
+      String(p.family_id).toLowerCase().includes(lower) ||
       (p.organism && p.organism.toLowerCase().includes(lower))
     )
     setSearchMatches(matches)
@@ -500,6 +609,24 @@ const AtlasMap = ({
     })
   }, [updateLayer])
 
+  // ── superfamily layout switch (UMAP ↔ t-SNE) ─────────────────────────────
+  const switchLayout = useCallback((next) => {
+    if (!superfamilyMode || next === layout) return
+    const points = pointsRef.current
+    if (!points.length || !deckRef.current || !LayerRef.current || !containerRef.current) return
+    applyLayout(points, next, layoutScalesRef.current)
+    setLayoutState(next)
+    deckRef.current.setProps({
+      layers: [buildScatterLayer(points, maxSizeRef.current, LayerRef.current, colorByRef.current, hidden, highlightFamilyId, highlightFamilyIds)],
+    })
+    const hp = highlightFamilyId != null ? points.find(p => p.family_id === highlightFamilyId) : null
+    highlightPosRef.current = hp ? [hp.umap_x, hp.umap_y, 0] : null
+    if (hasAtlasFocus) fitToAtlasFocus()
+    else fitDeckToPoints(points, deckRef, containerRef)
+    requestAnimationFrame(projectHighlight)
+    setTimeout(() => requestAnimationFrame(projectHighlight), 700)
+  }, [superfamilyMode, layout, hidden, highlightFamilyId, highlightFamilyIds, hasAtlasFocus, fitToAtlasFocus, projectHighlight])
+
   // ── mobile detection ─────────────────────────────────────────────────────
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -525,7 +652,9 @@ const AtlasMap = ({
         const timeoutId = setTimeout(() => controller.abort(), 30000)
         const endpoint = highlightFamilyId != null
           ? `${config.apiUrl}/family/${highlightFamilyId}/umap`
-          : config.atlasDataUrl
+          : superfamilyMode
+            ? config.superfamilyAtlasDataUrl
+            : config.atlasDataUrl
         let res
         try {
           res = await fetch(endpoint, { signal: controller.signal })
@@ -533,7 +662,27 @@ const AtlasMap = ({
           clearTimeout(timeoutId)
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const { points } = await res.json()
+        const payload = await res.json()
+        const { points } = payload
+
+        if (superfamilyMode) {
+          // superfamily points: id + size fields the shared map code reads, plus every layout's coordinates
+          const layoutList = payload.layouts?.length ? payload.layouts : [{ layout: "umap", label: "UMAP" }]
+          for (const p of points) {
+            p.family_id = p.superfamily_id
+            p.family_size = p.n_enzyme_clusters
+            p._xy = Object.fromEntries(layoutList.map(l => [l.layout, [p[`${l.layout}_x`], p[`${l.layout}_y`]]]))
+          }
+          const ref = robustSpan(points.map(p => p._xy[layoutList[0].layout][0]))
+          layoutScalesRef.current = Object.fromEntries(
+            layoutList.map(l => [l.layout, robustSpan(points.map(p => p._xy[l.layout][0])) / ref]),
+          )
+          applyLayout(points, layoutList[0].layout, layoutScalesRef.current)
+          setLayouts(layoutList)
+          setLayoutState(layoutList[0].layout)
+        } else {
+          radiusScale = 1
+        }
 
         const { Deck, OrthographicView } = await import("@deck.gl/core")
         const { ScatterplotLayer }       = await import("@deck.gl/layers")
@@ -575,6 +724,7 @@ const AtlasMap = ({
           layers: [buildScatterLayer(points, maxSize, ScatterplotLayer, initialColorBy, initialHidden, highlightFamilyId, highlightFamilyIds)],
           getTooltip: ({ object }) => object && buildTooltip(object, highlightFamilyId),
           onClick: ({ object }) => {
+            if (superfamilyMode) return
             if (object?.family_id != null && object.family_id !== highlightFamilyId) {
               window.open(`/family/${object.family_id}`, "_blank", "noopener,noreferrer")
             }
@@ -673,7 +823,7 @@ const AtlasMap = ({
       {searchPanel && ripplePos?.[0] && (() => {
         const pos = ripplePos[0]
         const { domain, phylum } = parseTaxonomy(searchPanel.taxonomy)
-        const rows = [
+        const rows = searchPanel.superfamily_id != null ? superfamilyRows(searchPanel) : [
           ["Family",    searchPanel.family_id],
           ["Sequences", searchPanel.family_size.toLocaleString()],
           searchPanel.organism ? ["Organism", searchPanel.organism] : null,
@@ -705,9 +855,11 @@ const AtlasMap = ({
                 <span style={{ color: "#f1f5f9", wordBreak: "break-word" }}>{v}</span>
               </div>
             ))}
-            <div style={{ marginTop: "6px", color: "#64748b", fontSize: "11px" }}>
-              Click to view family
-            </div>
+            {searchPanel.superfamily_id == null && (
+              <div style={{ marginTop: "6px", color: "#64748b", fontSize: "11px" }}>
+                Click to view family
+              </div>
+            )}
           </div>
         )
       })()}
@@ -918,7 +1070,7 @@ const AtlasMap = ({
           <span style={{ color: "#94a3b8", fontSize: "11px", marginRight: "2px" }}>
             Color by
           </span>
-          {COLOR_MODES.map(mode => (
+          {COLOR_MODES.filter(m => superfamilyMode || !m.superfamilyOnly).map(mode => (
             <button
               key={mode.value}
               onClick={() => setColorBy(mode.value)}
@@ -939,6 +1091,62 @@ const AtlasMap = ({
           ))}
         </div>
       )}
+
+      {/* layout toggle (superfamily atlas): same ESM-2 embeddings, two 2-D projections */}
+      {!loading && !error && superfamilyMode && layouts.length > 1 && (
+        <div
+          role="group"
+          aria-label="Layout"
+          style={{
+            position: "absolute",
+            top: hasAtlasFocus ? "70px" : "104px",
+            left: fullscreen && !isMobile ? "234px" : "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            zIndex: 10,
+          }}
+        >
+          <span style={{ color: "#94a3b8", fontSize: "11px", marginRight: "2px" }}>Layout</span>
+          {layouts.map(l => (
+            <button
+              key={l.layout}
+              type="button"
+              aria-pressed={layout === l.layout}
+              onClick={() => switchLayout(l.layout)}
+              title={`${l.embedding}; ${l.parameters}`}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "4px",
+                border: "1px solid",
+                borderColor: layout === l.layout ? "#38bdf8" : "#334155",
+                background: layout === l.layout ? "#0c4a6e" : "#1e293b",
+                color: layout === l.layout ? "#e0f2fe" : "#94a3b8",
+                fontSize: "12px",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* layout provenance (superfamily atlas) */}
+      {!loading && !error && superfamilyMode && fullscreen && !isMobile && (() => {
+        const l = layouts.find(x => x.layout === layout)
+        if (!l || !l.embedding) return null
+        return (
+          <div style={{
+            position: "absolute", right: "14px", bottom: "12px", zIndex: 6, pointerEvents: "none",
+            color: "#64748b", fontSize: "10.5px", textAlign: "right", maxWidth: "56ch", lineHeight: 1.45,
+          }}>
+            {pointCount.toLocaleString()} superfamilies (30% identity centroids, v260701) · {l.label} of {l.embedding}.
+            <br />Distances between clusters and cluster sizes are not meaningful.
+          </div>
+        )
+      })()}
 
       {/* text legend — flat (domain/phylum) */}
       {Array.isArray(legend) && legend.length > 0 && (!fullscreen || !isMobile || legendOpen) && (

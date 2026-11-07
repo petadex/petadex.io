@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import config from "../config"
-import { cathDomainPathForComponent } from "../utils/cathDomainCatalogLookup"
 
 /* ── Cluster definitions for fallback fake data ─────────────── */
 const FALLBACK_CLUSTERS = [
@@ -16,12 +15,6 @@ const FALLBACK_CLUSTERS = [
   { label: "Other",              color: "#EC4899", cx: -0.10, cy:  0.35, sx: 0.02, sy: 0.02, n: 18  },
   { label: "Other",              color: "#14B8A6", cx:  0.40, cy: -0.30, sx: 0.02, sy: 0.02, n: 12  },
 ]
-
-const COMPONENT_COLORS = {
-  0: "#4F8FE8", 1: "#2ECC71", 2: "#E74C4C", 3: "#9B5BE0",
-  4: "#F2C94C", 5: "#F2994A", 6: "#6FB7E8", 7: "#EC4899",
-  8: "#14B8A6", 9: "#F97316",
-}
 
 function seededRng(seed) {
   return () => {
@@ -56,8 +49,23 @@ function generateFallbackPoints() {
   return pts
 }
 
+// Superfamily atlas (v260701): one colour per catalytic fold, fixed order so a fold keeps its colour.
+const FOLD_COLORS = [
+  "#4F8FE8", "#9B5BE0", "#F2994A", "#2ECC71", "#E74C4C", "#F2C94C", "#6FB7E8", "#EC4899",
+  "#14B8A6", "#F97316", "#A3E635", "#64748b", "#C084FC", "#FB7185", "#38BDF8",
+]
+const foldColor = new Map()
+function colorForFold(fold) {
+  if (!foldColor.has(fold)) foldColor.set(fold, FOLD_COLORS[foldColor.size % FOLD_COLORS.length])
+  return foldColor.get(fold)
+}
+
 function normalizeApiPoints(apiPoints) {
   if (!apiPoints?.length) return null
+  // biggest folds first, so the colour order is stable across exports
+  const byFold = new Map()
+  for (const p of apiPoints) byFold.set(p.cath_fold, (byFold.get(p.cath_fold) || 0) + 1)
+  ;[...byFold.entries()].sort((a, b) => b[1] - a[1]).forEach(([f]) => colorForFold(f))
   const xs = apiPoints.map(p => p.umap_x)
   const ys = apiPoints.map(p => p.umap_y)
   const minX = Math.min(...xs), maxX = Math.max(...xs)
@@ -66,13 +74,14 @@ function normalizeApiPoints(apiPoints) {
   return apiPoints.map(p => ({
     x: ((p.umap_x - minX) / rangeX - 0.5) * 0.9,
     y: ((p.umap_y - minY) / rangeY - 0.5) * 0.9,
-    color: COMPONENT_COLORS[p.component % 10] || "#64748b",
-    label: p.domain_name || `Component ${p.component}`,
-    size: Math.max(1, Math.min(25, p.family_size || 1)),
-    familyId: p.family_id,
+    color: colorForFold(p.cath_fold),
+    label: p.domain_name || p.cath_fold,
+    // n 90 % enzyme clusters per superfamily, on the hero's 1-25 size scale
+    size: Math.max(1, Math.min(25, Math.round(Math.sqrt(p.n_enzyme_clusters || 1)))),
+    superfamilyId: p.superfamily_id,
     component: p.component,
     cathDomain: p.cath_domain,
-    familySize: p.family_size,
+    nSequences: p.n_sequences,
   }))
 }
 
@@ -93,7 +102,7 @@ export default function AtlasMap({ interactive = true, className = "" }) {
 
   // Fetch real atlas data
   useEffect(() => {
-    fetch(config.atlasDataUrl)
+    fetch(config.superfamilyAtlasDataUrl)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.points?.length) setApiPoints(data.points) })
       .catch(() => {}) // fallback to generated points
@@ -205,9 +214,9 @@ export default function AtlasMap({ interactive = true, className = "" }) {
     if (e.pointerType !== "touch") e.currentTarget.releasePointerCapture?.(e.pointerId)
     dragRef.current = null
 
-    // Tap (no drag) — navigate to family page
-    if (drag && !drag.moved && hover?.point?.familyId != null) {
-      window.open(`/family/${hover.point.familyId}`, "_blank", "noopener,noreferrer")
+    // Tap (no drag) — open the full atlas focused on this point's CATH domain
+    if (drag && !drag.moved && hover?.point?.cathDomain) {
+      window.open(`/atlas?cath=${encodeURIComponent(hover.point.cathDomain)}`, "_blank", "noopener,noreferrer")
     }
   }
 
@@ -269,7 +278,7 @@ export default function AtlasMap({ interactive = true, className = "" }) {
       <canvas
         ref={canvasRef}
         className="block w-full h-full select-none"
-        style={{ cursor: interactive ? (dragRef.current ? "grabbing" : hover?.point?.familyId != null ? "pointer" : "grab") : "default", touchAction: "pan-y" }}
+        style={{ cursor: interactive ? (dragRef.current ? "grabbing" : hover?.point?.cathDomain ? "pointer" : "grab") : "default", touchAction: "pan-y" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -292,6 +301,9 @@ export default function AtlasMap({ interactive = true, className = "" }) {
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: hover.point.color }} />
               <span className="text-foreground">{hover.point.label}</span>
             </div>
+            {hover.point.superfamilyId != null && (
+              <div className="text-muted-foreground mt-0.5">Superfamily: {hover.point.superfamilyId}</div>
+            )}
             {hover.point.cathDomain != null && String(hover.point.cathDomain).trim() !== "" && (
               <div className="text-muted-foreground mt-0.5">CATH: {hover.point.cathDomain}</div>
             )}
@@ -299,30 +311,22 @@ export default function AtlasMap({ interactive = true, className = "" }) {
               <div className="text-muted-foreground mt-0.5">Component: {hover.point.component}</div>
             )}
             <div className="text-muted-foreground mt-0.5">
-              Family size:{" "}
-              {hover.point.familySize != null
-                ? Number(hover.point.familySize).toLocaleString()
+              Sequences:{" "}
+              {hover.point.nSequences != null
+                ? Number(hover.point.nSequences).toLocaleString()
                 : "—"}
             </div>
           </div>
-          <div className="pointer-events-auto mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-border/60 pt-2">
-            {hover.point.component != null && (
+          {hover.point.cathDomain && (
+            <div className="pointer-events-auto mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-border/60 pt-2">
               <a
-                href={cathDomainPathForComponent(hover.point.component)}
+                href={`/cath-domains?cath=${encodeURIComponent(hover.point.cathDomain)}`}
                 className="text-accent hover:text-accent-hover underline underline-offset-2"
               >
                 CATH domain page
               </a>
-            )}
-            {hover.point.familyId != null && (
-              <a
-                href={`/family/${hover.point.familyId}`}
-                className="text-accent hover:text-accent-hover underline underline-offset-2"
-              >
-                Family page
-              </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -35,6 +35,13 @@ const config = {
   atlasDataUrl:
     process.env.GATSBY_ATLAS_DATA_URL ||
     'https://petadex.s3.amazonaws.com/atlas/umap.json.gz',
+  // v260701 superfamily atlas (65,769 30 % identity centroids; UMAP + t-SNE of ESM-2 core
+  // embeddings), exported from the `superfamily_atlas` materialized view by
+  // `npm run export-superfamily-atlas`. Used by /atlas and the homepage hero. The legacy
+  // family atlas above stays for family pages and search results, which key on legacy family IDs.
+  superfamilyAtlasDataUrl:
+    process.env.GATSBY_SUPERFAMILY_ATLAS_DATA_URL ||
+    'https://petadex.s3.amazonaws.com/atlas/v260701/superfamilies.json.gz',
 };
 
 export default config;

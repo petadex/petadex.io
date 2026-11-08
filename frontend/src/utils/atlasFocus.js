@@ -69,7 +69,7 @@ export function hiddenForFocus(points, visibleComponents) {
  * @param {object} deckRef
  * @param {object} containerRef
  */
-export function fitDeckToPoints(points, deckRef, containerRef) {
+export function fitDeckToPoints(points, deckRef, containerRef, { duration = 800, easing } = {}) {
   if (!points.length || !deckRef?.current || !containerRef?.current) return
 
   const xs = points.map(p => p.umap_x)
@@ -88,7 +88,13 @@ export function fitDeckToPoints(points, deckRef, containerRef) {
   const zoom = Math.log2(Math.min(w / xRange, h / yRange))
 
   deckRef.current.setProps({
-    initialViewState: { target: [cx, cy, 0], zoom, transitionDuration: 800, _ts: Date.now() },
+    initialViewState: {
+      target: [cx, cy, 0],
+      zoom,
+      transitionDuration: duration,
+      ...(easing ? { transitionEasing: easing } : {}),
+      _ts: Date.now(),
+    },
   })
 }
 

@@ -55,8 +55,8 @@ function hashColor(str, alpha = 200) {
   return [...color, alpha]
 }
 
-// Superfamily atlas (v260701): PETadex source colours, and a per-layout radius scale so a
-// layout with a wider coordinate range (t-SNE) draws points at the same apparent size as UMAP.
+// Superfamily atlas (v260701): PETadex source colours, and a per-layout radius scale (1 for
+// every layout once normalizeLayouts has put them all in one coordinate frame).
 const SOURCE_COLORS = {
   logan: [103, 154, 121, 220],
   nr:    [157,  94, 145, 220],
@@ -64,18 +64,49 @@ const SOURCE_COLORS = {
 }
 const SOURCE_LABELS = { logan: "Logan", nr: "NCBI nr", pazy: "PAZy" }
 let radiusScale = 1
+// Which layout's coordinates are in umap_x / umap_y. applyLayout rewrites the points in place,
+// so the data array keeps its identity; this key goes in the layer's updateTriggers so deck.gl
+// recomputes positions and radii on a switch instead of reusing its cached UMAP attributes.
+let currentLayout = "umap"
 
 const compareComponents = (a, b) =>
   typeof a === "number" && typeof b === "number"
     ? a - b
     : String(a).localeCompare(String(b), undefined, { numeric: true })
 
-/** 1st-99th percentile span of a coordinate list (robust to stray points). */
-function robustSpan(values) {
+/** 1st/99th percentile bounds of a coordinate list (robust to stray points). */
+function robustBounds(values) {
   const v = [...values].sort((a, b) => a - b)
   const q = f => v[Math.min(v.length - 1, Math.max(0, Math.round(f * (v.length - 1))))]
-  return (q(0.99) - q(0.01)) || 1
+  return [q(0.01), q(0.99)]
 }
+
+/**
+ * Rescale every layout into the reference layout's frame: same centre, same overall span, one
+ * uniform scale per layout so its shape is not distorted. With every layout in one frame a
+ * switch barely moves the camera, the points can tween between positions, and every layout
+ * draws at the same point size.
+ */
+function normalizeLayouts(points, layoutKeys) {
+  const frame = key => {
+    const [x0, x1] = robustBounds(points.map(p => p._xy[key][0]))
+    const [y0, y1] = robustBounds(points.map(p => p._xy[key][1]))
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, span: Math.max(x1 - x0, y1 - y0) || 1 }
+  }
+  const ref = frame(layoutKeys[0])
+  for (const key of layoutKeys.slice(1)) {
+    const f = frame(key)
+    const s = ref.span / f.span
+    for (const p of points) {
+      const [x, y] = p._xy[key]
+      p._xy[key] = [ref.cx + (x - f.cx) * s, ref.cy + (y - f.cy) * s]
+    }
+  }
+}
+
+// Layout switch animation: points tween between layouts while the camera refits on the same clock.
+const LAYOUT_TRANSITION_MS = 900
+const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
 /** Copy the chosen layout's coordinates into umap_x / umap_y (the fields every map helper reads). */
 function applyLayout(points, layout, scales) {
@@ -84,6 +115,7 @@ function applyLayout(points, layout, scales) {
     if (xy) { p.umap_x = xy[0]; p.umap_y = xy[1] }
   }
   radiusScale = scales?.[layout] ?? 1
+  currentLayout = layout
 }
 
 const HIDDEN_COLOR = [30, 41, 59, 40]
@@ -256,8 +288,15 @@ function buildScatterLayer(points, maxSize, ScatterplotLayer, colorBy, hidden, h
     },
     radiusMinPixels: 2,
     radiusMaxPixels: 12,
+    // Only position changes are animated: getPosition recomputes only when the layout changes
+    // (updateTriggers), so this fires on a layout switch and never on recolour or filtering.
+    transitions: { getPosition: { duration: LAYOUT_TRANSITION_MS, easing: easeInOutCubic } },
     getFillColor: d => getPointColor(d, colorBy, hidden, highlightFamilyId, highlightFamilyIds),
-    updateTriggers: { getFillColor: [colorBy, ...hidden, highlightFamilyId, highlightFamilyIds] },
+    updateTriggers: {
+      getPosition: [currentLayout],
+      getRadius: [currentLayout, radiusScale, highlightFamilyIds],
+      getFillColor: [colorBy, ...hidden, highlightFamilyId, highlightFamilyIds],
+    },
     pickable: true,
   })
 }
@@ -621,11 +660,18 @@ const AtlasMap = ({
     })
     const hp = highlightFamilyId != null ? points.find(p => p.family_id === highlightFamilyId) : null
     highlightPosRef.current = hp ? [hp.umap_x, hp.umap_y, 0] : null
-    if (hasAtlasFocus) fitToAtlasFocus()
-    else fitDeckToPoints(points, deckRef, containerRef)
-    requestAnimationFrame(projectHighlight)
-    setTimeout(() => requestAnimationFrame(projectHighlight), 700)
-  }, [superfamilyMode, layout, hidden, highlightFamilyId, highlightFamilyIds, hasAtlasFocus, fitToAtlasFocus, projectHighlight])
+    // camera refits on the same clock as the point tween, so the two read as one motion
+    const transition = { duration: LAYOUT_TRANSITION_MS, easing: easeInOutCubic }
+    if (hasAtlasFocus) {
+      const visible = resolveVisibleComponents(points, focusComponent, focusCathDomain)
+      fitDeckToPoints(visible ? filterPointsByComponents(points, visible) : points, deckRef, containerRef, transition)
+    } else {
+      fitDeckToPoints(points, deckRef, containerRef, transition)
+    }
+    // the highlight ripple marks a fixed screen spot, so hide it while points are moving
+    setRipplePos(null)
+    setTimeout(() => requestAnimationFrame(projectHighlight), LAYOUT_TRANSITION_MS + 50)
+  }, [superfamilyMode, layout, hidden, highlightFamilyId, highlightFamilyIds, hasAtlasFocus, focusComponent, focusCathDomain, projectHighlight])
 
   // ── mobile detection ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -673,15 +719,15 @@ const AtlasMap = ({
             p.family_size = p.n_enzyme_clusters
             p._xy = Object.fromEntries(layoutList.map(l => [l.layout, [p[`${l.layout}_x`], p[`${l.layout}_y`]]]))
           }
-          const ref = robustSpan(points.map(p => p._xy[layoutList[0].layout][0]))
-          layoutScalesRef.current = Object.fromEntries(
-            layoutList.map(l => [l.layout, robustSpan(points.map(p => p._xy[l.layout][0])) / ref]),
-          )
+          // every layout shares one frame after this, so no per-layout radius scale is needed
+          normalizeLayouts(points, layoutList.map(l => l.layout))
+          layoutScalesRef.current = Object.fromEntries(layoutList.map(l => [l.layout, 1]))
           applyLayout(points, layoutList[0].layout, layoutScalesRef.current)
           setLayouts(layoutList)
           setLayoutState(layoutList[0].layout)
         } else {
           radiusScale = 1
+          currentLayout = "umap"
         }
 
         const { Deck, OrthographicView } = await import("@deck.gl/core")

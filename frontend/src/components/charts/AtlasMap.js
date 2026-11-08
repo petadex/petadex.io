@@ -104,6 +104,13 @@ function normalizeLayouts(points, layoutKeys) {
   }
 }
 
+// The superfamily atlas opens on this layout when the payload has it (else the first one listed).
+const DEFAULT_LAYOUT = "tsne"
+
+// Cold-start timing: performance marks per load stage, readable from DevTools or a benchmark
+// via performance.getEntriesByName("atlas:*"). Marks are free, so they stay on in production.
+const mark = name => { try { performance.mark(`atlas:${name}`) } catch { /* no Performance API */ } }
+
 // Layout switch animation: points tween between layouts while the camera refits on the same clock.
 const LAYOUT_TRANSITION_MS = 900
 const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -684,6 +691,7 @@ const AtlasMap = ({
   // ── initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
     let initialized = false
+    let firstFrameMarked = false
 
     async function init() {
       if (initialized) return
@@ -702,13 +710,16 @@ const AtlasMap = ({
             ? config.superfamilyAtlasDataUrl
             : config.atlasDataUrl
         let res
+        mark("fetch-start")
         try {
           res = await fetch(endpoint, { signal: controller.signal })
         } finally {
           clearTimeout(timeoutId)
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        mark("response")
         const payload = await res.json()
+        mark("parsed")
         const { points } = payload
 
         if (superfamilyMode) {
@@ -722,17 +733,20 @@ const AtlasMap = ({
           // every layout shares one frame after this, so no per-layout radius scale is needed
           normalizeLayouts(points, layoutList.map(l => l.layout))
           layoutScalesRef.current = Object.fromEntries(layoutList.map(l => [l.layout, 1]))
-          applyLayout(points, layoutList[0].layout, layoutScalesRef.current)
+          const initialLayout = layoutList.some(l => l.layout === DEFAULT_LAYOUT) ? DEFAULT_LAYOUT : layoutList[0].layout
+          applyLayout(points, initialLayout, layoutScalesRef.current)
           setLayouts(layoutList)
-          setLayoutState(layoutList[0].layout)
+          setLayoutState(initialLayout)
         } else {
           radiusScale = 1
           currentLayout = "umap"
         }
+        mark("prepared")
 
         const { Deck, OrthographicView } = await import("@deck.gl/core")
         const { ScatterplotLayer }       = await import("@deck.gl/layers")
         LayerRef.current = ScatterplotLayer
+        mark("deck-loaded")
 
         if (!containerRef.current) return
 
@@ -777,6 +791,9 @@ const AtlasMap = ({
           },
           getCursor: ({ isHovering }) => isHovering ? "pointer" : "grab",
           onViewStateChange: () => { requestAnimationFrame(projectHighlight) },
+          onAfterRender: () => {
+            if (!firstFrameMarked) { firstFrameMarked = true; mark("first-frame") }
+          },
         })
 
         deckRef.current = deck
@@ -1475,7 +1492,10 @@ const AtlasMap = ({
       <TerminalLoader
         loading={loading}
         title="ENZYME ATLAS v2.0"
-        lines={["initializing enzyme atlas...", "loading 64,730 protein families..."]}
+        lines={[
+          "initializing enzyme atlas...",
+          superfamilyMode ? "loading 65,769 superfamilies..." : "loading 64,730 protein families...",
+        ]}
       />
 
       {/* error */}

@@ -16,10 +16,15 @@ export const LOADING_PROMPTS = [
 const TerminalLoader = ({ loading, title, lines = [] }) => {
   const [visible,  setVisible]  = useState(loading)
   const [fading,   setFading]   = useState(false)
-  const [promptIdx, setPromptIdx] = useState(() => Math.floor(Math.random() * LOADING_PROMPTS.length))
+  // The first render must match the server-rendered HTML, so it always starts on prompt 0;
+  // a random start is picked after mount. (Picking it with Math.random() in the initial state
+  // made the server and the browser disagree ~9 times in 10, which failed React hydration and
+  // forced a full client re-render of the page.)
+  const [promptIdx, setPromptIdx] = useState(0)
   const [progress,  setProgress]  = useState(0)
 
   useEffect(() => {
+    setPromptIdx(Math.floor(Math.random() * LOADING_PROMPTS.length))
     const interval = setInterval(() => {
       setPromptIdx(i => (i + 1) % LOADING_PROMPTS.length)
     }, 2500)

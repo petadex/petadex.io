@@ -83,7 +83,9 @@ export async function fetchMemberRange(rankStart, offset, limit) {
   const out = []
   for (let b = Math.floor(start / MEMBER_BLOCK); b * MEMBER_BLOCK < end; b++) {
     const text = await readGzObject(`members/${b}.tsv.gz`)
-    if (!text) break
+    // Every rank below the release's sequence count lies in some block, so a missing block is a store fault,
+    // not an empty cluster.
+    if (!text) throw Object.assign(new Error(`member block ${b} missing from the store`), { code: 'STORE_MISSING' })
     const lines = text.split('\n')
     const lo = Math.max(start, b * MEMBER_BLOCK) - b * MEMBER_BLOCK
     const hi = Math.min(end, (b + 1) * MEMBER_BLOCK) - b * MEMBER_BLOCK

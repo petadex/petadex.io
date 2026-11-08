@@ -18,7 +18,7 @@ const router = Router();
 const LEGACY_TABLES = { 90: 'block_90pid', 60: 'block_60pid', 30: 'block_30pid' };
 const levelSchema = Joi.number().integer().valid(90, 60, 30).required();
 const legacyIdSchema = Joi.number().integer().positive().required();
-const unavailable = err => err?.code === '42P01' || err?.code === '3F000';
+const unavailable = err => err?.code === '42P01' || err?.code === '3F000' || err?.code === 'STORE_MISSING';
 
 function parseLevel(req, res) {
   const { error, value } = levelSchema.validate(req.params.level);

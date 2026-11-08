@@ -83,6 +83,14 @@ function Summary({ level, row }) {
   )
 }
 
+// "a; b; a; c" -> "a, b, c" (unique, in order), capped at `max` with a count of the rest.
+function listText(v, max) {
+  if (!v) return null
+  const items = [...new Set(String(v).split(";").map(x => x.trim()).filter(Boolean))]
+  const head = items.slice(0, max).join(", ")
+  return items.length > max ? `${head} … and ${items.length - max} more` : head
+}
+
 function Samples({ row }) {
   if (row.t3_n_biosamples == null && row.t2_n_species == null && !row.t1_enzymes) return null
   let hist = row.t3_prof_hist
@@ -103,8 +111,8 @@ function Samples({ row }) {
         ["Species (nr members)", fmtInt(row.t2_n_species)],
         ["Genera (nr members)", fmtInt(row.t2_n_genera)],
         ["Most common phylum (nr members)", row.t2_phylum_mode],
-        ["Plasticome enzymes", row.t1_enzymes],
-        ["Plasticome substrates", row.t1_substrates],
+        ["Plasticome enzymes", listText(row.t1_enzymes, 25)],
+        ["Plasticome substrates", listText(row.t1_substrates, 25)],
       ]} />
       {hist && Object.keys(hist).length > 0 && (
         <div className="mt-5">

@@ -318,13 +318,16 @@ function superfamilyRows(o) {
   ].filter(Boolean)
 }
 
+const escapeHtml = v =>
+  String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
+
 function rowsToHtml(rows) {
   return rows
     .map(
       ([k, v]) =>
         `<div style="display:flex;gap:8px;margin-top:3px">
-           <span style="color:#94a3b8;min-width:72px">${k}</span>
-           <span style="color:#f1f5f9;word-break:break-word">${v}</span>
+           <span style="color:#94a3b8;min-width:72px">${escapeHtml(k)}</span>
+           <span style="color:#f1f5f9;word-break:break-word">${escapeHtml(v)}</span>
          </div>`
     )
     .join("")
@@ -472,6 +475,8 @@ const AtlasMap = ({
   const [layouts, setLayouts]     = useState([])   // superfamily mode: [{layout,label,embedding,parameters,...}]
 
   const highlightPosRef = useRef(null)   // world [x, y] of highlighted point
+  // set while a layout switch is tweening: the ring and pinned panel stay hidden until the points land
+  const layoutTweenTimerRef = useRef(null)
 
   const [loading,              setLoading]              = useState(true)
   const [error,                setError]                = useState(null)
@@ -598,7 +603,8 @@ const AtlasMap = ({
   }, [searchMatches, searchMatchIdx, zoomToPoint, hidden, highlightFamilyIds])
 
   const projectHighlight = useCallback(() => {
-    if (!deckRef.current) return
+    // camera transition frames call this too (onViewStateChange); skip them while points are moving
+    if (!deckRef.current || layoutTweenTimerRef.current) return
     const viewports = deckRef.current.getViewports()
     if (!viewports || !viewports.length) return
     const vp = viewports[0]
@@ -670,7 +676,11 @@ const AtlasMap = ({
     }
     // the highlight ripple marks a fixed screen spot, so hide it while points are moving
     setRipplePos(null)
-    setTimeout(() => requestAnimationFrame(projectHighlight), LAYOUT_TRANSITION_MS + 50)
+    clearTimeout(layoutTweenTimerRef.current)
+    layoutTweenTimerRef.current = setTimeout(() => {
+      layoutTweenTimerRef.current = null
+      requestAnimationFrame(projectHighlight)
+    }, LAYOUT_TRANSITION_MS + 50)
   }, [superfamilyMode, layout, hidden, highlightFamilyId, highlightFamilyIds, hasAtlasFocus, focusComponent, focusCathDomain, projectHighlight])
 
   // ── mobile detection ─────────────────────────────────────────────────────
@@ -804,6 +814,7 @@ const AtlasMap = ({
 
     return () => {
       ro.disconnect()
+      clearTimeout(layoutTweenTimerRef.current)
       if (deckRef.current) { deckRef.current.finalize(); deckRef.current = null }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

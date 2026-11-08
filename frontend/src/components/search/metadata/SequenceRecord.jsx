@@ -51,13 +51,23 @@ function AlignmentFields({ hit }) {
         {hit.card && (hit.card.c90 || hit.card.c60 || hit.card.c30) ? (
           <span className="font-mono">
             {[
-              ["c90", "90 %"],
-              ["c60", "60 %"],
-              ["c30", "30 %"],
+              ["c90", "90 %", 90],
+              ["c60", "60 %", 60],
+              ["c30", "30 %", 30],
             ]
               .filter(([k]) => hit.card[k])
-              .map(([k, l]) => `${clusterLabel(hit.card[k])} (${l})`)
-              .join(" · ")}
+              .map(([k, l, lvl], i) => (
+                <React.Fragment key={k}>
+                  {i > 0 && " · "}
+                  <a
+                    href={`/cluster/${lvl}/${encodeURIComponent(clusterLabel(hit.card[k]))}`}
+                    className="text-info hover:underline"
+                  >
+                    {clusterLabel(hit.card[k])}
+                  </a>{" "}
+                  ({l})
+                </React.Fragment>
+              ))}
           </span>
         ) : null}
       </Field>

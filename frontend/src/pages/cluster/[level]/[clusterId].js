@@ -14,10 +14,20 @@ import Seo from "../../../components/seo"
 import Container from "../../../components/common/Container"
 import config from "../../../config"
 import ClusterProfilesPanel from "../../../components/annotation/ClusterProfilesPanel"
+import ClusterView from "../../../components/v260701/ClusterView.jsx"
+import { isPetadexId } from "../../../components/v260701/common"
 
 const VALID_LEVELS = new Set(["90", "60", "30"])
 
+// v260701 clusters are named after their centroid (PL… / NR… / LG…); integer ids are v1.1 blocks (legacy links).
 export default function ClusterPage({ params }) {
+  if (isPetadexId(String(params.clusterId || "").toUpperCase())) {
+    return <ClusterView level={params.level} clusterId={params.clusterId} />
+  }
+  return <LegacyClusterPage params={params} />
+}
+
+function LegacyClusterPage({ params }) {
   const { level, clusterId } = params
   const [block, setBlock] = useState(null)
   const [status, setStatus] = useState("loading") // loading | ready | notfound | error
@@ -160,6 +170,11 @@ export default function ClusterPage({ params }) {
   )
 }
 
-export const Head = () => (
-  <Seo title="Cluster Block" description="PETadex cluster block" />
-)
+export const Head = ({ params }) => {
+  const id = String(params?.clusterId || "").toUpperCase()
+  return isPetadexId(id) ? (
+    <Seo title={`${id} (${params.level} %) - PETadex cluster`} description={`PETadex v260701 ${params.level} % identity cluster ${id}: members, sub-clusters, organisms and sample categories.`} />
+  ) : (
+    <Seo title="Cluster Block" description="PETadex cluster block" />
+  )
+}

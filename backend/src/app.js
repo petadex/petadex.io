@@ -28,6 +28,7 @@ import orfRoutes from './routes/orf.js';
 import kineticsRoutes from './routes/kinetics.js';
 import annotationRoutes from './routes/annotation.js';
 import sequenceSamplesRoutes from './routes/sequenceSamples.js';
+import { sequenceRouter as petadexSequenceRoutes, lookupRouter } from './routes/petadexSequence.js';
 import { searchSamplesRoutes, searchAlignRoutes } from './routes/searchRelays.js';
 import { pool } from './db.js';
 
@@ -77,6 +78,9 @@ app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
 // Found in Samples: per-sequence BioSample list from the v260701 metadata store,
 // via the search orchestrator's `samples` action.
+// v260701 sequence page (PL…/NR…/LG… ids; other ids fall through to the samples relay below).
+app.use('/api/sequence', petadexSequenceRoutes);
+app.use('/api/lookup', lookupRouter);
 app.use('/api/sequence', sequenceSamplesRoutes);
 app.use('/api/search/samples', searchSamplesRoutes);
 app.use('/api/search/align', searchAlignRoutes);

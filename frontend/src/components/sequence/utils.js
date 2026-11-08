@@ -51,7 +51,7 @@ export const RulerRow = React.memo(({ startIdx, count, slotsPerLine }) => {
   }
 
   return (
-    <div className={`grid gap-0.5 px-1.5 justify-items-center`} style={{"grid-template-columns": `repeat(${slotsPerLine}, 1fr)`}} >
+    <div className={`grid gap-0.5 px-1.5 justify-items-center`} style={{ gridTemplateColumns: `repeat(${slotsPerLine}, 1fr)` }} >
       {ticks.map((tick, i) => (
         <span
           key={i}

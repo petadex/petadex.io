@@ -28,12 +28,14 @@ const MATCH_TYPE_META = {
     className: "bg-info/10 text-info",
   },
   library_id: { label: "SRA library", className: "bg-warning/10 text-warning" },
+  petadex_id: { label: "PETadex ID", className: "bg-info/10 text-info" },
 }
 
 // Returns the predicted match_type for a raw query, or null if empty/ambiguous.
 function predictType(raw) {
   const q = raw.trim()
   if (!q) return null
+  if (/^(PL|NR|LG)[1-9]\d*$/i.test(q)) return "petadex_id"
   if (/^\d+$/.test(q)) return "orf_id"
   if (/^[SED]R[RXSAP]\d+$/i.test(q)) return "library_id"
   return "genbank_acc"
@@ -283,11 +285,37 @@ const SuggestionsList = ({ suggestions, query, onPick }) => (
 // ── IdentifierResolver ──────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
+// v260701 matches (GET /api/lookup): a petadex_id, or the PETadex ids carrying a GenBank accession.
+const V260701Result = ({ result }) => {
+  if (!result?.matches?.length) return null
+  return (
+    <div className="card text-left p-5 mb-4">
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <TypeBadge type="petadex_id" />
+        <span className="text-sm text-muted-foreground">PETadex v260701</span>
+      </div>
+      <ul className="m-0 pl-0 list-none space-y-1.5">
+        {result.matches.map(m => (
+          <li key={m.petadex_id} className="text-sm">
+            <Link to={`/sequence/${m.petadex_id}`} className="font-mono text-info hover:underline">
+              {m.petadex_id}
+            </Link>
+            {m.accession && (
+              <span className="text-muted-foreground"> · carries <span className="font-mono">{m.accession}</span></span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 const DEBOUNCE_MS = 280
 
 const IdentifierResolver = () => {
   const [query, setQuery] = useState("")
   const [result, setResult] = useState(null) // resolver payload or { result_kind: 'none' }
+  const [v2, setV2] = useState(null) // v260701 lookup payload
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
@@ -303,6 +331,13 @@ const IdentifierResolver = () => {
     setLoading(true)
     setError(null)
     setResult(null)
+    setV2(null)
+    fetch(`${config.apiUrl}/lookup?q=${encodeURIComponent(q)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (reqId === reqIdRef.current) setV2(d)
+      })
+      .catch(() => {})
     try {
       const res = await fetch(
         `${config.apiUrl}/resolve?q=${encodeURIComponent(
@@ -333,6 +368,7 @@ const IdentifierResolver = () => {
     if (!value.trim()) {
       reqIdRef.current++ // invalidate any in-flight response
       setResult(null)
+      setV2(null)
       setError(null)
       setLoading(false)
       return
@@ -422,6 +458,8 @@ const IdentifierResolver = () => {
             {error}
           </div>
         )}
+
+        <V260701Result result={v2} />
 
         {!error && result && result.result_kind === "single" && (
           <SingleResult result={result} />

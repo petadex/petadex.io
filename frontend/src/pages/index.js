@@ -36,7 +36,7 @@ function Hero() {
               <br />
               Pan-Genomic Atlas of
               <br />
-              <span className="text-accent">Plastic-Degrading Enzymes</span>
+              <span className="text-accent">Plastic-Degrading<br />Enzymes</span>
             </h1>
             <p className="mt-5 text-base text-muted-foreground max-w-120 leading-relaxed">
               298.7 million sequences. 3.2 million families in 65,769 superfamilies. 189 enzymes with measured activity. One interface to

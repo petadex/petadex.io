@@ -7,6 +7,12 @@ import ActivityView from "../components/halo-assay/ActivityView"
 
 const TABS = [
   {
+    key: "activity",
+    label: "Activity",
+    blurb: "How they performed in the assay",
+    long: "Halo assay readouts: median pixel intensity over time on BHET agar at 12.5 and 25 mM substrate concentrations.",
+  },
+  {
     key: "origins",
     label: "Origins",
     blurb: "Where samples were collected",
@@ -18,18 +24,12 @@ const TABS = [
     blurb: "What enzymes were cataloged",
     long: "Amino acid sequences in the catalog. Those flagged as “synthesized” have been cloned into expression hosts and tested in the halo assay.",
   },
-  {
-    key: "activity",
-    label: "Activity",
-    blurb: "How they performed in the assay",
-    long: "Halo assay readouts: median pixel intensity over time on BHET agar at 12.5 and 25 mM substrate concentrations.",
-  },
 ]
 
 const isValidTab = key => TABS.some(t => t.key === key)
 
 const HaloAssayPage = ({ location }) => {
-  const [activeTab, setActiveTab] = useState("origins")
+  const [activeTab, setActiveTab] = useState("activity")
   const [headerHidden, setHeaderHidden] = useState(false)
 
   useEffect(() => {

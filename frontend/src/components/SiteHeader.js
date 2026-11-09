@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { Link } from "gatsby"
 import { useTheme } from "../context/ThemeContext"
 import { ACTIVITY_LINKS } from "../data/activityLinks"
+import wordmark from "../images/petadex-wordmark.svg"
 
 const NAV_ITEMS = [
   {
@@ -173,7 +174,7 @@ const SiteHeader = () => {
         <div className="flex items-center justify-between p-3 border-b border-sidebar-border">
           <Link to="/" onClick={closeMobileMenu}>
             <img
-              src={require("../images/petadex-icon.png").default}
+              src={wordmark}
               alt="PETadex"
               className="h-8 w-auto dark:invert"
             />
@@ -239,7 +240,7 @@ const SiteHeader = () => {
           {/* Logo */}
           <Link to="/" aria-label="PETadex Home" className="shrink-0">
             <img
-              src={require("../images/petadex-icon.png").default}
+              src={wordmark}
               alt="PETadex"
               className="h-8 w-auto dark:invert"
             />

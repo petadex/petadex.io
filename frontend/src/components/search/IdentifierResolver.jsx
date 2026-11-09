@@ -15,7 +15,7 @@
 // opens the matched ORF's own sequence page (/sequence/orf/{orf_id}); a secondary
 // action opens its 90% cluster block (/cluster/90/{c90_id}). Library ORFs link to
 // the same corpus sequence page (NOT the curated /enzyme/${id} route).
-import React, { useState, useMemo, useRef, useEffect } from "react"
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { Link } from "gatsby"
 import config from "../../config"
 
@@ -29,6 +29,7 @@ const MATCH_TYPE_META = {
   },
   library_id: { label: "SRA library", className: "bg-warning/10 text-warning" },
   petadex_id: { label: "PETadex ID", className: "bg-info/10 text-info" },
+  biosample: { label: "BioSample", className: "bg-warning/10 text-warning" },
 }
 
 // Returns the predicted match_type for a raw query, or null if empty/ambiguous.
@@ -36,6 +37,7 @@ function predictType(raw) {
   const q = raw.trim()
   if (!q) return null
   if (/^(PL|NR|LG)[1-9]\d*$/i.test(q)) return "petadex_id"
+  if (/^(SAMN|SAMEA|SAMD)\d+$/i.test(q)) return "biosample"
   if (/^\d+$/.test(q)) return "orf_id"
   if (/^[SED]R[RXSAP]\d+$/i.test(q)) return "library_id"
   return "genbank_acc"
@@ -285,9 +287,83 @@ const SuggestionsList = ({ suggestions, query, onPick }) => (
 // ── IdentifierResolver ──────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
-// v260701 matches (GET /api/lookup): a petadex_id, or the PETadex ids carrying a GenBank accession.
+// v260701 matches (GET /api/lookup): a petadex_id, the PETadex ids carrying a GenBank accession, or the Logan
+// sequences assembled from a run / BioSample.
+const RunLgList = ({ run, total }) => {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const load = useCallback(
+    async offset => {
+      setLoading(true)
+      try {
+        const r = await fetch(`${config.apiUrl}/runs/${encodeURIComponent(run)}/lgs?offset=${offset}&limit=${PAGE_SIZE}`)
+        if (r.ok) {
+          const d = await r.json()
+          setRows(prev => (offset === 0 ? d.sequences : [...prev, ...d.sequences]))
+        }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [run]
+  )
+  useEffect(() => {
+    setRows([])
+    load(0)
+  }, [load])
+  return (
+    <>
+      <ul className="m-0 pl-0 list-none grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
+        {rows.map(m => (
+          <li key={m.id} className="text-sm">
+            <Link to={`/sequence/${m.id}`} className="font-mono text-info hover:underline">
+              {m.id}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3 flex items-center gap-3 text-sm">
+        <span className="text-muted-foreground">
+          {rows.length.toLocaleString()} of {total.toLocaleString()} shown, highest contig k-mer abundance first
+        </span>
+        {rows.length < total && (
+          <button className="btn btn-secondary" disabled={loading} onClick={() => load(rows.length)}>
+            {loading ? "Loading…" : `Load ${PAGE_SIZE} more`}
+          </button>
+        )}
+      </div>
+    </>
+  )
+}
+
 const V260701Result = ({ result }) => {
-  if (!result?.matches?.length) return null
+  if (!result || result.kind === "none") return null
+  if (result.kind === "run" || result.kind === "biosample") {
+    const isRun = result.kind === "run"
+    return (
+      <div className="card text-left p-5 mb-4">
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <TypeBadge type={isRun ? "library_id" : "biosample"} />
+          <span className="text-sm text-muted-foreground">PETadex v260701</span>
+        </div>
+        <p className="text-sm m-0 mb-3">
+          <span className="font-mono">{result.accession}</span>:{" "}
+          {result.n_lg.toLocaleString()} Logan sequence{result.n_lg === 1 ? "" : "s"} assembled from{" "}
+          {isRun ? "this run" : "this BioSample's runs"}.
+          {!isRun && (
+            <>
+              {" "}
+              <Link to={`/biosample/${result.accession}`} className="text-info hover:underline">
+                Open the BioSample page
+              </Link>
+            </>
+          )}
+        </p>
+        {isRun && <RunLgList run={result.accession} total={result.n_lg} />}
+      </div>
+    )
+  }
+  if (!result.matches?.length) return null
   return (
     <div className="card text-left p-5 mb-4">
       <div className="flex items-center gap-3 mb-3 flex-wrap">
@@ -323,6 +399,7 @@ const IdentifierResolver = () => {
   const debounceRef = useRef(null)
 
   const predicted = useMemo(() => predictType(query), [query])
+  const v2Hit = !!v2 && v2.kind !== "none"
 
   const performResolve = async rawQ => {
     const q = (rawQ ?? "").trim()
@@ -433,7 +510,7 @@ const IdentifierResolver = () => {
             type="text"
             value={query}
             onChange={e => handleChange(e.target.value)}
-            placeholder="Search an ORF ID, GenBank accession, or SRA library…"
+            placeholder="Search a PETadex ID, GenBank accession, SRA run or BioSample…"
             className="input"
             aria-label="Identifier to resolve"
           />
@@ -461,11 +538,12 @@ const IdentifierResolver = () => {
 
         <V260701Result result={v2} />
 
-        {!error && result && result.result_kind === "single" && (
+        {/* The previous release (v1.1) answers only when v260701 has no match, so one query never shows both. */}
+        {!error && !v2Hit && result && result.result_kind === "single" && (
           <SingleResult result={result} />
         )}
 
-        {!error && result && result.result_kind === "list" && (
+        {!error && !v2Hit && result && result.result_kind === "list" && (
           <ListResult
             result={result}
             onLoadMore={loadMore}
@@ -481,12 +559,12 @@ const IdentifierResolver = () => {
           />
         )}
 
-        {!error && result && result.result_kind === "none" && (
+        {!error && !v2Hit && result && result.result_kind === "none" && (
           <p className="text-muted-foreground text-sm">
-            No match for &quot;{result.query}&quot;. Try part of an ORF ID,
-            GenBank accession (e.g.{" "}
-            <span className="font-mono">WP_054022242</span>), or SRA library
-            (e.g. <span className="font-mono">ERR4800418</span>).
+            No match for &quot;{result.query}&quot;. Try a PETadex ID (e.g.{" "}
+            <span className="font-mono">PL1</span>), a GenBank accession (e.g.{" "}
+            <span className="font-mono">WP_054022242.1</span>), an SRA run (e.g.{" "}
+            <span className="font-mono">SRR18079661</span>) or a BioSample.
           </p>
         )}
       </div>

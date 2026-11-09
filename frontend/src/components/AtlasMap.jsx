@@ -66,14 +66,16 @@ function normalizeApiPoints(apiPoints) {
   const byFold = new Map()
   for (const p of apiPoints) byFold.set(p.cath_fold, (byFold.get(p.cath_fold) || 0) + 1)
   ;[...byFold.entries()].sort((a, b) => b[1] - a[1]).forEach(([f]) => colorForFold(f))
-  const xs = apiPoints.map(p => p.umap_x)
-  const ys = apiPoints.map(p => p.umap_y)
+  // The hero shows the t-SNE layout (same default as /atlas); UMAP if the payload has no t-SNE.
+  const key = apiPoints.every(p => p.tsne_x != null && p.tsne_y != null) ? "tsne" : "umap"
+  const xs = apiPoints.map(p => p[`${key}_x`])
+  const ys = apiPoints.map(p => p[`${key}_y`])
   const minX = Math.min(...xs), maxX = Math.max(...xs)
   const minY = Math.min(...ys), maxY = Math.max(...ys)
   const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1
   return apiPoints.map(p => ({
-    x: ((p.umap_x - minX) / rangeX - 0.5) * 0.9,
-    y: ((p.umap_y - minY) / rangeY - 0.5) * 0.9,
+    x: ((p[`${key}_x`] - minX) / rangeX - 0.5) * 0.9,
+    y: ((p[`${key}_y`] - minY) / rangeY - 0.5) * 0.9,
     color: colorForFold(p.cath_fold),
     label: p.domain_name || p.cath_fold,
     // n 90 % enzyme clusters per superfamily, on the hero's 1-25 size scale

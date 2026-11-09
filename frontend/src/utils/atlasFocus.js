@@ -20,13 +20,24 @@ export function parseAtlasQuery(search) {
 
 /**
  * @param {{ component?: number|null, cath_domain?: string|null }[]} points
- * @param {number|null} focusComponent
+ * @param {number|string|null} focusComponent
  * @param {string|null} focusCathDomain
  * @returns {Set<string>|null} visible component keys, or null when no focus
  */
 export function resolveVisibleComponents(points, focusComponent, focusCathDomain) {
   if (focusComponent != null) {
-    return new Set([String(focusComponent)])
+    const key = String(focusComponent)
+    // a bare v260701 label (C014) also covers its subcomponents (C014-1, C014-2, ...);
+    // some components exist only as subcomponents
+    if (/^C\d{3}$/.test(key)) {
+      const visible = new Set()
+      for (const p of points) {
+        const c = p.component == null ? null : String(p.component)
+        if (c === key || c?.startsWith(`${key}-`)) visible.add(c)
+      }
+      if (visible.size) return visible
+    }
+    return new Set([key])
   }
   if (!focusCathDomain) return null
 

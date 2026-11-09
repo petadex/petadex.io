@@ -1,6 +1,6 @@
 # PETadex API - Database Dependencies
 
-**Auto-generated**: 2026-11-02
+**Auto-generated**: 2026-11-09
 **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
 
 ---
@@ -22,6 +22,8 @@
 | `/api/atlas/umap` | GET | None |
 | `/api/atlas/components` | GET | None |
 | `/api/cluster/:level/:clusterId` | GET | None |
+| `/api/cluster/:level/:clusterId/members` | GET | None |
+| `/api/cluster/:level/:clusterId/children` | GET | None |
 | `/api/enzymes/` | GET | None |
 | `/api/enzymes/search` | GET | enzyme_taxonomy, family_stats, enzyme_fastaa |
 | `/api/enzymes/:enzyme_id` | GET | enzyme_fastaa, enzyme_taxonomy |
@@ -216,6 +218,22 @@ Base: `/api/cluster`
 SELECT * FROM ${table} WHERE cluster_id = $1 LIMIT 1
 ```
 </details>
+
+---
+
+### GET `/api/cluster/:level/:clusterId/members`
+
+**Parameters**: `level`, `clusterId`
+
+**Tables**: None
+
+---
+
+### GET `/api/cluster/:level/:clusterId/children`
+
+**Parameters**: `level`, `clusterId`
+
+**Tables**: None
 
 ---
 
@@ -1099,6 +1117,14 @@ Base: `/api/petadex-domains`
 
 ---
 
+## PetadexSequence Routes
+
+Base: `/api/petadex-sequence`
+
+## PetadexSequence.test Routes
+
+Base: `/api/petadex-sequence.test`
+
 ## PlateData Routes
 
 Base: `/api/plate-data`
@@ -1438,6 +1464,14 @@ Base: `/api/sequence-samples`
 ## SequenceSamples.test Routes
 
 Base: `/api/sequence-samples.test`
+
+## V260701Links Routes
+
+Base: `/api/v260701-links`
+
+## V260701Links.test Routes
+
+Base: `/api/v260701-links.test`
 
 ---
 

@@ -147,7 +147,7 @@ export default function SequenceViewer({
     setIsExternalHighlight(false)
   }
 
-  const fastaHeader = header?.trim() || "sequence"
+  const fastaHeader = String(header ?? "").trim() || "sequence"
 
   // ── External (controlled) highlight ─────────────────────────────────────────
   // Drive the selection from `highlightRange` so a domain selected in the track

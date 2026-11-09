@@ -78,24 +78,62 @@ export async function fetchSequenceRecord(id) {
 
 /** Members [rankStart + offset, rankStart + offset + limit) of a cluster range. */
 export async function fetchMemberRange(rankStart, offset, limit) {
+  const lines = await readRankRange('members', rankStart, offset, limit)
+  return lines.map(([id, length, c90, c60]) => ({ id, source: id.slice(0, 2), length: Number(length), c90, c60 }))
+}
+
+/**
+ * Lines [rankStart + offset, rankStart + offset + limit) of a ranked TSV block store (`{prefix}/{rank // 10000}.tsv.gz`).
+ * Every rank below the store's total lies in some block, so a missing block is a store fault (STORE_MISSING).
+ */
+async function readRankRange(prefix, rankStart, offset, limit) {
   const start = Number(rankStart) + offset
   const end = start + limit
   const out = []
   for (let b = Math.floor(start / MEMBER_BLOCK); b * MEMBER_BLOCK < end; b++) {
-    const text = await readGzObject(`members/${b}.tsv.gz`)
-    // Every rank below the release's sequence count lies in some block, so a missing block is a store fault,
-    // not an empty cluster.
-    if (!text) throw Object.assign(new Error(`member block ${b} missing from the store`), { code: 'STORE_MISSING' })
+    const text = await readGzObject(`${prefix}/${b}.tsv.gz`)
+    if (!text) throw Object.assign(new Error(`${prefix} block ${b} missing from the store`), { code: 'STORE_MISSING' })
     const lines = text.split('\n')
     const lo = Math.max(start, b * MEMBER_BLOCK) - b * MEMBER_BLOCK
     const hi = Math.min(end, (b + 1) * MEMBER_BLOCK) - b * MEMBER_BLOCK
-    for (const line of lines.slice(lo, hi)) {
-      if (!line) continue
-      const [id, length, c90, c60] = line.split('\t')
-      out.push({ id, source: id.slice(0, 2), length: Number(length), c90, c60 })
-    }
+    for (const line of lines.slice(lo, hi)) if (line) out.push(line.split('\t'))
   }
   return out
+}
+
+const optNum = v => (v === undefined || v === '' ? null : Number(v))
+
+/**
+ * Logan sequences (LGs) assembled from a BioSample's runs, highest contig k-mer abundance first.
+ * @returns {Promise<null | {biosample, bioproject, n_lg, offset, limit, sequences: [{id, ka_max, n_runs}]}>}
+ *   null when the BioSample carries no PETadex sequence.
+ */
+export async function fetchBiosampleLgs(biosample, offset = 0, limit = 100) {
+  const { rows } = await pool.query(
+    `SELECT biosample, bioproject, n_lg, rank_start FROM ${SCHEMA}.biosample_lgs WHERE biosample = $1`, [biosample])
+  const r = rows[0]
+  if (!r) return null
+  const n = Number(r.n_lg)
+  const take = Math.max(0, Math.min(limit, n - offset))
+  const lines = take ? await readRankRange('biosample_lg', r.rank_start, offset, take) : []
+  return {
+    biosample: r.biosample, bioproject: r.bioproject, n_lg: n, offset, limit,
+    sequences: lines.map(([id, ka, runs]) => ({ id, ka_max: optNum(ka), n_runs: optNum(runs) })),
+  }
+}
+
+/**
+ * Logan sequences (LGs) assembled from one sequencing run, highest contig k-mer abundance first.
+ * @returns {Promise<null | {run, n_lg, offset, limit, sequences: [{id, ka}]}>}
+ */
+export async function fetchRunLgs(run, offset = 0, limit = 100) {
+  const { rows } = await pool.query(`SELECT run, n_lg, rank_start FROM ${SCHEMA}.run_lgs WHERE run = $1`, [run])
+  const r = rows[0]
+  if (!r) return null
+  const n = Number(r.n_lg)
+  const take = Math.max(0, Math.min(limit, n - offset))
+  const lines = take ? await readRankRange('run_lg', r.rank_start, offset, take) : []
+  return { run: r.run, n_lg: n, offset, limit, sequences: lines.map(([id, ka]) => ({ id, ka: optNum(ka) })) }
 }
 
 const CLUSTER_COLS = `level, cluster_id, member_count, n_pl, n_nr, n_lg, n_components, rank_start, child_count,

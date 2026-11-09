@@ -9,8 +9,11 @@
 // /api/sequence/:id/samples relay keeps working.
 import { Router } from 'express'
 import { computeSeqStats } from '../lib/seqStats.js'
+import { RUN_RE, BIOSAMPLE_RE } from './v260701Links.js'
 import {
   parseId, fetchSequenceRecord, fetchClustersOf, fetchBiosampleAnnotation, fetchPdbFor, lookupAccession, SOURCE_LABELS,
+  fetchBiosampleLgs,
+  fetchRunLgs,
 } from '../lib/v260701.js'
 
 export const sequenceRouter = Router()
@@ -60,6 +63,12 @@ lookupRouter.get('/', async (req, res, next) => {
     if (parseId(up)) {
       const rec = await fetchSequenceRecord(up)
       return res.json({ q, kind: rec ? 'sequence' : 'none', matches: rec ? [{ petadex_id: up, match: 'petadex_id' }] : [] })
+    }
+    // Run and BioSample accessions resolve to the Logan sequences assembled from them.
+    if (RUN_RE.test(up) || BIOSAMPLE_RE.test(up)) {
+      const isRun = RUN_RE.test(up)
+      const out = isRun ? await fetchRunLgs(up, 0, 0) : await fetchBiosampleLgs(up, 0, 0)
+      return res.json({ q, kind: out ? (isRun ? 'run' : 'biosample') : 'none', accession: up, n_lg: out?.n_lg ?? 0, matches: [] })
     }
     const rows = await lookupAccession(q)
     res.json({

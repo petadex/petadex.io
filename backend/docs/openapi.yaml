@@ -164,11 +164,31 @@ paths:
         '404': { description: Not a v260701 sequence }
   /api/lookup:
     get:
-      summary: Identifier lookup for v260701 (petadex_id or GenBank accession -> petadex_id)
+      summary: Identifier lookup for v260701 (petadex_id, GenBank accession, run or BioSample accession)
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, maxLength: 64 } }
       responses:
-        '200': { description: "{ q, kind: sequence | list | none, matches: [{ petadex_id, match, accession? }] }" }
+        '200': { description: "{ q, kind: sequence | list | run | biosample | none, matches: [{ petadex_id, match, accession? }], n_lg? }" }
+  /api/biosamples/{id}/lgs:
+    get:
+      summary: PETadex v260701 Logan sequences assembled from a BioSample's runs, highest contig k-mer abundance first
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(SAMN|SAMEA|SAMD|ERS|SRS)[0-9]+$' } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ release, biosample, bioproject, n_lg, offset, limit, sequences: [{ id, ka_max, n_runs }] }" }
+        '404': { description: The BioSample carries no PETadex v260701 sequence }
+  /api/runs/{id}/lgs:
+    get:
+      summary: PETadex v260701 Logan sequences assembled from one sequencing run, highest contig k-mer abundance first
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(SRR|ERR|DRR)[0-9]+$' } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ release, run, n_lg, offset, limit, sequences: [{ id, ka }] }" }
+        '404': { description: The run carries no PETadex v260701 sequence }
   /api/cluster/{level}/{clusterId}:
     get:
       summary: Cluster page row

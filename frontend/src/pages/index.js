@@ -27,7 +27,6 @@ function Hero() {
       ">
         <Container size="wide">
           <div className="max-w-140 md:pointer-events-auto">
-            <p className="label mb-4">Open · Free · Community-driven</p>
             <h1
               className="text-foreground font-semibold tracking-tight leading-[1.05] md:whitespace-nowrap"
               style={{ fontSize: "clamp(1.9rem, 3.6vw, 3rem)" }}
@@ -39,11 +38,11 @@ function Hero() {
               <span className="text-accent">Plastic-Degrading<br />Enzymes</span>
             </h1>
             <p className="mt-5 text-base text-muted-foreground max-w-120 leading-relaxed">
-              298.7 million sequences. 3.2 million families in 65,769 superfamilies. 189 enzymes with measured activity. One interface to
-              <span className="text-foreground"> search</span>,{" "}
-              <span className="text-foreground">align</span>,{" "}
-              <span className="text-foreground">compare substrates</span>, and{" "}
-              <span className="text-foreground">trace evolution</span>.
+              Our dataset comprises 298.7 million catalytically complete Plastic-Degrading Enzymes across 15 folds.
+              This represents 65,769 superfamilies. We provide software tools to
+              <span className="text-foreground"> Search Novel Enzymes</span>,{" "}
+              <span className="text-foreground">Compare Substrates</span>, and{" "}
+              <span className="text-foreground">trace enzyme phylogeny</span>.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <a href="/atlas" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
@@ -195,30 +194,24 @@ function SubstrateThumb() {
   )
 }
 
-function FamilyThumb() {
-  const lines = useMemo(() => {
-    const out = [], cx = 80, cy = 50, n = 14
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 - Math.PI / 2
-      const r1 = 14 + (i % 3) * 4, r2 = 38 + (i % 4) * 3
-      out.push({ x1: cx + Math.cos(a) * r1, y1: cy + Math.sin(a) * r1, x2: cx + Math.cos(a) * r2, y2: cy + Math.sin(a) * r2 })
-      for (let j = -1; j <= 1; j += 2) {
-        const a2 = a + j * 0.10, r3 = r2 + 6 + (i % 3) * 2
-        out.push({ x1: cx + Math.cos(a) * r2, y1: cy + Math.sin(a) * r2, x2: cx + Math.cos(a2) * r3, y2: cy + Math.sin(a2) * r3, tip: true })
-      }
-    }
-    return out
-  }, [])
+// A real clade (16 tips) from the IsPETase + LCC superfamily tree (sf6, 90%-identity representatives),
+// drawn as a rectangular phylogram with branch lengths to scale. Layout precomputed from the Newick file.
+const PHYLO_PATH = "M6.0 42.7H10.0M10.0 22.6V62.8M10.0 22.6H25.0M10.0 62.8H19.1M25.0 14.1V31.2M25.0 14.1H30.9M25.0 31.2H39.8M30.9 10.0V18.2M30.9 10.0H62.6M30.9 18.2H46.5M46.5 15.5V20.9M46.5 15.5H65.9M46.5 20.9H66.0M39.8 26.4V36.0M39.8 26.4H91.6M39.8 36.0H47.4M47.4 31.9V40.1M47.4 31.9H81.8M47.4 40.1H95.1M95.1 37.3V42.8M95.1 37.3H116.7M95.1 42.8H121.2M19.1 51.0V74.6M19.1 51.0H23.7M19.1 74.6H51.6M23.7 48.3V53.7M23.7 48.3H41.1M23.7 53.7H51.5M51.6 64.0V85.2M51.6 64.0H64.1M51.6 85.2H58.3M64.1 59.2V68.8M64.1 59.2H112.4M64.1 68.8H68.0M68.0 64.7V72.9M68.0 64.7H128.0M68.0 72.9H88.1M88.1 70.1V75.6M88.1 70.1H101.9M88.1 75.6H130.0M58.3 81.1V89.3M58.3 81.1H120.1M58.3 89.3H73.2M73.2 86.5V92.0M73.2 86.5H76.2M73.2 92.0H122.0"
+const PHYLO_TIPS = [[62.6, 10.0], [65.9, 15.5], [66.0, 20.9], [91.6, 26.4], [81.8, 31.9], [116.7, 37.3], [121.2, 42.8], [41.1, 48.3], [51.5, 53.7], [112.4, 59.2], [128.0, 64.7], [101.9, 70.1], [130.0, 75.6], [120.1, 81.1], [76.2, 86.5], [122.0, 92.0]]
+
+function PhylogenyThumb() {
   return (
     <svg viewBox="0 0 160 100" className="absolute inset-0 w-full h-full">
       <rect width="160" height="100" fill="#0e0e0e" />
-      <circle cx="80" cy="50" r="3" fill="var(--accent)" />
-      {lines.map((l, i) => (
-        <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-          stroke={l.tip ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.30)"} strokeWidth={l.tip ? 0.6 : 0.8} />
+      {PHYLO_TIPS.map(([x, y], i) => (
+        <line key={`g${i}`} x1={x} y1={y} x2="148" y2={y} stroke="rgba(255,255,255,0.12)" strokeWidth="0.4" strokeDasharray="1 1.5" />
       ))}
-      {lines.filter(l => l.tip).map((l, i) => (
-        <circle key={i} cx={l.x2} cy={l.y2} r="1.2" fill={i % 4 === 0 ? "var(--accent)" : "#4F8FE8"} fillOpacity="0.9" />
+      <path d={PHYLO_PATH} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.7" strokeLinecap="square" />
+      {PHYLO_TIPS.map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="1.4" fill={i < 7 ? "var(--accent)" : "#4F8FE8"} />
+      ))}
+      {PHYLO_TIPS.map(([, y], i) => (
+        <rect key={`l${i}`} x="150" y={y - 0.6} width={4 + ((i * 7) % 5)} height="1.2" rx="0.6" fill="rgba(255,255,255,0.25)" />
       ))}
     </svg>
   )
@@ -228,7 +221,7 @@ const TOOL_CARDS = [
   { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the superfamily atlas", sub: "Explore 65,769 superfamilies in 2D t-SNE or UMAP space. Color by CATH component, source, domain, or phylum.", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
   { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans the 298.7M-sequence v260701 corpus and returns nearest neighbors with alignments and activity context.", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
   { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
-  { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for the curated enzyme families, with member tables and centroid sequences.", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
+  { id: "family", eyebrow: "04 · Family", title: "Trace Phylogeny", sub: "Newick-rendered phylogenies for the curated enzyme families, with member tables and centroid sequences.", cta: "Open a family →", href: "/enzymes", Thumb: PhylogenyThumb },
 ]
 
 function ToolCards() {

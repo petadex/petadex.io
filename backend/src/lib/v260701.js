@@ -59,7 +59,8 @@ async function readGzObject(key) {
     if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404 || err?.$metadata?.httpStatusCode === 403) text = null
     else throw err
   }
-  cachePut(key, text)
+  // Misses are not cached: a block that appears later (store upload in progress) must be seen by a warm process.
+  if (text !== null) cachePut(key, text)
   return text
 }
 

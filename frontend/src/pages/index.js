@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react"
 import config from "../config"
 import AtlasMap from "../components/AtlasMap"
 import Container from "../components/common/Container"
+import Seo from "../components/seo"
 
 /* ── Legend chip ─────────────────────────────────────────────── */
 const LegendChip = ({ color, children, className = "" }) => (
@@ -53,7 +54,7 @@ function Hero() {
               </a>
               <span className="text-2xs font-mono text-muted-foreground hidden sm:inline-flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                v0.4 · April 2026
+                v260701
               </span>
             </div>
           </div>
@@ -78,22 +79,23 @@ function Hero() {
         {/* Top-right chips */}
         <div className="absolute top-2 right-2 md:top-4 md:right-4 flex flex-col items-end gap-1.5 md:gap-2 pointer-events-none">
           <LegendChip color="#4F8FE8">
-            Family Atlas <span className="text-foreground ml-1">live</span>
+            Superfamily Atlas <span className="text-foreground ml-1">live</span>
           </LegendChip>
           <LegendChip className="hidden sm:inline-flex">scroll · drag · click</LegendChip>
           <LegendChip className="sm:hidden">pinch · drag · tap</LegendChip>
         </div>
 
-        {/* Bottom legend strip — desktop only */}
+        {/* Bottom legend strip — desktop only. The 7 largest folds of the v260701 superfamily atlas, in the
+            colour order AtlasMap.jsx assigns (FOLD_COLORS, folds ranked by superfamily count). */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 hidden md:flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-lg bg-black/55 border border-border backdrop-blur-md pointer-events-auto">
           {[
             { c: "#4F8FE8", l: "α/β hydrolase" },
-            { c: "#2ECC71", l: "DD-peptidase" },
-            { c: "#E74C4C", l: "Amidase" },
             { c: "#9B5BE0", l: "Trypsin-like" },
-            { c: "#F2C94C", l: "Arylesterase" },
-            { c: "#F2994A", l: "Cupredoxin" },
-            { c: "#6FB7E8", l: "L-aa peptidase" },
+            { c: "#F2994A", l: "Cytochrome P450" },
+            { c: "#2ECC71", l: "Peptidase S8/S53" },
+            { c: "#E74C4C", l: "β-lactamase / DD-peptidase" },
+            { c: "#F2C94C", l: "Acid protease" },
+            { c: "#6FB7E8", l: "Purple acid phosphatase" },
           ].map(x => (
             <LegendChip key={x.l} color={x.c}>{x.l}</LegendChip>
           ))}
@@ -220,10 +222,10 @@ function FamilyThumb() {
 }
 
 const TOOL_CARDS = [
-  { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the superfamily atlas", sub: "Explore 65,769 superfamilies in 2D t-SNE or UMAP space. Color by CATH component, source, domain, or phylum.", kbd: "A", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
-  { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans the 298.7M-sequence v260701 corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
-  { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
-  { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for every family, with member tables and centroid sequences.", kbd: "F", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
+  { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the superfamily atlas", sub: "Explore 65,769 superfamilies in 2D t-SNE or UMAP space. Color by CATH component, source, domain, or phylum.", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
+  { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans the 298.7M-sequence v260701 corpus and returns nearest neighbors with alignments and activity context.", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
+  { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
+  { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for the curated enzyme families, with member tables and centroid sequences.", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
 ]
 
 function ToolCards() {
@@ -240,15 +242,12 @@ function ToolCards() {
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {TOOL_CARDS.map(({ id, eyebrow, title, sub, kbd, cta, href, Thumb }) => (
+          {TOOL_CARDS.map(({ id, eyebrow, title, sub, cta, href, Thumb }) => (
             <a key={id} href={href} target="_blank" rel="noopener noreferrer" className="card flex flex-col group no-underline">
               <div className="relative h-40 bg-surface-sunken rounded-t-xl border-b border-border overflow-hidden">
                 <Thumb />
                 <div className="absolute top-2 left-2">
                   <LegendChip>{eyebrow}</LegendChip>
-                </div>
-                <div className="hidden sm:block absolute top-2 right-2 px-1.5 py-0.5 rounded text-2xs font-mono text-muted-foreground border border-border bg-black/50">
-                  ⌘ {kbd}
                 </div>
               </div>
               <div className="p-4 flex-1 flex flex-col">
@@ -271,8 +270,8 @@ const STATS = [
   { v: "298.7M", k: "Sequences", sub: "Plasticome · NCBI nr · Logan" },
   { v: "3.23M", k: "Enzyme families", sub: "60% identity clusters" },
   { v: "65,769", k: "Superfamilies", sub: "30% identity · atlas centroids" },
-  { v: "189", k: "Assayed enzymes", sub: "BHET plate-reader activity" },
-  { v: "189", k: "Sample countries", sub: "geo metadata + dates" },
+  { v: "189", k: "Assayed enzymes", sub: "BHET halo-assay activity" },
+  { v: "239", k: "Countries & territories", sub: "of linked BioSamples (NCBI)" },
 ]
 
 function StatsStrip() {
@@ -293,12 +292,12 @@ function StatsStrip() {
 
 /* ── What's in PETadex ───────────────────────────────────────── */
 const DATA_ROWS = [
-  { t: "Sequences", d: "Curated amino-acid sequences from NCBI BLAST-NR + literature", k: "fastaa · enzyme_fastaa · enzyme_taxonomy" },
+  { t: "Sequences", d: "298.7M protein sequences from Logan, NCBI nr and the Plasticome, clustered at 90 / 60 / 30% identity", k: "sequence/:id · cluster/:level/:id" },
   { t: "Structures", d: "Predicted & experimental structures via Molstar + 3DMol viewers", k: "PDB · Molstar · 3DMol.js" },
-  { t: "Activity", d: "Plate-reader BHET hydrolysis at three substrate concentrations", k: "plate_data · plate_metadata · plate_activity_view" },
-  { t: "Provenance", d: "Geographic origin, BioSample / SRA links, sampling dates", k: "with_sra_and_biosample_loc_metadata" },
+  { t: "Activity", d: "Halo-assay BHET hydrolysis at 12.5, 25 and 50 mM substrate", k: "plate_data · plate_metadata · plate_activity_view" },
+  { t: "Provenance", d: "BioSample and SRA run links, coordinates, collection dates and environment profiles for each sequence", k: "sequences/:id/provenance · biosamples/:id · profiles" },
   { t: "Embeddings", d: "t-SNE + UMAP coordinates of ESM-2 embeddings for every superfamily", k: "superfamily_atlas (materialized view)" },
-  { t: "Phylogenies", d: "Pre-computed Newick trees per family from S3-backed alignments", k: "family/:id/tree" },
+  { t: "Phylogenies", d: "Pre-computed Newick trees per curated enzyme family from S3-backed alignments", k: "family/:id/tree" },
 ]
 
 function WhatsInside() {
@@ -366,10 +365,10 @@ function Citation() {
             tools, or atlases, please cite the entry below.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <a href="https://github.com/ababaian/petadex.io/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="btn btn-ghost border border-border-strong text-sm">
+            <a href="https://github.com/petadex/petadex.io/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="btn btn-ghost border border-border-strong text-sm">
               License (MIT)
             </a>
-            <a href="https://github.com/ababaian/petadex.io" target="_blank" rel="noopener noreferrer" className="btn btn-ghost border border-border-strong text-sm">
+            <a href="https://github.com/petadex/petadex.io" target="_blank" rel="noopener noreferrer" className="btn btn-ghost border border-border-strong text-sm">
               Source on GitHub
             </a>
           </div>
@@ -417,3 +416,10 @@ export default function HomePage() {
     </>
   )
 }
+
+export const Head = () => (
+  <Seo
+    title="The Planetary-scale Pan-Genomic Atlas of Plastic-degrading Enzymes"
+    description="298.7 million protein sequences from Logan, NCBI nr and the Plasticome, clustered into 65,769 superfamilies, with sequence search, BioSample metadata and halo-assay activity data."
+  />
+)

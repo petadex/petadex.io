@@ -21,14 +21,14 @@ const Footer = () => {
               <small>Database</small>
             </Link>
             <a
-              href="https://github.com/ababaian/petadex.io"
+              href="https://github.com/petadex/petadex.io"
               aria-label="GitHub"
               className="text-primary hover:text-accent-hover transition-colors duration-150"
             >
               <small>GitHub</small>
             </a>
             <a
-              href="https://github.com/ababaian/petadex.io#contributing"
+              href="https://github.com/petadex/petadex.io#contributing"
               aria-label="Contribute"
               className="text-primary hover:text-accent-hover transition-colors duration-150"
             >
@@ -39,7 +39,7 @@ const Footer = () => {
           {/* SOCIAL */}
           <nav role="navigation" className="flex shrink-0 items-center gap-2">
             <a
-              href="https://github.com/ababaian/petadex.io"
+              href="https://github.com/petadex/petadex.io"
               aria-label="GitHub"
               className="text-primary hover:text-accent-hover transition-colors duration-150"
             >

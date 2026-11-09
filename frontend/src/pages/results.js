@@ -28,7 +28,7 @@ import {
   sequenceHrefForTargetId,
 } from "../utils/lib"
 
-const GITHUB_REPO = "ababaian/petadex.io"
+const GITHUB_REPO = "petadex/petadex.io"
 
 const SEARCH_STAGES = [
   { id: "submit", label: "Query submitted", pct: 10 },

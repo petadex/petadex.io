@@ -9,8 +9,8 @@
  */
 module.exports = {
   siteMetadata: {
-    title: 'PETadex - Plastic-Degrading Enzyme Database',
-    description: 'Explore and analyze plastic-degrading enzymes (PETases). Search sequences, view 3D structures, and access experimental data.',
+    title: 'PETadex',
+    description: 'The Planetary-scale Pan-Genomic Atlas of Plastic-degrading Enzymes: 298.7 million protein sequences from Logan, NCBI nr and the Plasticome, with sequence search, clusters, BioSample metadata and assay data.',
     author: '@ababaian',
     siteUrl: 'https://petadex.net/',
   },

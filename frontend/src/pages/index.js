@@ -29,11 +29,14 @@ function Hero() {
           <div className="max-w-140 md:pointer-events-auto">
             <p className="label mb-4">Open · Free · Community-driven</p>
             <h1
-              className="text-foreground font-semibold tracking-tight leading-[1.05]"
+              className="text-foreground font-semibold tracking-tight leading-[1.05] md:whitespace-nowrap"
               style={{ fontSize: "clamp(1.9rem, 3.6vw, 3rem)" }}
             >
-              The Planetary-scale Pan-Genomic Atlas{" "}
-              <span className="text-accent">of Plastic-degrading Enzymes</span>
+              The Planetary-scale
+              <br />
+              Pan-Genomic Atlas of
+              <br />
+              <span className="text-accent">Plastic-Degrading Enzymes</span>
             </h1>
             <p className="mt-5 text-base text-muted-foreground max-w-120 leading-relaxed">
               298.7 million sequences. 3.2 million families in 65,769 superfamilies. 189 enzymes with measured activity. One interface to

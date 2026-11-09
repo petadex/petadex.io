@@ -53,9 +53,10 @@ export default function ComparisonRegion({ sequence, orfId, accession }) {
         </span>
       </div>
       <p className="text-sm text-muted-foreground mt-1 mb-4 max-w-2xl">
-        Pre-fill the sequence search with this ORF (sequence + identity header)
-        to run a DIAMOND similarity search against the ~307M-sequence Logan
-        corpus. Results are alignment statistics for{" "}
+        Pre-fill the sequence search with this sequence (sequence + identity
+        header) to run a DIAMOND similarity search against the PETadex v260701
+        corpus (298.7M sequences from the Plasticome, NCBI nr and Logan).
+        Results are alignment statistics for{" "}
         <em>searching this sequence</em> — distinct from the factual annotations
         above.
       </p>

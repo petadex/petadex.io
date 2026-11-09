@@ -158,8 +158,8 @@ const SubstrateHero = ({ heroStats, activeSubstrates }) => {
 
 // ── PlotModeToggle ─────────────────────────────────────────────────────────
 
-const PlotModeToggle = ({ plotMode, onModeChange }) => (
-  <div className="flex items-center gap-2 mb-6 flex-wrap">
+const PlotModeToggle = ({ plotMode, onModeChange, className = "mb-6" }) => (
+  <div className={`flex items-center gap-2 flex-wrap ${className}`}>
     <span className="text-sm font-semibold text-secondary-foreground">Plot Mode:</span>
     {Object.entries(plotModes).map(([mode, { label, description }]) => {
       const isActive = plotMode === mode
@@ -182,10 +182,10 @@ const PlotModeToggle = ({ plotMode, onModeChange }) => (
 
 // ── TimepointToggle ────────────────────────────────────────────────────────
 
-const TimepointToggle = ({ availableTimepoints, activeTimepoint, onSelect }) => {
+const TimepointToggle = ({ availableTimepoints, activeTimepoint, onSelect, className = "mb-8" }) => {
   if (availableTimepoints.length === 0) return null
   return (
-    <div className="flex items-center gap-2 mb-8 flex-wrap">
+    <div className={`flex items-center gap-2 flex-wrap ${className}`}>
       <span className="text-sm font-semibold text-secondary-foreground">Timepoint:</span>
       {[null, ...availableTimepoints].map(tp => {
         const isActive = activeTimepoint === tp
@@ -210,36 +210,6 @@ const TimepointToggle = ({ availableTimepoints, activeTimepoint, onSelect }) => 
   )
 }
 
-// ── SubstrateToggle ────────────────────────────────────────────────────────
-
-const SubstrateToggle = ({ activeSubstrates, onToggle }) => (
-  <div className="flex items-center gap-3 mb-8 flex-wrap">
-    <span className="text-sm font-semibold text-secondary-foreground">Substrates:</span>
-    {allSubstrates.map(substrate => {
-      const isActive = activeSubstrates.has(substrate)
-      const color = mediaColors[substrate]
-      return (
-        <button
-          key={substrate}
-          onClick={() => onToggle(substrate)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full border-2 text-sm font-bold transition-colors"
-          style={{
-            borderColor: color,
-            backgroundColor: isActive ? color : "transparent",
-            color: isActive ? "#fff" : color,
-          }}
-        >
-          <span
-            className="w-2 h-2 rounded-full inline-block"
-            style={{ backgroundColor: isActive ? "#fff" : color }}
-          />
-          {mediaLabels[substrate]}
-        </button>
-      )
-    })}
-  </div>
-)
-
 // ── SubstrateScatter ───────────────────────────────────────────────────────
 
 const SubstrateScatter = ({
@@ -248,6 +218,7 @@ const SubstrateScatter = ({
   onXAxisChange, onYAxisChange,
   onDotClick, highlightedGene,
   activeTimepoint, plotMode,
+  onModeChange, availableTimepoints, onTimepointSelect,
 }) => {
   const isActivityMode = plotMode === "activity"
   const axisLabel = isActivityMode ? "Activity" : "Avg Intensity"
@@ -278,7 +249,7 @@ const SubstrateScatter = ({
     ? { top: 16, right: 12, left: 48, bottom: 64 }
     : { top: 24, right: 48, left: 88, bottom: 88 }
   const chartHeight = isFocused
-    ? Math.max(320, viewportHeight - (isMobile ? 260 : 230))
+    ? Math.max(320, viewportHeight - (isMobile ? 260 : 230) - (plotMode === "intensity" ? 88 : 44)) // minus the Plot Mode / Timepoint rows
     : isMobile ? 340 : 460
   const xLabelOffset = isMobile ? 22 : 48
   const yLabelDx = isMobile ? -28 : -64
@@ -677,6 +648,20 @@ const SubstrateScatter = ({
           )}
         </div>
       </div>
+
+      {isFocused && (
+        <div className="px-6 mb-3 flex flex-col gap-2">
+          <PlotModeToggle plotMode={plotMode} onModeChange={onModeChange} className="" />
+          {plotMode === "intensity" && (
+            <TimepointToggle
+              availableTimepoints={availableTimepoints}
+              activeTimepoint={activeTimepoint}
+              onSelect={onTimepointSelect}
+              className=""
+            />
+          )}
+        </div>
+      )}
 
       {isFocused && (
         <div className="px-6 mb-3 relative max-w-md">
@@ -1199,7 +1184,8 @@ const ActivityView = ({ showTitle = false }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedGenes, setExpandedGenes] = useState(new Set())
-  const [activeSubstrates, setActiveSubstrates] = useState(new Set(["BHET12.5", "BHET25"]))
+  // Fixed comparison: BHET 12.5 mM vs 25 mM (no substrate toggle).
+  const [activeSubstrates] = useState(new Set(allSubstrates))
   const [scatterXAxis, setScatterXAxis] = useState("BHET12.5")
   const [scatterYAxis, setScatterYAxis] = useState("BHET25")
   const [highlightedGene, setHighlightedGene] = useState(null)
@@ -1370,19 +1356,6 @@ const ActivityView = ({ showTitle = false }) => {
     }).filter(Boolean)
   }, [geneGroups, activityByGeneMedia, scatterXAxis, scatterYAxis, activeTimepoint, plotMode])
 
-  const toggleSubstrate = substrate => {
-    setActiveSubstrates(prev => {
-      const next = new Set(prev)
-      if (next.has(substrate)) {
-        if (next.size <= 1) return prev
-        next.delete(substrate)
-      } else {
-        next.add(substrate)
-      }
-      return next
-    })
-  }
-
   const toggleGene = gene => {
     setExpandedGenes(prev => {
       const next = new Set(prev)
@@ -1426,17 +1399,6 @@ const ActivityView = ({ showTitle = false }) => {
         </div>
       )}
 
-      <SubstrateToggle activeSubstrates={activeSubstrates} onToggle={toggleSubstrate} />
-      <PlotModeToggle plotMode={plotMode} onModeChange={setPlotMode} />
-
-      {plotMode === "intensity" && (
-        <TimepointToggle
-          availableTimepoints={availableTimepoints}
-          activeTimepoint={activeTimepoint}
-          onSelect={setActiveTimepoint}
-        />
-      )}
-
       {loading ? (
         <p className="text-center text-muted-foreground italic py-12">Loading substrate data…</p>
       ) : error ? (
@@ -1448,6 +1410,15 @@ const ActivityView = ({ showTitle = false }) => {
       ) : (
         <>
           <SubstrateHero heroStats={heroStats} activeSubstrates={activeSubstrates} />
+
+          <PlotModeToggle plotMode={plotMode} onModeChange={setPlotMode} />
+          {plotMode === "intensity" && (
+            <TimepointToggle
+              availableTimepoints={availableTimepoints}
+              activeTimepoint={activeTimepoint}
+              onSelect={setActiveTimepoint}
+            />
+          )}
 
           {activeSubstrates.size >= 2 && scatterXAxis !== scatterYAxis && (
             <SubstrateScatter
@@ -1461,6 +1432,9 @@ const ActivityView = ({ showTitle = false }) => {
               highlightedGene={highlightedGene}
               activeTimepoint={activeTimepoint}
               plotMode={plotMode}
+              onModeChange={setPlotMode}
+              availableTimepoints={availableTimepoints}
+              onTimepointSelect={setActiveTimepoint}
             />
           )}
 

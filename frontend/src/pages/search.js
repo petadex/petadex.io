@@ -10,7 +10,7 @@ const SearchPage = () => {
         <Container>
           <h1 className="text-3xl font-bold tracking-tight text-primary md:text-4xl">Sequence Search</h1>
           <p className="mt-4 text-lg text-secondary-foreground">
-            Find similar plastic-degrading enzymes by searching ~307M sequences in the Logan corpus with DIAMOND
+            Find similar plastic-degrading enzymes by searching the 298.7M-sequence PETadex v260701 corpus with DIAMOND
           </p>
           <SequenceSearch />
         </Container>
@@ -29,7 +29,8 @@ const SearchPage = () => {
             >
               DIAMOND
             </a>{" "}
-            to search your query sequence against the{" "}
+            to search your query sequence against the PETadex v260701 corpus: 298.7M protein
+            sequences from the Plasticome, NCBI nr and{" "}
             <a
               href="https://github.com/IndexThePlanet/Logan"
               target="_blank"
@@ -38,7 +39,7 @@ const SearchPage = () => {
             >
               Logan
             </a>{" "}
-            corpus (~307M protein sequences assembled from the SRA). The search identifies
+            (assembled from the SRA). The search identifies
             proteins with similar sequences, which may share functional properties.
           </p>
 

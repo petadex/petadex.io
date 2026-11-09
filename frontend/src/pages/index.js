@@ -88,15 +88,15 @@ function Hero() {
           <LegendChip className="sm:hidden">pinch · drag · tap</LegendChip>
         </div>
 
-        {/* Bottom legend strip — desktop only. The 7 largest folds of the v260701 superfamily atlas, in the
+        {/* Bottom legend strip — one line, lg+ only (too wide below ~1000px). The 7 largest folds of the v260701 superfamily atlas, in the
             colour order AtlasMap.jsx assigns (FOLD_COLORS, folds ranked by superfamily count). */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 hidden md:flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-lg bg-black/55 border border-border backdrop-blur-md pointer-events-auto">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 hidden lg:flex w-max flex-nowrap whitespace-nowrap items-center gap-x-2 px-3 py-2 rounded-lg bg-black/55 border border-border backdrop-blur-md pointer-events-auto">
           {[
             { c: "#4F8FE8", l: "α/β hydrolase" },
             { c: "#9B5BE0", l: "Trypsin-like" },
             { c: "#F2994A", l: "Cytochrome P450" },
             { c: "#2ECC71", l: "Peptidase S8/S53" },
-            { c: "#E74C4C", l: "β-lactamase / DD-peptidase" },
+            { c: "#E74C4C", l: "β-lactamase" },
             { c: "#F2C94C", l: "Acid protease" },
             { c: "#6FB7E8", l: "Purple acid phosphatase" },
           ].map(x => (

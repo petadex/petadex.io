@@ -12,8 +12,10 @@
 //       s3://petadex/site/v260701/seq/{PL|NR|LG}/{n // BS}.ndjson.gz   (BS: PL/NR 1000, LG 4000)
 //   - Member lists are one global ranking in which every cluster is a contiguous range:
 //       s3://petadex/site/v260701/members/{rank // 10000}.tsv.gz        (petadex_id, length, c90, c60)
+//   - BioSample -> LG and run -> LG links use the same ranked layout (highest contig k-mer abundance first):
+//       s3://petadex/site/v260701/{biosample_lg|run_lg}/{rank // 10000}.tsv.gz
 //   - RDS schema `v260701`: `clusters` (one row per level + cluster_id, with rank_start), `accessions`
-//     (accession -> petadex_id), `release` (store metadata).
+//     (accession -> petadex_id), `biosample_lgs` / `run_lgs` (accession -> n_lg, rank_start), `release`.
 import { gunzipSync } from 'zlib'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import { pool } from '../db.js'

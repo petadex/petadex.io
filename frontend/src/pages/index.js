@@ -36,7 +36,7 @@ function Hero() {
               <span className="text-accent">in one atlas.</span>
             </h1>
             <p className="mt-5 text-base text-muted-foreground max-w-120 leading-relaxed">
-              1.3 billion unique sequences. 64,730 enzyme families. 350+ characterized PETases. One interface to
+              298.7 million sequences. 3.2 million families in 65,769 superfamilies. 189 enzymes with measured activity. One interface to
               <span className="text-foreground"> search</span>,{" "}
               <span className="text-foreground">align</span>,{" "}
               <span className="text-foreground">compare substrates</span>, and{" "}
@@ -221,8 +221,8 @@ function FamilyThumb() {
 }
 
 const TOOL_CARDS = [
-  { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the family atlas", sub: "Explore 64,730 families in 2D UMAP space. Color by domain, phylum, or CATH component.", kbd: "A", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
-  { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans ~307M sequences in the Logan corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
+  { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the superfamily atlas", sub: "Explore 65,769 superfamilies in 2D t-SNE or UMAP space. Color by CATH component, source, domain, or phylum.", kbd: "A", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
+  { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans the 298.7M-sequence v260701 corpus and returns nearest neighbors with alignments and activity context.", kbd: "S", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
   { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", kbd: "B", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
   { id: "family", eyebrow: "04 · Family", title: "Trace a family tree", sub: "Newick-rendered phylogenies for every family, with member tables and centroid sequences.", kbd: "F", cta: "Open a family →", href: "/enzymes", Thumb: FamilyThumb },
 ]
@@ -269,10 +269,10 @@ function ToolCards() {
 
 /* ── Stats strip ─────────────────────────────────────────────── */
 const STATS = [
-  { v: "1.3B", k: "Unique sequences", sub: "across all enzyme families" },
-  { v: "64,730", k: "Enzyme families", sub: "UMAP-embedded centroids" },
-  { v: "350+", k: "Characterized PETases", sub: "with experimental activity" },
-  { v: "12,884", k: "Sequences in fastaa", sub: "amino-acid + provenance" },
+  { v: "298.7M", k: "Sequences", sub: "Plasticome · NCBI nr · Logan" },
+  { v: "3.23M", k: "Enzyme families", sub: "60% identity clusters" },
+  { v: "65,769", k: "Superfamilies", sub: "30% identity · atlas centroids" },
+  { v: "189", k: "Assayed enzymes", sub: "BHET plate-reader activity" },
   { v: "189", k: "Sample countries", sub: "geo metadata + dates" },
 ]
 
@@ -298,7 +298,7 @@ const DATA_ROWS = [
   { t: "Structures", d: "Predicted & experimental structures via Molstar + 3DMol viewers", k: "PDB · Molstar · 3DMol.js" },
   { t: "Activity", d: "Plate-reader BHET hydrolysis at three substrate concentrations", k: "plate_data · plate_metadata · plate_activity_view" },
   { t: "Provenance", d: "Geographic origin, BioSample / SRA links, sampling dates", k: "with_sra_and_biosample_loc_metadata" },
-  { t: "Embeddings", d: "UMAP coordinates + CATH-domain colorings for every family", k: "family_atlas (materialized view)" },
+  { t: "Embeddings", d: "t-SNE + UMAP coordinates of ESM-2 embeddings for every superfamily", k: "superfamily_atlas (materialized view)" },
   { t: "Phylogenies", d: "Pre-computed Newick trees per family from S3-backed alignments", k: "family/:id/tree" },
 ]
 

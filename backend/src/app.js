@@ -28,6 +28,8 @@ import orfRoutes from './routes/orf.js';
 import kineticsRoutes from './routes/kinetics.js';
 import annotationRoutes from './routes/annotation.js';
 import sequenceSamplesRoutes from './routes/sequenceSamples.js';
+import { sequenceRouter as petadexSequenceRoutes, lookupRouter } from './routes/petadexSequence.js';
+import v260701LinkRoutes from './routes/v260701Links.js';
 import { searchSamplesRoutes, searchAlignRoutes } from './routes/searchRelays.js';
 import { pool } from './db.js';
 
@@ -77,11 +79,15 @@ app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
 // Found in Samples: per-sequence BioSample list from the v260701 metadata store,
 // via the search orchestrator's `samples` action.
+// v260701 sequence page (PL…/NR…/LG… ids; other ids fall through to the samples relay below).
+app.use('/api/sequence', petadexSequenceRoutes);
+app.use('/api/lookup', lookupRouter);
 app.use('/api/sequence', sequenceSamplesRoutes);
 app.use('/api/search/samples', searchSamplesRoutes);
 app.use('/api/search/align', searchAlignRoutes);
 // BioSample annotation layer: /api/sequences, /api/annotations, /api/biosamples,
 // /api/clusters, /api/profiles (see routes/annotation.js for the full contract).
+app.use('/api', v260701LinkRoutes);
 app.use('/api', annotationRoutes);
 
 // Root: no HTML UI — API lives under /api/*. Browsers hitting :3001/ alone see this instead of "Cannot GET /".

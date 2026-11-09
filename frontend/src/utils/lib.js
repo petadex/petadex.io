@@ -90,9 +90,9 @@ export function parseCorpusTargetId(targetId) {
 /**
  * Canonical sequence-page href for a DIAMOND hit / corpus target id.
  * Corpus ORFs (numeric first field) → /sequence/orf/{orfId}. A bare accession
- * with no orf_id → /sequence/{accession} (curated path). Null if unparseable,
- * and null for v260701 petadex_ids: no page exists for them yet, and the v1.1
- * pages would resolve the wrong record.
+ * with no orf_id → /sequence/{accession} (curated path). A v260701 petadex_id
+ * (PL…/NR…/LG…) → /sequence/{petadex_id} (the v260701 sequence page). Null if
+ * unparseable.
  *
  * @param {string | null | undefined} targetId
  * @returns {string | null}
@@ -100,6 +100,7 @@ export function parseCorpusTargetId(targetId) {
 export function sequenceHrefForTargetId(targetId) {
   const parsed = parseCorpusTargetId(targetId)
   if (!parsed) return null
+  if (parsed.petadexId) return `/sequence/${encodeURIComponent(parsed.petadexId)}`
   if (parsed.orfId) return `/sequence/orf/${encodeURIComponent(parsed.orfId)}`
   if (parsed.accession)
     return `/sequence/${encodeURIComponent(parsed.accession)}`

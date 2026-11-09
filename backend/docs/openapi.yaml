@@ -149,6 +149,79 @@ paths:
         - { name: evidence, in: query, schema: { type: string, enum: [stated, inferred, form_template, none] } }
       responses:
         '200': { description: "{ profile, biosamples: [{ biosample, profile_evidence, isolation_source, env_broad_scale, country, collection_year, has_coordinates }], next_after }" }
+  /api/sequence/{id}:
+    get:
+      summary: v260701 sequence page payload (PL / NR / LG petadex_id)
+      description: >-
+        Stored record from the S3 block store site/v260701 (sequence, catalytic core with catalytic sites, 90/60/30 %
+        cluster names, accessions, organism, BLAST-nr fields, Logan assembly + sample summary), plus computed stats,
+        the three cluster rows (RDS v260701.clusters), the representative BioSample's stated annotation (Logan) and
+        curated PDB structures (Plasticome / nr). Other id shapes fall through to /api/sequence/{id}/samples.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(PL|NR|LG)[1-9][0-9]*$' } }
+      responses:
+        '200': { description: Sequence record }
+        '404': { description: Not a v260701 sequence }
+  /api/lookup:
+    get:
+      summary: Identifier lookup for v260701 (petadex_id, GenBank accession, run or BioSample accession)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 64 } }
+      responses:
+        '200': { description: "{ q, kind: sequence | list | run | biosample | none, matches: [{ petadex_id, match, accession? }], n_lg? }" }
+  /api/biosamples/{id}/lgs:
+    get:
+      summary: PETadex v260701 Logan sequences assembled from a BioSample's runs, highest contig k-mer abundance first
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(SAMN|SAMEA|SAMD|ERS|SRS)[0-9]+$' } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ release, biosample, bioproject, n_lg, offset, limit, sequences: [{ id, ka_max, n_runs }] }" }
+        '404': { description: The BioSample carries no PETadex v260701 sequence }
+  /api/runs/{id}/lgs:
+    get:
+      summary: PETadex v260701 Logan sequences assembled from one sequencing run, highest contig k-mer abundance first
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(SRR|ERR|DRR)[0-9]+$' } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ release, run, n_lg, offset, limit, sequences: [{ id, ka }] }" }
+        '404': { description: The run carries no PETadex v260701 sequence }
+  /api/cluster/{level}/{clusterId}:
+    get:
+      summary: Cluster page row
+      description: >-
+        v260701 clusters are named after their centroid's petadex_id (PL… / NR… / LG…) and come from RDS
+        v260701.clusters, with the parent cluster rows. Integer ids are legacy v1.1 blocks (block_{level}pid).
+      parameters:
+        - { name: level, in: path, required: true, schema: { type: integer, enum: [90, 60, 30] } }
+        - { name: clusterId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Cluster row (release v260701 or v1.1) }
+        '404': { description: No such cluster at this level }
+  /api/cluster/{level}/{clusterId}/members:
+    get:
+      summary: Sequences in a v260701 cluster, centroid first (offset-paged)
+      parameters:
+        - { name: level, in: path, required: true, schema: { type: integer, enum: [90, 60, 30] } }
+        - { name: clusterId, in: path, required: true, schema: { type: string } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { description: "{ level, cluster_id, member_count, members: [{ id, source, length, c90, c60 }], next_offset }" }
+  /api/cluster/{level}/{clusterId}/children:
+    get:
+      summary: Clusters one level down (60 % -> 90 %, 30 % -> 60 %), largest first (keyset-paged)
+      parameters:
+        - { name: level, in: path, required: true, schema: { type: integer, enum: [60, 30] } }
+        - { name: clusterId, in: path, required: true, schema: { type: string } }
+        - { name: after_count, in: query, schema: { type: integer } }
+        - { name: after_id, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200': { description: "{ children: [cluster rows], next: { after_count, after_id } | null }" }
 components:
   schemas:
     Provenance:

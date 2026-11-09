@@ -865,11 +865,21 @@ const ResultsView = ({
                           {hit.rank}
                         </td>
                         <td className="py-2 px-2.5">
-                          {/* v260701 petadex_ids have no sequence page yet
-                              (sequence_href null): plain text, not a link to
-                              a v1.1 page with the wrong id. */}
+                          {/* v260701 petadex_ids link to their v260701 sequence page
+                              (/sequence/PL1); without an href they stay plain text. */}
                           {hit.origin ? (
-                            <span>{hit.display_id || hit.accession}</span>
+                            hit.sequence_href ? (
+                              <a
+                                href={hit.sequence_href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline font-mono"
+                              >
+                                {hit.display_id || hit.accession}
+                              </a>
+                            ) : (
+                              <span>{hit.display_id || hit.accession}</span>
+                            )
                           ) : (
                             <a
                               href={

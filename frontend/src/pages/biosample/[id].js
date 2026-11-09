@@ -3,13 +3,13 @@
 // Client-only dynamic route /biosample/:id — one BioSample from the annotation
 // layer (§4.3 of "02 Annotation Layer - Frontend"): the full attribute table, the
 // "what this sample reports" chips, the profile with its evidence and in-universe
-// flag, the SRA runs, and a keyset-paged list of the ORFs assembled from it.
+// flag, the SRA runs, and an offset-paged list of the PETadex v260701 sequences (LGs) assembled from it.
 //
 //   GET /api/biosamples/:id              → { annotation | null, runs }
-//   GET /api/biosamples/:id/sequences    → { sequences, next_after }
+//   GET /api/biosamples/:id/lgs          → { n_lg, sequences: [{ id, ka_max, n_runs }] }  (404 = none)
 //
 // `annotation: null` is not an error: the accession is outside the annotation
-// snapshot, but its runs (and ORFs) can still exist, so both are rendered.
+// snapshot, but its runs (and sequences) can still exist, so both are rendered.
 import React, { useEffect, useState, useCallback } from "react"
 import { Link } from "gatsby"
 import Seo from "../../components/seo"
@@ -127,26 +127,31 @@ function ProfileBlock({ a }) {
 
 function SequenceList({ id }) {
   const [rows, setRows] = useState([])
-  const [nextAfter, setNextAfter] = useState(0) // 0 = first page; null = done
+  const [total, setTotal] = useState(null) // PETadex sequences assembled from this sample; 0 = none
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const loadPage = useCallback(
-    async after => {
+    async offset => {
       setLoading(true)
       setError(null)
       try {
         const res = await fetch(
           `${config.apiUrl}/biosamples/${encodeURIComponent(
             id
-          )}/sequences?after=${after}&limit=${PAGE_SIZE}`
+          )}/lgs?offset=${offset}&limit=${PAGE_SIZE}`
         )
+        if (res.status === 404) {
+          setRows([])
+          setTotal(0)
+          return
+        }
         if (!res.ok) throw new Error(`Request failed (${res.status})`)
         const data = await res.json()
         setRows(prev =>
-          after === 0 ? data.sequences : [...prev, ...data.sequences]
+          offset === 0 ? data.sequences : [...prev, ...data.sequences]
         )
-        setNextAfter(data.next_after)
+        setTotal(data.n_lg)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -158,17 +163,23 @@ function SequenceList({ id }) {
 
   useEffect(() => {
     setRows([])
+    setTotal(null)
     loadPage(0)
   }, [loadPage])
 
+  const more = total != null && rows.length < total
   return (
     <section className="card p-6">
-      <h2 className="text-lg font-semibold text-foreground m-0 mb-4">
+      <h2 className="text-lg font-semibold text-foreground m-0 mb-1">
         Sequences from this sample
       </h2>
-      {rows.length === 0 && !loading && !error && (
+      <p className="text-sm text-muted-foreground mt-0 mb-4">
+        PETadex v260701 Logan sequences assembled from this BioSample's runs,
+        highest contig k-mer abundance first.
+      </p>
+      {total === 0 && !loading && !error && (
         <p className="text-sm text-muted-foreground m-0">
-          No corpus ORFs were assembled from this sample's runs.
+          No PETadex sequence was assembled from this sample's runs.
         </p>
       )}
       {rows.length > 0 && (
@@ -176,40 +187,49 @@ function SequenceList({ id }) {
           <thead>
             <tr>
               <th className="bg-surface-raised text-left py-2 px-2.5 font-semibold">
-                ORF
+                Sequence
               </th>
-              <th className="bg-surface-raised text-left py-2 px-2.5 font-semibold">
-                Run
+              <th className="bg-surface-raised text-right py-2 px-2.5 font-semibold">
+                Contig k-mer abundance (max)
+              </th>
+              <th className="bg-surface-raised text-right py-2 px-2.5 font-semibold">
+                Runs of this sample carrying it
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.orf_id} className="hover:bg-surface-raised">
+              <tr key={r.id} className="hover:bg-surface-raised">
                 <td className="py-1.5 px-2.5">
                   <Link
-                    to={`/sequence/orf/${r.orf_id}`}
+                    to={`/sequence/${r.id}`}
                     className="font-mono text-info hover:underline"
                   >
-                    {r.orf_id}
+                    {r.id}
                   </Link>
                 </td>
-                <td className="py-1.5 px-2.5 font-mono">{r.run}</td>
+                <td className="py-1.5 px-2.5 text-right font-mono">
+                  {r.ka_max != null ? r.ka_max.toLocaleString() : "—"}
+                </td>
+                <td className="py-1.5 px-2.5 text-right font-mono">
+                  {r.n_runs != null ? r.n_runs.toLocaleString() : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
       <div className="mt-4 flex items-center gap-3 text-sm">
-        <span className="text-muted-foreground">
-          {rows.length.toLocaleString()} shown
-          {nextAfter == null && rows.length > 0 ? " (all)" : ""}
-        </span>
-        {nextAfter != null && rows.length > 0 && (
+        {total > 0 && (
+          <span className="text-muted-foreground">
+            {rows.length.toLocaleString()} of {total.toLocaleString()} shown
+          </span>
+        )}
+        {more && rows.length > 0 && (
           <button
             className="btn btn-secondary"
             disabled={loading}
-            onClick={() => loadPage(nextAfter)}
+            onClick={() => loadPage(rows.length)}
           >
             {loading ? "Loading…" : `Load ${PAGE_SIZE} more`}
           </button>

@@ -13,6 +13,9 @@
 import React from "react"
 import SequenceTemplate from "../../templates/sequence"
 import BareIdRedirect from "../../components/sequence/BareIdRedirect"
+import PetadexSequenceTemplate, { Head as PetadexHead } from "../../templates/petadexSequence"
+import { Head as CuratedHead } from "../../templates/sequence"
+import { isPetadexId } from "../../components/v260701/common"
 
 // Anything that isn't a plain curated accession: a composite corpus header
 // (contains "|") or a bare all-digit ORF id.
@@ -22,10 +25,17 @@ const needsRedirect = value => {
 }
 
 export default function SequencePage({ params }) {
+  // v260701 sequences: PL… / NR… / LG… (no curated accession has this shape; checked 2026-11-08).
+  if (isPetadexId(String(params.sequenceId || "").toUpperCase())) {
+    return <PetadexSequenceTemplate pageContext={{ sequenceId: params.sequenceId }} />
+  }
   if (needsRedirect(params.sequenceId)) {
     return <BareIdRedirect id={String(params.sequenceId).trim()} />
   }
   return <SequenceTemplate pageContext={{ sequenceId: params.sequenceId }} />
 }
 
-export { Head } from "../../templates/sequence"
+export const Head = props => {
+  const id = String(props?.params?.sequenceId || "").toUpperCase()
+  return isPetadexId(id) ? <PetadexHead {...props} /> : <CuratedHead {...props} />
+}

@@ -291,7 +291,7 @@ export default function SequenceViewer({
                   <div
                     className={`grid gap-0.5 px-1.5`}
                     style={{
-                      "grid-template-columns": `repeat(${slotsPerLine}, 1fr)`,
+                      gridTemplateColumns: `repeat(${slotsPerLine}, 1fr)`,
                     }}
                   >
                     {row.slice.split("").map((char, i) => {

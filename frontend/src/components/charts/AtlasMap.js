@@ -352,9 +352,12 @@ const TOOLTIP_STYLE = {
 
 function buildTooltip(object, highlightFamilyId) {
   if (object.superfamily_id != null) {
-    const link = object.cath_domain
-      ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid #334155;display:flex;flex-wrap:wrap;gap:10px;pointer-events:auto"><a href="/cath-domains?cath=${encodeURIComponent(object.cath_domain)}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">CATH domain page</a></div>`
+    // superfamily_id is the 30 % cluster's name (its centroid petadex_id), so it addresses /cluster/30/{id}.
+    const clusterLink = `<a href="/cluster/30/${encodeURIComponent(object.superfamily_id)}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">30 % cluster page</a>`
+    const cathLink = object.cath_domain
+      ? `<a href="/cath-domains?cath=${encodeURIComponent(object.cath_domain)}" style="color:#38bdf8;text-decoration:underline;font-size:11px" target="_blank" rel="noopener noreferrer">CATH domain page</a>`
       : ""
+    const link = `<div style="margin-top:8px;padding-top:6px;border-top:1px solid #334155;display:flex;flex-wrap:wrap;gap:10px;pointer-events:auto">${clusterLink}${cathLink}</div>`
     return {
       html: `<div style="max-width:280px;pointer-events:none">${rowsToHtml(superfamilyRows(object))}${link}</div>`,
       style: TOOLTIP_STYLE,

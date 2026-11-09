@@ -276,7 +276,7 @@ function Domain({ d }) {
       </div>
 
       <p className="text-sm text-secondary-foreground mt-2 mb-0">
-        Matched PAZy HMM{" "}
+        Matched {d.hmm_source || "PAZy HMM"}{" "}
         <span className="font-mono text-foreground">{d.pazy_hmm_id}</span> over
         residues {d.domain_start}–{d.domain_end}.
         {residues.length > 0 && (
@@ -324,6 +324,9 @@ export default function CatalyticDomainsPanel({
   orfId,
   seqLength,
   onSelectDomain,
+  domains: preloaded = null,
+  title = "Catalytic domains",
+  note = "Deterministic PAZy HMM matches with coordinates — shown as evidence, not a function assignment.",
 }) {
   const [domains, setDomains] = useState([])
   const [status, setStatus] = useState("idle") // idle | loading | ready | empty | error
@@ -352,6 +355,12 @@ export default function CatalyticDomainsPanel({
   }
 
   useEffect(() => {
+    // Preloaded domains (v260701 pages carry the core in the sequence record): no fetch.
+    if (Array.isArray(preloaded)) {
+      setDomains(preloaded)
+      setStatus(preloaded.length ? "ready" : "empty")
+      return
+    }
     if (orfId == null || orfId === "") {
       setStatus("idle")
       return
@@ -380,7 +389,7 @@ export default function CatalyticDomainsPanel({
     return () => {
       cancelled = true
     }
-  }, [orfId])
+  }, [orfId, preloaded])
 
   // Render nothing while loading/idle (avoids layout flash on the common
   // no-domains case).
@@ -390,15 +399,14 @@ export default function CatalyticDomainsPanel({
     <section className="card p-6">
       <div className="flex items-center gap-2 mb-1">
         <h2 className="text-lg font-semibold text-foreground m-0">
-          Catalytic domains
+          {title}
         </h2>
         <span className="inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success">
           Factual · HMM evidence
         </span>
       </div>
       <p className="text-xs text-muted-foreground mt-1 mb-4">
-        Deterministic PAZy HMM matches with coordinates — shown as evidence, not
-        a function assignment.
+        {note}
       </p>
 
       {status === "ready" && (

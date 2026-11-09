@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     children: ACTIVITY_LINKS,
   },
   { label: "Enzymes", path: "/enzymes", key: "enzymes" },
+  { label: "Explore", path: "/explore", key: "explore" },
   { label: "Search", path: "/search", key: "search" },
   // CATH domains hidden from nav — page still exists at /cath-domains
   { label: "Atlas", path: "/atlas", key: "atlas" },

@@ -66,6 +66,19 @@ async function readGzObject(key) {
   return text
 }
 
+// Parsed small JSON files of the store (explore summaries); kept apart from the block LRU so they are never evicted.
+const jsonCache = new Map()
+
+/** A gzipped JSON file of the store, parsed; null if it is not in the store (misses are not cached). */
+export async function readStoreJson(key) {
+  if (jsonCache.has(key)) return jsonCache.get(key)
+  const text = await readGzObject(key)
+  if (text == null) return null
+  const obj = JSON.parse(text)
+  jsonCache.set(key, obj)
+  return obj
+}
+
 /** The stored record for one sequence, or null if the id is not in v260701. */
 export async function fetchSequenceRecord(id) {
   const p = parseId(id)

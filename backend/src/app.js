@@ -30,6 +30,7 @@ import annotationRoutes from './routes/annotation.js';
 import sequenceSamplesRoutes from './routes/sequenceSamples.js';
 import { sequenceRouter as petadexSequenceRoutes, lookupRouter } from './routes/petadexSequence.js';
 import v260701LinkRoutes from './routes/v260701Links.js';
+import exploreRoutes from './routes/explore.js';
 import { searchSamplesRoutes, searchAlignRoutes } from './routes/searchRelays.js';
 import { pool } from './db.js';
 
@@ -75,6 +76,7 @@ app.use('/api/sara-viewer', saraViewerRoutes);
 app.use('/api/petadex-domains', petadexDomainsRoutes);
 app.use('/api/resolve', resolveRoutes);
 app.use('/api/cluster', clusterRoutes);
+app.use('/api/explore', exploreRoutes);
 app.use('/api/orf', orfRoutes);
 app.use('/api/kinetics', kineticsRoutes);
 // Found in Samples: per-sequence BioSample list from the v260701 metadata store,

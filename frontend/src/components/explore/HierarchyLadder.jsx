@@ -175,7 +175,7 @@ export default function HierarchyLadder({ summary, onAction }) {
   const countOf = r => (r.key === "domain" ? summary.domains.length : summary.levels.find(l => String(l.level) === r.key)?.n)
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-6 items-start">
-      <ol className="list-none m-0 p-0" aria-label="Clustering levels, from single proteins up to folds">
+      <ol className="list-none m-0 p-0 w-full sm:w-fit mx-auto" aria-label="Clustering levels, from single proteins up to folds">
         {RUNGS.map((r, i) => (
           <li key={r.key}>
             <button

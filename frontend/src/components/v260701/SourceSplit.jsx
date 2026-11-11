@@ -21,12 +21,12 @@ const share = (n, total) => {
  * A static bar split by source. With `total`, the bar's filled length is counts / total (the rest stays empty), so
  * several bars can be compared on one scale.
  */
-export function SourceBar({ counts, total }) {
+export function SourceBar({ counts, total, height = "h-2.5" }) {
   const sum = ORDER.reduce((s, k) => s + (Number(counts?.[k]) || 0), 0)
   if (!sum) return null
   const scale = total ? sum / total : 1
   return (
-    <span className="block w-full h-2.5 rounded-full overflow-hidden bg-secondary" aria-hidden="true">
+    <span className={`block w-full ${height} rounded-full overflow-hidden bg-secondary`} aria-hidden="true">
       <span className="flex h-full" style={{ width: `${Math.max(0.5, 100 * scale)}%` }}>
         {ORDER.map(k => {
           const n = Number(counts[k]) || 0
@@ -37,11 +37,11 @@ export function SourceBar({ counts, total }) {
   )
 }
 
-/** The counts as a three-row table (used inside popovers and on its own). */
-export function SourceSplitTable({ counts, unit }) {
+/** The counts as a three-row table (used inside popovers and on its own). `textSize` is a Tailwind text class. */
+export function SourceSplitTable({ counts, unit, textSize = "text-xs" }) {
   const total = ORDER.reduce((s, k) => s + (Number(counts?.[k]) || 0), 0)
   return (
-    <table className="w-full text-xs border-collapse">
+    <table className={`w-full ${textSize} border-collapse`}>
       <tbody>
         {ORDER.map(k => (
           <tr key={k}>

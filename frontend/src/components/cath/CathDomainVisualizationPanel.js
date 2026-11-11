@@ -85,7 +85,7 @@ const CathDomainVisualizationPanel = ({ domain }) => {
 
   const petadexLinks = buildCathDomainPetadexLinks(domain)
   const hasPetadexLinks =
-    petadexLinks.atlas || petadexLinks.enzymes || petadexLinks.extras.length > 0
+    petadexLinks.atlas || petadexLinks.extras.length > 0
   const embedPdbId =
     Array.isArray(domain.pdbIds) && domain.pdbIds.length ? String(domain.pdbIds[0]).toUpperCase() : null
   const embedUrl =
@@ -181,16 +181,6 @@ const CathDomainVisualizationPanel = ({ domain }) => {
                   >
                     {petadexLinks.atlas.label}
                   </a>
-                </li>
-              )}
-              {petadexLinks.enzymes && (
-                <li>
-                  <Link
-                    to={petadexLinks.enzymes.url}
-                    className="inline-flex items-center rounded-lg border border-input bg-background px-3 py-1.5 text-sm font-medium text-accent hover:bg-muted/50 hover:text-accent-hover transition-colors"
-                  >
-                    {petadexLinks.enzymes.label}
-                  </Link>
                 </li>
               )}
               {petadexLinks.extras.map(({ label, url, internal }) =>

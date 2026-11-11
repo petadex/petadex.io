@@ -87,7 +87,7 @@ export default function EnzymeTemplate({ pageContext }) {
         <Container>
           {/* Back link */}
           <Link
-            to="/enzymes"
+            to="/explore"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
           >
             <svg
@@ -103,7 +103,7 @@ export default function EnzymeTemplate({ pageContext }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to Enzymes
+            Back to Explore
           </Link>
 
           {/* Header */}

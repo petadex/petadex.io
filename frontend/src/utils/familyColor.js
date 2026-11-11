@@ -1,6 +1,6 @@
 /**
  * Stable per-family colour: golden-angle hue spacing so adjacent family ids
- * land far apart on the wheel. Shared by /enzymes, search results, the results
+ * land far apart on the wheel. Shared by search results, the results
  * scatterplot and the atlas so a family reads the same colour everywhere.
  */
 const HUE_STEP = 137.508

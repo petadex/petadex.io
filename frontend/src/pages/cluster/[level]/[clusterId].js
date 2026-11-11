@@ -92,10 +92,10 @@ function LegacyClusterPage({ params }) {
     <section className="py-20 md:py-24">
       <Container>
         <Link
-          to="/enzymes"
+          to="/explore"
           className="text-sm text-info no-underline border-b-2 border-transparent transition-colors hover:border-info"
         >
-          ← Back to enzyme database
+          ← Back to Explore
         </Link>
 
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-primary md:text-4xl">

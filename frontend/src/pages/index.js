@@ -221,7 +221,7 @@ const TOOL_CARDS = [
   { id: "atlas", eyebrow: "01 · Atlas", title: "Browse the superfamily atlas", sub: "Explore 65,769 superfamilies in 2D t-SNE or UMAP space. Color by CATH component, source, domain, or phylum.", cta: "Open Atlas →", href: "/atlas", Thumb: AtlasThumb },
   { id: "search", eyebrow: "02 · Search", title: "Find homologs by sequence", sub: "Paste a FASTA sequence; DIAMOND scans the 298.7M-sequence v260701 corpus and returns nearest neighbors with alignments and activity context.", cta: "Run a search →", href: "/search", Thumb: SequenceThumb },
   { id: "substrate", eyebrow: "03 · Substrate", title: "Compare BHET activity", sub: "Side-by-side scatter of measured activity at 12.5 / 25 mM BHET. Drag to zoom, click any gene to drill in.", cta: "Compare substrates →", href: "/halo-assay?tab=activity", Thumb: SubstrateThumb },
-  { id: "family", eyebrow: "04 · Family", title: "Trace Phylogeny", sub: "Newick-rendered phylogenies for the curated enzyme families, with member tables and centroid sequences.", cta: "Open a family →", href: "/enzymes", Thumb: PhylogenyThumb },
+  { id: "family", eyebrow: "04 · Family", title: "Trace Phylogeny", sub: "Newick-rendered phylogenies for the curated enzyme families, with member tables and centroid sequences.", cta: "Open a family →", href: "/explore", Thumb: PhylogenyThumb },
 ]
 
 function ToolCards() {

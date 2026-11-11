@@ -189,6 +189,44 @@ paths:
       responses:
         '200': { description: "{ release, run, n_lg, offset, limit, sequences: [{ id, ka }] }" }
         '404': { description: The run carries no PETadex v260701 sequence }
+  /api/explore/summary:
+    get:
+      summary: PETadex v260701 levels (protein, 90, 60, 30) and the 15 folds, each split by source (static, from the site store)
+      responses:
+        '200': { description: "{ release, levels: [{ level, n, members, centroids?, composition? }], domains: [{ fold, name, cath_code, n_proteins, n_90, n_60, n_30, members, centroids }] }" }
+        '503': { description: Explore data missing from the store }
+  /api/explore/plasticome:
+    get:
+      summary: The Plasticome entries in the v260701 clustering, with names, substrates, EC, organism, fold and 90/60/30 % clusters
+      responses:
+        '200': { description: "{ release, entries: [{ id, name, names, substrates, ec, organism, domain, metagenomic, doi, fold, c90, c60, c30 }] }" }
+  /api/explore/superfamilies:
+    get:
+      summary: Superfamilies (30 % clusters), filtered and sorted by facts the viewer picks
+      parameters:
+        - { name: fold, in: query, schema: { type: string, pattern: '^[a-z0-9-]+$' } }
+        - { name: has_plasticome, in: query, schema: { type: boolean, default: false } }
+        - { name: env, in: query, description: Dominant environment profile, schema: { type: string, pattern: '^[a-z_]+$' } }
+        - { name: sort, in: query, schema: { type: string, enum: [size, families, plasticome, nr, logan_share, biosamples], default: size } }
+        - { name: order, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200': { description: "{ release, offset, limit, total, rows: [{ id, member_count, n_pl, n_nr, n_lg, child_count, fold, domain_name, env_dominant, n_biosamples, plasticome_names, n_plasticome_names, substrates, ... }] }" }
+  /api/explore/envs:
+    get:
+      summary: Dominant environment profiles of superfamilies, with how many superfamilies each covers
+      parameters:
+        - { name: fold, in: query, schema: { type: string, pattern: '^[a-z0-9-]+$' } }
+      responses:
+        '200': { description: "{ release, envs: [{ env, n }] }" }
+  /api/explore/random:
+    get:
+      summary: A uniformly random protein or cluster
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [protein, '90', '60', '30'], default: '30' } }
+      responses:
+        '200': { description: "{ kind, id, path }" }
   /api/cluster/{level}/{clusterId}:
     get:
       summary: Cluster page row

@@ -9,7 +9,6 @@
  * }} domain
  * @returns {{
  *   atlas: { label: string, url: string } | null,
- *   enzymes: { label: string, url: string } | null,
  *   extras: { label: string, url: string, internal: boolean }[],
  * }}
  */
@@ -47,14 +46,5 @@ export function buildCathDomainPetadexLinks(domain) {
     }
   }
 
-  let enzymes = null
-  if (domain.component != null && Number.isFinite(Number(domain.component))) {
-    const n = Number(domain.component)
-    enzymes = {
-      label: `Browse enzymes (component ${n})`,
-      url: `/enzymes?component=${n}`,
-    }
-  }
-
-  return { atlas, enzymes, extras }
+  return { atlas, extras }
 }

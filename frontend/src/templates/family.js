@@ -413,10 +413,10 @@ export default function FamilyTemplate({ pageContext }) {
       <section className="max-w-6xl mx-auto px-8 py-8">
         <div className="mb-4">
           <Link
-            to="/enzymes"
+            to="/explore"
             className="text-accent text-sm hover:text-accent-hover"
           >
-            &larr; Back to Enzymes
+            &larr; Back to Explore
           </Link>
         </div>
 

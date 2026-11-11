@@ -13,6 +13,7 @@ import Container from "../common/Container"
 import {
   Card, Fields, ClusterLink, SequenceLink, HistogramBars, SourceBadge, fmtInt, fmtNum, fmtPct, SOURCE_LABELS,
 } from "./common"
+import SourceSplit, { clusterCounts } from "./SourceSplit"
 
 const PAGE = 100
 
@@ -66,7 +67,7 @@ function Summary({ level, row }) {
       <Fields cols={3} rows={[
         ["Centroid", <span><SequenceLink id={row.cluster_id} /> <span className="text-muted-foreground text-xs">({SOURCE_LABELS[row.centroid_source]}, {fmtInt(row.centroid_length)} aa)</span></span>],
         ["Sequences", fmtInt(row.member_count)],
-        ["Plasticome / NCBI nr / Logan", `${fmtInt(row.n_pl)} / ${fmtInt(row.n_nr)} / ${fmtInt(row.n_lg)}`],
+        ["Plasticome / NCBI nr / Logan", <span className="inline-flex items-center gap-2 flex-wrap">{`${fmtInt(row.n_pl)} / ${fmtInt(row.n_nr)} / ${fmtInt(row.n_lg)}`}<SourceSplit counts={clusterCounts(row)} title="Sequences by source" unit="sequences" /></span>],
         [level === 90 ? null : `Clusters at ${level === 30 ? 60 : 90} %`, row.child_count != null ? fmtInt(row.child_count) : null],
         ["CATH domain", row.domain_name ? `${row.domain_name}${row.cath_code ? ` (${row.cath_code})` : ""}` : row.cath_fold],
         ["Components (HMMs) among members", fmtInt(row.n_components)],
@@ -156,7 +157,10 @@ function Children({ level, id }) {
               <tr key={c.cluster_id} className="border-b border-border last:border-0">
                 <td className="py-1.5 pr-4"><ClusterLink level={childLevel} id={c.cluster_id} /></td>
                 <td className="py-1.5 pr-4 text-right font-mono">{fmtInt(c.member_count)}</td>
-                <td className="py-1.5 pr-4 text-right font-mono text-xs">{fmtInt(c.n_pl)} / {fmtInt(c.n_nr)} / {fmtInt(c.n_lg)}</td>
+                <td className="py-1.5 pr-4 text-right font-mono text-xs whitespace-nowrap">
+                  <span className="mr-2">{fmtInt(c.n_pl)} / {fmtInt(c.n_nr)} / {fmtInt(c.n_lg)}</span>
+                  <SourceSplit counts={clusterCounts(c)} title={`${c.cluster_id} (${childLevel} %): sequences by source`} unit="sequences" width="w-20" />
+                </td>
                 <td className="py-1.5 pr-4 text-xs">{c.dominant_organism}</td>
               </tr>
             ))}

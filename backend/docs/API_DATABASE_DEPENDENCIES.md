@@ -1,6 +1,6 @@
 # PETadex API - Database Dependencies
 
-**Auto-generated**: 2026-11-09
+**Auto-generated**: 2026-11-11
 **Purpose**: Maps API endpoints to database tables/columns to identify breaking changes
 
 ---
@@ -473,6 +473,14 @@ SELECT * FROM enzyme_stats_overview LIMIT 1
 **Tables**: None
 
 ---
+
+## Explore Routes
+
+Base: `/api/explore`
+
+## Explore.test Routes
+
+Base: `/api/explore.test`
 
 ## Family Routes
 
